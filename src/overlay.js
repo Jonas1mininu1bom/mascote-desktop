@@ -121,6 +121,18 @@ const RESERVA = {
 };
 // Pets que sabem dançar: o desenho vetorial tem a dancinha (Pato) ou o pet.json tem "dancando".
 const sabeDancar = () => pet.desenho === "pato" || !!pet.animacoes?.dancando;
+const VEL_VOO = 110; // px/s subindo ou descendo, quando o pato voa com o bilhete
+// Na barra de tarefas, o pato vai buscar o bilhete voando: assim o papel no bico fica acima do chat.
+const vaiVoar = () => noChao() && pet.desenho === "pato";
+function voarNaAlturaDoBilhete(dt, altura = 150) {
+  if (!P.voando) Object.assign(P, { voando: true, tVoo: 0 });
+  P.tVoo += dt;
+  const m = maoTras();
+  // primeiro bate as asas um instante no chão, depois sobe devagar (nada de pulo)
+  const alvoY = P.tVoo < 0.5 ? P.y : tetoBilhete(P.x, altura) + 24 + (P.y - m.y) + Math.sin(relogio * 5) * 6;
+  P.y += Math.max(-VEL_VOO, Math.min(VEL_VOO, (alvoY - P.y) * 3)) * dt;
+  if (P.alvo) P.alvo.y = P.y;
+}
 const CHANCE_DANCAR = 0.04; // aleatória, fora do intervalo das bagunças
 function animacao(nome) {
   if (sprites[nome]) return nome;
@@ -131,6 +143,9 @@ function animacao(nome) {
 // ---------- estados ----------
 function mudar(estado, tempo, extra = {}) {
   if (debug && estado !== P.estado) console.warn(`[debug] ${P.estado} -> ${estado} x=${Math.round(P.x)} y=${Math.round(P.y)} cursor=${cursor.x},${cursor.y}`);
+  // voando com o bilhete: decola para buscar, pega (parado no ar), volta puxando e pousa
+  const noVoo = ["buscar", "arrastando", "pousando"].includes(estado) || (estado === "parado" && P.estado === "buscar");
+  if (!noVoo) P.voando = false;
   P.estado = estado;
   P.tempo = tempo;
   Object.assign(P, extra);
@@ -403,7 +418,9 @@ function moverBilhete() {
   const x = ladoEsq ? m.x - b.largura + 8 : m.x - 8;
   // pendurado na boca ele ficaria baixo demais (pet lá embaixo, na barra de tarefas):
   // aí ele carrega o papel em cima da cabeça, como uma placa (a cabeça fica na altura do chat)
-  P.bilheteNaCabeca = m.y - 24 > tetoBilhete(x + b.largura / 2, b.altura);
+  const teto = tetoBilhete(x + b.largura / 2, b.altura);
+  if (P.voando) return window.api.enviar("bilhete:mover", { id: b.id, x, y: Math.min(m.y - 24, teto) });
+  P.bilheteNaCabeca = m.y - 24 > teto;
   if (P.bilheteNaCabeca) {
     const balanco = Math.sin(relogio * 9) * 3; // sobe e desce um pouquinho com os passos
     const y = P.y - alturaPx() - b.altura + 12 + balanco;
@@ -545,13 +562,14 @@ function atualizar(dt) {
       return;
     }
     case "buscar":
+      if (vaiVoar()) voarNaAlturaDoBilhete(dt); // o pato vai voando buscar o bilhete
       if (andarAte(P.alvo, dt, 1.3)) {
         mudar("parado", 99);
         const ladoInicial = P.lado;
         const lim = limites();
         const xb = ladoInicial < 0 ? lim.min - 260 : lim.max + 20;
         window.api.invocar("bilhete:criar", { x: xb, y: Math.min(P.y - 60, tetoBilhete(P.x, 150)) }).then((b) => {
-          if (!b || P.estado !== "parado") return proximoEstado();
+          if (!b || P.estado !== "parado") return P.voando && P.estado === "parado" ? mudar("pousando", 6) : proximoEstado();
           P.bilhete = b;
           P.olhando = -ladoInicial;
           // puxa só até ~30% da tela do lado de onde veio: no meio da tela o bilhete atrapalha
@@ -560,11 +578,14 @@ function atualizar(dt) {
           const x = ladoInicial < 0 ? rand(a.x + a.w * 0.12, a.x + a.w * 0.3) : rand(a.x + a.w * 0.7, a.x + a.w * 0.88);
           mudar("arrastando", 20, { alvo: { x: limitarX(x), y: P.y } });
         });
-      } else if (P.tempo <= 0) proximoEstado();
+      } else if (P.tempo <= 0) P.voando ? mudar("pousando", 6) : proximoEstado();
       return;
     case "arrastando": {
       // anda de costas para dentro da tela, puxando o bilhete
       const olhar = P.olhando;
+      // na barra de tarefas o pato sai voando, batendo as asas, na altura em que o bilhete
+      // pendurado no bico fica acima do chat (os outros pets levam o papel na cabeça)
+      if (vaiVoar() && P.bilhete) voarNaAlturaDoBilhete(dt, P.bilhete.altura);
       const chegou = andarAte(P.alvo, dt, 0.7);
       P.olhando = olhar;
       moverBilhete();
@@ -573,6 +594,18 @@ function atualizar(dt) {
         // com o papel em cima da cabeça, o balão de fala cobriria o texto dele
         if (!P.bilheteNaCabeca) falar(escolha(["Trouxe pra você!", "Um presente 💌", "Leia isso!"]), 2.5);
         P.bilheteNaCabeca = false;
+        if (P.voando) return mudar("pousando", 6); // desce batendo as asas
+        mudar("feliz", 1.5);
+      }
+      return;
+    }
+    case "pousando": {
+      // desce devagar batendo as asas até o chão (a barra de tarefas)
+      const chao = chaoDe();
+      P.y = Math.min(chao, P.y + VEL_VOO * 0.8 * dt);
+      if (P.y >= chao || P.tempo <= 0) {
+        P.y = chao;
+        P.ancora = { x: P.x, y: P.y };
         mudar("feliz", 1.5);
       }
       return;
@@ -741,6 +774,7 @@ function desenhar3D(dt) {
       desenho: pet.desenho, anim: P.anim, estado: P.estado, t: P.tAnim, relogio, x: P.x, y: P.y,
       olhando: P.olhando, alturaPx: alturaPx(), dpr: window.devicePixelRatio || 1,
       planando: P.estado === "caindo" && P.aberto && !!window.Vida?.plana(),
+      voando: !!P.voando,
       deCostas: P.estado === "segurando" || P.estado === "arrastando", // puxando: anda de costas
     });
     if (img?.boca) boca3d = { ...img.boca, em: relogio };
@@ -751,11 +785,12 @@ function desenhar3D(dt) {
   }
   if (!img) return false;
   // sombra macia no chão (encolhe quando ele está no ar)
-  const noAr = P.estado === "caindo" ? 0.6 : 1;
+  const noAr = P.estado === "caindo" || P.voando ? 0.6 : 1;
+  const ySombra = P.voando ? chaoDe() : P.y; // voando, a sombra fica lá no chão
   ctx.save();
   ctx.fillStyle = "rgba(20,22,35,0.18)";
   ctx.beginPath();
-  ctx.ellipse(P.x, P.y, larguraPx() * 0.42 * noAr, larguraPx() * 0.12 * noAr, 0, 0, Math.PI * 2);
+  ctx.ellipse(P.x, ySombra, larguraPx() * 0.42 * noAr, larguraPx() * 0.12 * noAr, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(img.canvas, img.x, img.y, img.w, img.h);
@@ -856,7 +891,7 @@ window.api.ouvir("tela", (t) => {
   const mudou = Math.hypot(antiga.x - t.casa.x, antiga.y - t.casa.y) > 1;
   const emCasa = P.ancora && Math.hypot(P.ancora.x - antiga.x, P.ancora.y - antiga.y) < 1;
   if (mudou && emCasa) P.ancora = { ...t.casa };
-  const ocupado = segurado || ["perseguir", "segurando", "buscar", "arrastando", "travessura"].includes(P.estado);
+  const ocupado = segurado || ["perseguir", "segurando", "buscar", "arrastando", "pousando", "travessura"].includes(P.estado);
   const foraDasTelas = !t.areas.some((a) => dentro(P, a));
   if (!segurado && foraDasTelas) chamarDeVolta(8, { ficar: false }); // a tela onde ele estava deixou de ser permitida
   else if (mudou && !ocupado && (Math.hypot(P.x - antiga.x, P.y - antiga.y) < 140 || !config.passear)) chamarDeVolta(8, { ficar: false });

@@ -37,7 +37,7 @@ window.Vida = (() => {
 
   // ---------- queda ----------
   function precisaCair() {
-    return noChao() && P.y < chao() - 4;
+    return noChao() && !P.voando && P.y < chao() - 4; // voando (pato com bilhete) ele não cai
   }
   function cair(vx = 0, vy = 0) {
     mudar("caindo", 30);
