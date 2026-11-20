@@ -421,7 +421,7 @@ function criarBilhete({ x, y }) {
   w.once("ready-to-show", () => w.showInactive());
   w.on("closed", () => {
     bilhetes.delete(id);
-    overlay?.webContents.send("bilhete:fechado", id);
+    if (overlay && !overlay.isDestroyed()) overlay.webContents.send("bilhete:fechado", id); // no fechamento do app o overlay já foi
   });
   bilhetes.set(id, w);
   return { id, largura: 240, altura: 150 };
@@ -444,9 +444,13 @@ function registrarIpc() {
   });
   handle("bilhete:criar", (_e, dados) => {
     if (!config.bagunca || !dados || !num(dados.x) || !num(dados.y)) return null;
+    // No máximo 5 na tela: o mais antigo sai para dar lugar ao novo (antes ele parava de trazer,
+    // e bilhetes "perdidos", fora da vista, travavam tudo).
     if (bilhetes.size >= 5) {
-      log("main", "info", "bilhete: já tem 5 abertos na tela, feche algum para ele trazer outro");
-      return null;
+      const [idAntigo, antigo] = bilhetes.entries().next().value;
+      bilhetes.delete(idAntigo);
+      if (!antigo.isDestroyed()) antigo.close();
+      log("main", "info", "bilhete: já tinha 5, fechei o mais antigo");
     }
     log("main", "info", `bilhete: trazendo um novo (${bilhetes.size + 1} na tela)`);
     return criarBilhete(dados);
