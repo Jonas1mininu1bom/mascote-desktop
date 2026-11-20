@@ -16,9 +16,8 @@ window.Vida = (() => {
   let bola = null; // { x, y, vx, vy, chao, giro }
 
   const ESTADOS = ["caindo", "tonto", "bravo", "comendo", "brincando"];
-  // o Pato 3D não usa paraquedas: abre as asas e plana, indo para a frente
-  // (só no 3D: o desenho 2D não tem a pose de asas abertas, então continua de paraquedas)
-  const plana = () => pet.desenho === "pato" && config.visual3d !== false;
+  // o Pato não usa paraquedas: abre as asas e plana, indo para a frente
+  const plana = () => pet.desenho === "pato";
   const ocioso = () => ["parado", "andar", "acenando", "dormindo", "feliz", "dancando"].includes(P.estado);
   const chao = () => chaoDe(P.x);
   const coracao = (n = 5) => {

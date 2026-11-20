@@ -1,8 +1,8 @@
 # 🐾 Mascote Desktop
 
 Um bichinho que mora na **sua tela** e conversa com você usando o **Claude Code** por trás.
-Vêm três pets, todos desenhados com formas suaves e animados: o **Palito** (padrão), o **Pato** 🦆
-e a **Tartaruga** 🐢 (troque em ⚙️ → Pet). Cada um conversa com uma personalidade própria.
+Vêm três pets em **3D de verdade**: o **Palito** (padrão), o **Pato** 🦆 e a **Tartaruga** 🐢 (troque em
+⚙️ → Pet). Eles giram para a direção em que andam, e cada um conversa com uma personalidade própria.
 
 ![Pato, Palito e Tartaruga](docs/pets.png)
 
@@ -12,7 +12,10 @@ e a **Tartaruga** 🐢 (troque em ⚙️ → Pet). Cada um conversa com uma pers
 - 🧸 **Um bichinho de verdade:** ele pisca, acena, cochila e passeia (se você deixar). Clique para dar
   carinho, use o **botão direito** para dar comida ou jogar bola, **chacoalhe** e ele fica tonto (e
   depois bravo com você), e **solte ele lá do alto** para ver o paraquedas. 🪂
-- 🧊 **Visual 3D (beta):** os pets são modelos 3D de verdade (three.js), vistos de cima na diagonal e girando para qualquer direção em que andam. O Pato (branco, de pescoço comprido) dança de vez em quando e plana com as asas abertas em vez de usar paraquedas; a Tartaruga se esconde no casco dormindo, caindo ou sendo chacoalhada. Liga e desliga em ⚙️ → Visual 3D (sem placa de vídeo compatível, ele volta para o 2D sozinho).
+- 🧊 **3D de verdade:** modelos feitos com three.js, vistos de cima na diagonal. O Pato (branco, de pescoço
+  comprido) anda gingando, dança de vez em quando e plana com as asas abertas em vez de usar paraquedas;
+  a Tartaruga se esconde no casco dormindo, caindo ou sendo chacoalhada; o Palito usa cachecol. Se a placa
+  de vídeo não tiver WebGL, ele usa sozinho um desenho com volume parecido.
 - 🧱 **Chão:** ele anda pela tela inteira ou só em cima da barra de tarefas, em todos os monitores ou
   em um só.
 - 😈 **Modo bagunça (opcional):** ele rouba o seu mouse (no estilo do Desktop Goose), traz bilhetinhos
@@ -84,6 +87,8 @@ Cole uma imagem com **Ctrl+V** no campo de mensagem (ou arraste o arquivo para o
 mensagem (PNG, JPG, GIF ou WEBP, até 5 MB cada), e o Claude Code vê a imagem junto com o seu texto.
 
 ### Brincar com o pet
+
+![Pato dançando e andando, Palito bravo e caindo, Tartaruga andando e escondida no casco](docs/estados.png)
 
 - **Chão** (⚙️ → Chão): ele pode andar pela **tela inteira** ou **só em cima da barra de tarefas**, como
   se ela fosse o chão.
@@ -195,7 +200,8 @@ aprovar.
 ## Créditos
 
 - Ícones do chat: [Lucide](https://lucide.dev) (licença ISC, em `src/icones/LICENSE-lucide.txt`).
-- Pets, ícone do app e desenhos: originais deste projeto (`src/vetor.js`).
+- Pets, ícone do app e desenhos: originais deste projeto (`src/pet3d.js`, com reserva em `src/vetor.js`).
+- 3D: [three.js](https://threejs.org) (licença MIT).
 
 ## Observações
 

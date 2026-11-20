@@ -181,7 +181,7 @@ window.Pet3D = (() => {
   function montarTartaruga() {
     const raiz = new T.Group();
     const VERDE = 0x7ed957, VERDE_ESC = 0x5cb93c;
-    const corpo = pivo(raiz, [0, 0.2, 0]);
+    const corpo = pivo(raiz, [0, 0.3, 0]); // a animação ajusta (desce quando se esconde no casco)
     // barriga amarela (aparece embaixo do casco e na frente)
     parte(esfera(), 0xf0cf4a, { pai: corpo, pos: [0, -0.04, 0.06], esc: [0.32, 0.14, 0.38] });
     // casco (meia esfera um pouco mais funda que meia) + borda
@@ -208,14 +208,15 @@ window.Pet3D = (() => {
     const boca = parte(new T.TorusGeometry(0.035, 0.009, 6, 16, Math.PI), basico(0x2a1d38), { pai: cabeca, pos: [0.03, -0.07, 0.315], rot: [0, 0, Math.PI], contorno: 0 });
     // focinho: risquinho em cima da boca
     parte(new T.TorusGeometry(0.03, 0.008, 6, 12, Math.PI * 0.8), basico(0x2a1d38), { pai: cabeca, pos: [-0.01, -0.01, 0.325], rot: [0, 0, 0.3], contorno: 0 });
-    const patas = [[0.27, 0.22], [-0.27, 0.22], [0.25, -0.24], [-0.25, -0.24]].map(([x, z]) => {
+    // patas grossas e compridas o bastante para aparecerem bem embaixo do casco
+    const patas = [[0.3, 0.22], [-0.3, 0.22], [0.28, -0.24], [-0.28, -0.24]].map(([x, z]) => {
       const p = pivo(corpo, [x, -0.02, z]);
-      parte(capsula(0.095, 0.1), VERDE, { pai: p, pos: [0, -0.08, 0] });
+      parte(capsula(0.12, 0.14), VERDE, { pai: p, pos: [0, -0.12, 0] });
       return p;
     });
     const rabo = pivo(corpo, [0, 0, -0.48]);
     parte(new T.ConeGeometry(0.05, 0.14, 8), VERDE, { pai: rabo, pos: [0, 0, -0.05], rot: [-Math.PI / 2, 0, 0] });
-    return { raiz, corpo, cabecaP, cabeca, olhos, boca, patas, rabo, tipo: "tartaruga", altura: 1.15 };
+    return { raiz, corpo, cabecaP, cabeca, olhos, boca, patas, rabo, tipo: "tartaruga", altura: 1.25 };
   }
 
   const MONTAR = { pato: montarPato, palito: montarPalito, tartaruga: montarTartaruga };
@@ -412,7 +413,7 @@ window.Pet3D = (() => {
       const quer = ["dormindo", "caindo", "tonto"].includes(anim) ? 1 : 0;
       estado.esconde = lerp(estado.esconde, quer, Math.min(1, dt * 8));
       const k = 1 - estado.esconde;
-      m.corpo.position.y = 0.2 * k + 0.08 * (1 - k) + respira * 0.5;
+      m.corpo.position.y = 0.3 * k + 0.08 * (1 - k) + respira * 0.5; // em pé, as patas seguram o corpo mais alto
       m.cabecaP.position.set(0, 0.1 - 0.05 * (1 - k), 0.05 + 0.27 * k);
       m.cabecaP.scale.setScalar(Math.max(0.001, k));
       m.rabo.scale.setScalar(Math.max(0.001, k));

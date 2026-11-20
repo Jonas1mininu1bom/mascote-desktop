@@ -58,7 +58,7 @@ function vigiar(nome, w) {
 }
 
 // ---------- configuração ----------
-const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir(), travessuras: {}, telas: "todas", chao: "tela", visual3d: true };
+const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir(), travessuras: {}, telas: "todas", chao: "tela" };
 let config = { ...PADRAO };
 const arqConfig = () => path.join(app.getPath("userData"), "config.json");
 const pastaPetsUsuario = () => path.join(app.getPath("userData"), "pets");
@@ -714,7 +714,7 @@ app.on("web-contents-created", (_e, wc) => {
 
 // O que a página do chat pode mudar na configuração.
 // (a pasta de trabalho e o pet têm canais próprios, com diálogo/validação no processo principal)
-const CONFIG_DA_PAGINA = ["passear", "bagunca", "visual3d"]; // allowlist: chave nova fica bloqueada por padrão
+const CONFIG_DA_PAGINA = ["passear", "bagunca"]; // allowlist: chave nova fica bloqueada por padrão
 function filtrarConfigDaPagina(parcial) {
   if (!parcial || typeof parcial !== "object" || Array.isArray(parcial)) return {};
   const limpo = {};

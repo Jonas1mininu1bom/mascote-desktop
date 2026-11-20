@@ -38,7 +38,6 @@ function mostrarConfig(c) {
   config = c;
   $("passear").checked = c.passear;
   $("bagunca").checked = c.bagunca;
-  $("visual3d").checked = c.visual3d !== false;
   $("pastaNome").textContent = c.pasta;
   $("pets").value = c.pet;
   $("chao").value = c.chao === "barra" ? "barra" : "tela";
@@ -170,7 +169,6 @@ $("pasta").onclick = async () => {
   if (p !== antes) adicionar("info", "Agora estou trabalhando em " + p);
 };
 $("passear").onchange = (e) => ponte.enviar("config:mudar", { passear: e.target.checked });
-$("visual3d").onchange = (e) => ponte.enviar("config:mudar", { visual3d: e.target.checked });
 $("bagunca").onchange = (e) => ponte.enviar("config:mudar", { bagunca: e.target.checked });
 $("pets").onchange = (e) => ponte.enviar("pets:escolher", e.target.value);
 $("voltar").onclick = () => ponte.enviar("pet:voltar");

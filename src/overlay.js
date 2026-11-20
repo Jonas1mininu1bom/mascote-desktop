@@ -618,10 +618,10 @@ function desenhar(dt) {
   ctx.clearRect(0, 0, tela.largura, tela.altura);
   if (!sprites.parado) return;
 
-  // Visual 3D: modelo 3D de verdade (pet3d.js, three.js). Se o WebGL falhar, usa o desenho
-  // com volume falso "<desenho>3d" de vetor.js, e por último o 2D.
-  if (config.visual3d !== false && window.Pet3D?.tem(pet.desenho) && desenhar3D(dt)) return;
-  const vetor = pet.desenho && ((config.visual3d !== false && window.Vetor?.[pet.desenho + "3d"]) || window.Vetor?.[pet.desenho]);
+  // Pets do app: modelo 3D de verdade (pet3d.js, three.js). Se o WebGL falhar, usa o desenho
+  // com volume de vetor.js. Pets da comunidade continuam em pixel art ou imagens.
+  if (window.Pet3D?.tem(pet.desenho) && desenhar3D(dt)) return;
+  const vetor = pet.desenho && window.Vetor?.[pet.desenho];
   if (vetor) return desenharVetor(vetor, dt);
   const nome = animacao(P.anim);
   const quadros = sprites[nome];
@@ -700,7 +700,7 @@ function desenhar3D(dt) {
   return true;
 }
 
-// Pets com "desenho": formas vetoriais suaves (vetor.js) em vez de pixel art.
+// Reserva sem WebGL: desenho com volume (vetor.js) em vez do modelo 3D.
 function desenharVetor(vetor, dt) {
   const w = larguraPx();
   const h = alturaPx();
