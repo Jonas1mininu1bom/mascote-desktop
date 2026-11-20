@@ -17,10 +17,11 @@ Configurações → Pet). Eles giram para a direção em que andam, e cada um co
   a Tartaruga se esconde no casco dormindo, caindo ou sendo chacoalhada; o Palito usa cachecol. Se a placa
   de vídeo não tiver WebGL, ele usa sozinho um desenho com volume parecido.
 - **Chão:** ele anda pela tela inteira ou só em cima da barra de tarefas, em todos os monitores ou
-  em um só.
+  em um só (inclusive monitores em pé ou de tamanhos diferentes).
 - **Modo bagunça (opcional):** ele rouba o seu mouse (no estilo do Desktop Goose), traz bilhetinhos
-  coloridos e faz travessuras como apertar Alt+Tab ou abrir o navegador. Cada travessura liga e desliga
-  nas configurações, e dá para criar as suas.
+  coloridos e faz travessuras como apertar Alt+Tab ou abrir o navegador. Você escolhe de quanto em
+  quanto tempo ele apronta (1, 3, 5 ou 10 minutos). Cada travessura liga e desliga nas configurações,
+  e dá para criar as suas.
 - **Feito para a comunidade:** bilhetes, travessuras e pets próprios são só arquivos JSON (veja
   [abaixo](#bilhetes-da-comunidade) e [CRIAR_PET.md](CRIAR_PET.md)).
 - **Aplicativo de verdade no Windows, macOS e Linux:** instalador (`.exe`, `.dmg`, AppImage e `.deb`),
@@ -102,6 +103,7 @@ ao entrar no Mac"; no Linux, "Iniciar com o Linux").
 | Andar só em cima da barra de tarefas | Configurações → Chão |
 | Mudar o pet de lugar | Arraste o pet com o mouse |
 | Ligar passeio / modo bagunça | Configurações do chat, ou o ícone na bandeja do sistema |
+| Mudar de quanto em quanto tempo ele apronta | Configurações → Bagunça (1, 3, 5 ou 10 minutos; o padrão é 3) |
 | Trocar de pet / abrir a pasta de pets | Configurações do chat |
 | Escolher os bilhetes que ele traz | Configurações → Pasta de bilhetes |
 | Ligar travessuras (pegar o mouse, Alt+Tab, navegador) / criar novas | Configurações → Travessuras / Pasta de travessuras |
@@ -138,7 +140,10 @@ mensagem (PNG, JPG, GIF ou WEBP, até 5 MB cada), e o Claude Code vê a imagem j
 
 ## Bilhetes da comunidade
 
-No modo bagunça o pet traz bilhetes. Ele já vem com 40 mensagens, e você pode colocar as suas:
+No modo bagunça o pet traz bilhetes da borda da tela e deixa onde dá para ler: sempre acima da altura
+do chat, longe da barra de tarefas. No modo barra de tarefas o Pato vai buscar **voando**, batendo as
+asas, e a Tartaruga e o Palito trazem o papel na cabeça. Ele mantém até 50 bilhetes na tela (feche no
+X). Já vem com 40 mensagens, e você pode colocar as suas:
 abra **Configurações → Pasta de bilhetes** e edite o `bilhetes.json`:
 
 ```json
@@ -162,7 +167,9 @@ abra **Configurações → Pasta de bilhetes** e edite o `bilhetes.json`:
 
 Com o modo bagunça ligado, ative em **Configurações → Travessuras** as que quiser. "Pegar o mouse" vem ligada;
 as outras começam desligadas.
-Ele faz no máximo uma a cada 3 minutos (e nenhuma nos 3 primeiros minutos depois de abrir o app). Para criar as suas, abra **Configurações → Pasta de travessuras**
+Ele apronta no máximo uma bagunça (pegar o mouse, trazer bilhete ou travessura) a cada intervalo
+escolhido em **Configurações → Bagunça** (3 minutos por padrão), e a primeira vem na metade desse
+tempo depois de abrir o app. A dança fica fora dessa conta: ele dança quando der vontade. Para criar as suas, abra **Configurações → Pasta de travessuras**
 e edite o `travessuras.json`:
 
 ```json
