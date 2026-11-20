@@ -201,7 +201,11 @@ async function executar(nome, args, { pasta, permissao, sinal }) {
     const soLeitura = ["listar_arquivos", "ler_arquivo", "buscar_texto"].includes(nome);
     // ler dentro da pasta é livre; o resto sempre pergunta
     if (!soLeitura || !dentro) {
-      let texto = resumo(nome, a);
+      // no pedido de permissão vai o comando INTEIRO (o resumo curto poderia esconder o fim dele)
+      if (nome === "rodar_comando" && String(a.comando ?? "").length > 4000) {
+        return "Comando longo demais para a pessoa conferir. Divida em partes menores.";
+      }
+      let texto = nome === "rodar_comando" ? `${nome}: ${String(a.comando ?? "")}` : resumo(nome, a);
       if (!dentro) texto = `(fora da pasta de trabalho) ${texto}`;
       if (nome === "editar_arquivo") texto += `\n- ${String(a.procurar).slice(0, 300)}\n+ ${String(a.substituir).slice(0, 300)}`;
       if (nome === "escrever_arquivo") texto += ` (${String(a.conteudo ?? "").length} caracteres)`;

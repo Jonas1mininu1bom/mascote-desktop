@@ -35,6 +35,7 @@ const PROVEDORES = [
   },
   {
     id: "ollama",
+    enderecoLivre: true,
     nome: "Ollama (no seu computador)",
     endereco: "http://localhost:11434/v1",
     modelo: "qwen3",
@@ -43,6 +44,7 @@ const PROVEDORES = [
   },
   {
     id: "personalizado",
+    enderecoLivre: true,
     nome: "Outra (compatível com OpenAI)",
     endereco: "http://localhost:1234/v1",
     modelo: "",
@@ -58,8 +60,20 @@ function escolhaAtual(ia) {
   return {
     p,
     modelo: (ia?.modelos?.[p.id] || p.modelo || "").trim(),
-    endereco: (ia?.enderecos?.[p.id] || p.endereco || "").trim(),
+    // Gemini, OpenAI e OpenRouter usam sempre o endereço oficial: assim a chave deles nunca vai
+    // para outro servidor, mesmo que alguém mexa na configuração ou na página do chat.
+    endereco: ((p.enderecoLivre && ia?.enderecos?.[p.id]) || p.endereco || "").trim(),
   };
+}
+
+// A chave só pode ir por https, ou por http para o próprio computador (Ollama, LM Studio...).
+function podeMandarChave(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" || ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
+  } catch {
+    return false;
+  }
 }
 
 function enderecoValido(url) {
@@ -119,7 +133,9 @@ class Conversa {
           ? `O endereço de ${p.nome} não é válido. Confira em Ajustes, IA.`
           : p.chave === "sim" && !chave
             ? `Falta a chave de API de ${p.nome}. Cole a chave em Ajustes, IA.`
-            : null;
+            : chave && !podeMandarChave(endereco)
+              ? `Por segurança, a chave de ${p.nome} só é enviada por https:// (ou para o seu próprio computador). Confira o endereço em Ajustes, IA.`
+              : null;
       if (erro) {
         eventos.erro(erro);
         return eventos.fim();
@@ -168,7 +184,7 @@ function aplicar(ia, pedido, cofre) {
       if (m && m !== p.modelo) novo.modelos[p.id] = m;
       else delete novo.modelos[p.id];
     }
-    if (typeof pedido.endereco === "string") {
+    if (typeof pedido.endereco === "string" && p.enderecoLivre) {
       const u = pedido.endereco.trim();
       if (u && !enderecoValido(u)) throw new Error("O endereço precisa começar com http:// ou https://");
       if (u && u !== p.endereco) novo.enderecos[p.id] = u;
@@ -189,6 +205,7 @@ async function listarModelos(ia, id, cofre) {
   const { p, endereco } = escolhaAtual({ ...ia, provedor: id });
   if (p.id === "claude" || !enderecoValido(endereco)) return [];
   const chave = cofre.pegar(p.id);
+  if (chave && !podeMandarChave(endereco)) throw new Error("Por segurança, a chave só é enviada por https:// (ou para o seu próprio computador).");
   const r = await fetch(endereco.replace(/\/+$/, "") + "/models", {
     headers: chave ? { Authorization: `Bearer ${chave}` } : {},
     signal: AbortSignal.timeout(15000),
@@ -202,4 +219,4 @@ async function listarModelos(ia, id, cofre) {
     .slice(0, 500);
 }
 
-module.exports = { Conversa, estado, aplicar, listarModelos, PROVEDORES };
+module.exports = { Conversa, estado, aplicar, listarModelos, podeMandarChave, PROVEDORES };
