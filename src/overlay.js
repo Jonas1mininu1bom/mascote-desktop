@@ -667,8 +667,30 @@ function desenhar(dt) {
   desenharExtras(dy, dt);
 }
 
+// Setinha do mouse desenhada no bico enquanto ele segura o cursor. No PC ela fica exatamente embaixo
+// do ponteiro de verdade (não aparece em dobro); por acesso remoto (AnyDesk, Parsec, RustDesk...),
+// o app remoto desenha o próprio ponteiro e ignora o do PC, então é esta setinha que aparece no vídeo.
+function desenharCursorSegurado() {
+  if (P.estado !== "segurando" || !P.cursorEsperado) return;
+  const { x, y } = P.cursorEsperado;
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  ctx.beginPath();
+  // seta padrão do Windows (ponta em 0,0)
+  for (const [px, py] of [[0, 0], [0, 17], [4, 13], [7, 20], [10, 19], [7, 12], [12, 12]]) ctx.lineTo(px, py);
+  ctx.closePath();
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 1.2;
+  ctx.lineJoin = "round";
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
 function desenharExtras(topo, dt) {
   window.Vida?.desenhar(topo, dt);
+  desenharCursorSegurado();
   desenharTeclas(topo);
   if (P.estado === "dormindo") {
     ctx.font = "bold 14px system-ui, sans-serif";
