@@ -151,7 +151,7 @@
     oval(g, 41, 31, 6.2, 7.5);
     pintar(g, "#ffd84d"); // esconde a emenda do contorno
     // asa (bate quando acena ou está feliz)
-    const bate = s.anim === "caindo" ? Math.sin(s.t * 22) * 0.6 - 0.4 : ["acenando", "feliz", "travessura"].includes(s.anim) ? Math.sin(s.t * 14) * 0.5 - 0.3 : r.anda ? Math.sin(s.t * 9) * 0.08 : 0;
+    const bate = s.anim === "caindo" ? Math.sin(s.t * 22) * 0.6 - 0.4 : ["acenando", "feliz", "travessura", "dancando"].includes(s.anim) ? Math.sin(s.t * 14) * 0.5 - 0.3 : r.anda ? Math.sin(s.t * 9) * 0.08 : 0;
     g.save();
     g.translate(24, 37);
     g.rotate(-0.25 + bate);
@@ -497,5 +497,158 @@
     braco(maoFrente, false);
   }
 
-  window.Vetor = { pato, palito, tartaruga, palito3d };
+
+  // ---------- Pato 3D ----------
+  // Pato gordinho de óculos escuros, com a mesma luz/volume do Palito 3D. Tem a "dancinha":
+  // balança de um lado para o outro no ritmo, quica, bate as asas alternadas e mexe a cabeça.
+  function pato3d(g, s) {
+    const { w, h } = s;
+    const r = ritmo(s);
+    r.espelhado = s.espelhado;
+    g.scale(w / 64, h / 64);
+    const danca = s.anim === "dancando";
+    const fase = s.t * TAU * 2; // 2 batidas por segundo
+    const lado = danca ? Math.sin(fase / 2) : 0; // -1..1, um passo para cada lado por batida
+    const quica = danca ? Math.abs(Math.sin(fase)) * 3.2 : 0;
+    const sobe = -r.quique - r.pulo - quica;
+    sombra3d(g, 32 + lado * 2, 62.5, 19, -sobe + (s.anim === "caindo" ? 30 : 0));
+
+    const AMARELO = ["#fff7c2", "#ffd84d", "#e3a614", "#a8780f"];
+    const LARANJA = ["#ffc58a", "#ff9a2e", "#d4691a", "#9c4a0f"];
+    // pés: na dança, o pé do lado para onde ele vai levanta
+    for (const [px, ld] of [[25, -1], [39, 1]]) {
+      const levanta = danca ? Math.max(0, lado * ld) * 3.5 : Math.max(0, -r.passo * ld) * 2.5;
+      const anda = r.passo * 4.5 * ld;
+      const fx = px + anda + lado * 2.5;
+      const fy = 61.5 - levanta;
+      tubo(g, (c) => { c.beginPath(); c.moveTo(px + lado * 3, 53 + sobe * 0.6); c.lineTo(fx, fy); }, 2.8, ["#9c4a0f", "#f08a26", "#ffd0a0"], r, ld < 0);
+      g.beginPath();
+      g.moveTo(fx - 3.5, fy + 0.8);
+      g.quadraticCurveTo(fx + 3, fy - 3, fx + 7.5, fy + 1);
+      g.quadraticCurveTo(fx + 2, fy + 2.6, fx - 3.5, fy + 0.8);
+      const gp = g.createLinearGradient(0, fy - 3, 0, fy + 2.5);
+      gp.addColorStop(0, ld < 0 ? "#e8892c" : "#ffb04a");
+      gp.addColorStop(1, "#c0560e");
+      pintar(g, gp, "#8a3f0c", 1);
+    }
+
+    g.save();
+    // gira o corpo todo em volta dos pés (rebolado), quica e achata um pouco ao "pousar"
+    g.translate(32, 60);
+    g.rotate(lado * 0.13);
+    const achata = danca ? 1 - Math.max(0, Math.cos(fase)) * 0.05 : 1;
+    g.scale(2 - achata, achata);
+    g.translate(-32 + lado * 2.5, -60 + sobe);
+
+    // asa de trás (aparece do outro lado do corpo)
+    const asaTras = danca ? -Math.max(0, -lado) * 1.1 : 0;
+    g.save();
+    g.translate(40, 40);
+    g.rotate(0.35 - asaTras);
+    oval(g, 3, -2, 8, 5.5);
+    pintar(g, "#d9a31a", "#a8780f", 1.1);
+    g.restore();
+    // rabinho
+    g.beginPath();
+    g.moveTo(16, 40);
+    g.quadraticCurveTo(6, 34, 8, 29);
+    g.quadraticCurveTo(13, 34, 20, 36);
+    pintar(g, "#f2c233", "#a8780f", 1.2);
+    // corpo gordinho
+    esfera(g, 31, 43 + r.respira * 0.3, 18, 15.5 + r.respira * 0.3, AMARELO, r, 1.6);
+    oval(g, 34, 49, 11, 6.5);
+    pintar(g, "rgba(255,250,215,0.55)");
+    // cabeça (balança contra o corpo, no contratempo)
+    const bob = danca ? Math.sin(fase + 0.6) * 1.6 : 0;
+    const inclina = danca ? -lado * 0.18 : 0;
+    const cabY = (s.anim === "dormindo" ? 24 : 21) + bob;
+    g.save();
+    g.translate(38, cabY);
+    g.rotate(inclina);
+    g.translate(-38, -cabY);
+    // topetinho
+    for (const [x, a] of [[33, -0.5], [36, -0.15]]) {
+      g.save();
+      g.translate(x, cabY - 11.5);
+      g.rotate(a + (danca ? Math.sin(fase) * 0.25 : 0));
+      oval(g, 0, -2.5, 1.8, 3.6);
+      pintar(g, "#ffd84d", "#a8780f", 1);
+      g.restore();
+    }
+    esfera(g, 38, cabY, 13, 12.5, AMARELO, r, 1.6);
+    // bico largo de pato
+    const by = cabY + 4;
+    const abre = r.mastiga ? 3 : danca && Math.sin(fase) > 0.7 ? 1.5 : 0; // "canta" na batida
+    g.beginPath();
+    g.moveTo(47, by - 3);
+    g.bezierCurveTo(56, by - 5.5, 62, by - 3, 61.5, by + 0.5);
+    g.bezierCurveTo(60, by + 1.5, 52, by + 1.5, 47, by + 1);
+    g.closePath();
+    const gb = g.createLinearGradient(0, by - 5, 0, by + 1.5);
+    gb.addColorStop(0, LARANJA[0]);
+    gb.addColorStop(0.5, LARANJA[1]);
+    gb.addColorStop(1, LARANJA[2]);
+    pintar(g, gb, LARANJA[3], 1.2);
+    g.beginPath();
+    g.moveTo(47, by + 1 + abre * 0.3);
+    g.bezierCurveTo(53, by + 2 + abre, 59, by + 1.5 + abre, 60, by + 1 + abre * 0.6);
+    g.bezierCurveTo(56, by + 4.5 + abre, 50, by + 4.5 + abre, 47, by + 3 + abre * 0.5);
+    g.closePath();
+    pintar(g, "#e0761c", LARANJA[3], 1.1);
+    oval(g, 54, by - 2.8, 4, 0.9, -0.08);
+    pintar(g, "rgba(255,255,255,0.45)");
+    // bochecha
+    bochecha(g, 44, by + 4, 2.6);
+    // óculos escuros (no lugar dos olhos); bravo ganha sobrancelha, tonto fica torto
+    g.save();
+    if (s.anim === "tonto") {
+      g.translate(44, cabY - 3);
+      g.rotate(Math.sin((s.relogio || 0) * 6) * 0.35);
+      g.translate(-44, -cabY + 3);
+    }
+    linha(g, 31, cabY - 4.5, 38, cabY - 3.5, "#1b1c26", 1.4); // haste
+    const lente = (x, larg) => {
+      g.beginPath();
+      g.roundRect(x, cabY - 7, larg, 6.5, [1.5, 1.5, 3.2, 3.2]);
+      const gl = g.createLinearGradient(x, cabY - 7, x + larg, cabY - 0.5);
+      gl.addColorStop(0, "#4b4f6b");
+      gl.addColorStop(0.5, "#16171f");
+      gl.addColorStop(1, "#2a2c3d");
+      pintar(g, gl, "#0b0c12", 1.1);
+      // reflexo diagonal
+      g.save();
+      g.clip();
+      linha(g, x + larg * 0.25, cabY - 0.5, x + larg * 0.65, cabY - 7, "rgba(255,255,255,0.45)", 1.3);
+      g.restore();
+    };
+    lente(38, 7.5);
+    lente(46.5, 6.5);
+    linha(g, 45.5, cabY - 5.5, 46.5, cabY - 5.5, "#0b0c12", 1.4); // ponte
+    if (s.anim === "bravo") {
+      linha(g, 39, cabY - 10, 45, cabY - 7.5, "#7a5208", 1.6);
+      linha(g, 53, cabY - 10, 48, cabY - 7.5, "#7a5208", 1.6);
+    }
+    g.restore();
+    g.restore();
+
+    // asa da frente: na dança sobe e desce no ritmo, oposta à de trás
+    const bate = danca
+      ? -Math.max(0, lado) * 1.2 - 0.15
+      : s.anim === "caindo"
+        ? Math.sin(s.t * 22) * 0.6 - 0.4
+        : ["acenando", "feliz", "travessura"].includes(s.anim)
+          ? Math.sin(s.t * 14) * 0.5 - 0.3
+          : r.anda ? Math.sin(s.t * 9) * 0.08 : 0;
+    g.save();
+    g.translate(24, 39);
+    g.rotate(-0.2 + bate);
+    esfera(g, 3, 3, 10.5, 6.8, ["#fff3a8", "#f7c832", "#d39a14", "#a8780f"], r, 1.3);
+    linha(g, -2, 4, 7, 5.5, "rgba(168,120,15,0.5)", 0.9);
+    linha(g, -1, 6.5, 6, 7.5, "rgba(168,120,15,0.4)", 0.9);
+    g.restore();
+    g.restore();
+  }
+
+  pato3d.danca = true; // a dança já vem no desenho (os outros só balançam, pelo overlay)
+  window.Vetor = { pato, palito, tartaruga, palito3d, pato3d };
 })();

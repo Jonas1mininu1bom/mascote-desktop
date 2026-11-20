@@ -118,8 +118,11 @@ const RESERVA = {
   dormindo: ["parado"], feliz: ["parado"], trabalhando: ["correndo", "andando"],
   travessura: ["acenando", "feliz", "parado"],
   caindo: ["carregado", "acenando", "parado"], tonto: ["parado"], bravo: ["parado"],
-  comendo: ["feliz", "parado"], brincando: ["correndo", "andando"],
+  comendo: ["feliz", "parado"], brincando: ["correndo", "andando"], dancando: ["feliz", "parado"],
 };
+// Pets que sabem dançar: o desenho vetorial tem a dancinha (Pato) ou o pet.json tem "dancando".
+const sabeDancar = () => pet.desenho === "pato" || !!pet.animacoes?.dancando;
+const CHANCE_DANCAR = 0.08;
 function animacao(nome) {
   if (sprites[nome]) return nome;
   for (const r of RESERVA[nome] || []) if (sprites[r]) return r;
@@ -184,9 +187,11 @@ function proximoEstado() {
   const r = Math.random();
   if (debug === "perseguir" && mouseNativo) return mudar("perseguir", 10);
   if (debug === "seguir") return mudar("seguir", 10);
+  if (debug === "dancar" && sabeDancar()) return mudar("dancando", 6);
   if (debug === "travessura" && config.bagunca) pedirTravessura();
   if (!config.passear || relogio < ficarAte) {
     const a = P.ancora || tela.casa;
+    if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", rand(4, 6));
     if (r < 0.5) return mudar("parado", rand(3, 7));
     if (r < 0.62) return mudar("acenando", 1.6);
     if (r < 0.9) {
@@ -212,6 +217,7 @@ function proximoEstado() {
     const a = areaDe(x);
     return mudar("buscar", 20, { alvo: { x, y: limitarY(rand(a.y + 220, a.y + a.h), x) }, lado });
   }
+  if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", rand(4, 6));
   if (r < 0.45) return mudar("parado", rand(2, 5));
   if (r < 0.85) return mudar("andar", 12, { alvo: pontoAleatorio() });
   if (r < 0.92) return mudar("dormindo", rand(6, 12));
@@ -676,6 +682,13 @@ function desenharVetor(vetor, dt) {
     ctx.translate(w / 2, h);
     ctx.rotate(Math.sin(relogio * 7) * 0.12);
     ctx.translate(-w / 2, -h);
+  }
+  if (P.estado === "dancando" && !vetor.danca) {
+    // dancinha genérica: rebola em volta dos pés e quica no ritmo
+    const f = P.tAnim * Math.PI * 4;
+    ctx.translate(w / 2, h);
+    ctx.rotate(Math.sin(f / 2) * 0.14);
+    ctx.translate(-w / 2, -h - Math.abs(Math.sin(f)) * 4);
   }
   if (P.olhando < 0) {
     ctx.translate(w, 0);

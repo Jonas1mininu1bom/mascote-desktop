@@ -16,7 +16,7 @@ window.Vida = (() => {
   let bola = null; // { x, y, vx, vy, chao, giro }
 
   const ESTADOS = ["caindo", "tonto", "bravo", "comendo", "brincando"];
-  const ocioso = () => ["parado", "andar", "acenando", "dormindo", "feliz"].includes(P.estado);
+  const ocioso = () => ["parado", "andar", "acenando", "dormindo", "feliz", "dancando"].includes(P.estado);
   const chao = () => chaoDe(P.x);
   const coracao = (n = 5) => {
     for (let i = 0; i < n; i++) coracoes.push({ x: P.x + rand(-15, 15), y: P.y - alturaPx(), vy: rand(30, 60), vx: rand(-15, 15), vida: 1.4 });
