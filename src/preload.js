@@ -8,7 +8,7 @@ const INVOCAR = new Set(["inicio", "bilhete:criar", "pets:listar", "chat:escolhe
 const ENVIAR = new Set([
   "app:sair", "app:minimizar", "brinquedos:abrir", "chat:abrir", "chat:enviar", "chat:nova", "chat:parar", "chat:responderPermissao",
   "config:mudar", "pet:voltar", "pets:abrirPasta", "bilhetes:abrirPasta", "pets:escolher",
-  "bilhete:fechar", "bilhete:mover", "pet:ignorar", "pet:moverCursor",
+  "bilhete:fechar", "bilhete:mover", "pet:ignorar", "pet:onde", "pet:moverCursor",
   "travessuras:ligar", "travessuras:abrirPasta", "travessura:executar", "chat:posicaoPadrao", "ia:abrirLink",
 ]);
 const OUVIR = new Set([
