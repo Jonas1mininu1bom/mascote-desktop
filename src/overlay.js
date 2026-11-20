@@ -28,7 +28,11 @@ const alturaPx = () => tamGrade.h * pet.escala;
 const velocidade = () => pet.velocidade * 60; // pixels por segundo
 const VEL_PERSEGUIR = 900; // px/s correndo atrás do mouse
 const RAIO_PEGAR = 26; // distância da mão até o mouse para "pegar"
-const VEL_ARRASTAR = 260; // px/s arrastando o mouse roubado
+// Pegar o mouse no estilo do Desktop Goose: guarda a distância mão→mouse na hora da mordida,
+// corre em disparada levando o mouse junto, e solta se a pessoa puxar o mouse com força.
+const VEL_ARRASTAR = 560; // px/s em disparada com o mouse
+const RAIO_SOLTAR = 200; // se o mouse ficar mais longe que isso do lugar esperado, a pessoa ganhou
+const CHANCE_PEGAR = 0.1; // chance, a cada decisão no modo bagunça, de ir atrás do mouse
 const VEL_VOLTAR = 450; // px/s voltando para casa
 let ficarAte = 0; // depois de "chamar de volta", fica em casa até este tempo (relógio)
 
@@ -180,7 +184,8 @@ function proximoEstado() {
     return mudar("parado", 3.5);
   }
 
-  if (pegarMouseLigado() && r < 0.25) {
+  // sorteio separado: não pode "roubar" a faixa do r que é dos bilhetes e travessuras
+  if (pegarMouseLigado() && Math.random() < CHANCE_PEGAR) {
     console.info("[mouse] vou pegar o mouse");
     return mudar("perseguir", 10);
   }
@@ -380,7 +385,9 @@ function atualizar(dt) {
       if (Math.hypot(cursor.x - m2.x, cursor.y - m2.y) < RAIO_PEGAR || sobreOPet(cursor)) {
         console.info(`[mouse] peguei em ${(10 - P.tempo).toFixed(1)}s`);
         falar(escolha(["Peguei! 😈", "É meu agora!", "Hehe"]), 2);
-        return mudar("segurando", rand(3, 6), { alvo: pontoAleatorio() });
+        // o mouse não "pula" para a mão: fica onde foi mordido, e anda junto com ela
+        const offset = { x: cursor.x - m2.x, y: cursor.y - m2.y };
+        return mudar("segurando", rand(2.5, 4), { alvo: pontoAleatorio(), offset, cursorEsperado: { ...cursor } });
       }
       if (P.tempo <= 0) {
         const m3 = mao();
@@ -391,11 +398,22 @@ function atualizar(dt) {
       return;
     }
     case "segurando": {
-      // leva o mouse para longe; chegando, escolhe outro lugar
-      if (andarAte(P.alvo, dt, Math.max(1, VEL_ARRASTAR / velocidade()))) P.alvo = pontoAleatorio();
+      // a pessoa puxou o mouse para longe (mais forte que o pet): ele solta
+      const puxou = Math.hypot(cursor.x - P.cursorEsperado.x, cursor.y - P.cursorEsperado.y) > RAIO_SOLTAR;
+      if (puxou) {
+        console.info("[mouse] a pessoa puxou o mouse de volta");
+        falar(escolha(["Ei! 😤", "Devolve!", "Tá bom, tá bom..."]), 2);
+      }
+      // corre em disparada para pontos aleatórios; chegando, escolhe outro
+      if (!puxou && andarAte(P.alvo, dt, Math.max(1, VEL_ARRASTAR / velocidade()))) P.alvo = pontoAleatorio();
       const m = mao();
-      window.api.enviar("pet:moverCursor", { x: m.x, y: m.y });
-      if (P.tempo <= 0 || !pegarMouseLigado()) {
+      const area = { w: tela.largura, h: tela.altura };
+      P.cursorEsperado = {
+        x: Math.max(0, Math.min(area.w - 1, m.x + P.offset.x)),
+        y: Math.max(0, Math.min(area.h - 1, m.y + P.offset.y)),
+      };
+      if (!puxou) window.api.enviar("pet:moverCursor", P.cursorEsperado);
+      if (puxou || P.tempo <= 0 || !pegarMouseLigado()) {
         mudar("feliz", 1.2);
         P.x = limitarX(P.x);
         P.y = limitarY(P.y); // se estava no topo/barra de tarefas, volta para o chão

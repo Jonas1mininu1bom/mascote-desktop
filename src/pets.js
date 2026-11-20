@@ -69,21 +69,39 @@ function lerPet(pasta) {
   return pet;
 }
 
+// Copia os pets que vêm com o app para a pasta da pessoa (só os que ainda não estão lá),
+// para ela ver, editar e usar de modelo. Não sobrescreve nada.
+function copiarPetsPadrao(origem, destino) {
+  fs.mkdirSync(destino, { recursive: true });
+  for (const nome of fs.readdirSync(origem)) {
+    const de = path.join(origem, nome);
+    const para = path.join(destino, nome);
+    if (!fs.existsSync(path.join(de, "pet.json")) || fs.existsSync(para)) continue;
+    try {
+      fs.cpSync(de, para, { recursive: true });
+    } catch (e) {
+      console.warn(`[pet ${nome}] não consegui copiar para a pasta de pets: ${e.message}`);
+    }
+  }
+}
+
+// Pastas em ordem de prioridade crescente: um pet com o mesmo id numa pasta posterior substitui o anterior.
 function listarPets(pastas) {
-  const pets = [];
+  const pets = new Map();
   for (const base of pastas) {
     if (!fs.existsSync(base)) continue;
     for (const nome of fs.readdirSync(base)) {
       const pasta = path.join(base, nome);
       if (!fs.existsSync(path.join(pasta, "pet.json"))) continue;
       try {
-        pets.push(lerPet(pasta));
+        const p = lerPet(pasta);
+        pets.set(p.id, p);
       } catch (e) {
         console.warn(`[pet ${nome}] ignorado: ${e.message}`);
       }
     }
   }
-  return pets;
+  return [...pets.values()];
 }
 
 // Desenha um quadro de pixel art num buffer BGRA (para o ícone da bandeja).
@@ -110,4 +128,4 @@ function quadroParaBitmap(pet, quadro, escala) {
   return { buf, w, h };
 }
 
-module.exports = { lerPet, listarPets, quadroParaBitmap };
+module.exports = { lerPet, listarPets, copiarPetsPadrao, quadroParaBitmap };

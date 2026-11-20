@@ -4,12 +4,17 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
-const { listarPets, quadroParaBitmap } = require("./src/pets");
+const { listarPets, copiarPetsPadrao, quadroParaBitmap } = require("./src/pets");
 const { ChatClaude } = require("./src/claude");
 const bilhetesMod = require("./src/bilhetes");
 const travessuras = require("./src/travessuras");
 
 if (process.platform === "linux") app.commandLine.appendSwitch("enable-transparent-visuals");
+// No Windows, o Chromium para de PINTAR janelas que ele acha que estão cobertas por outras
+// (ex.: navegador maximizado). A janela do pet é transparente e cobre as telas todas, então ele
+// erra a conta: o pet "anda" por dentro mas a imagem congela, e os bilhetes não aparecem.
+app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
+app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 if (!app.requestSingleInstanceLock()) app.quit();
 
 // ---------- log ----------
@@ -80,7 +85,7 @@ function salvarConfig() {
 let pets = [];
 const petAtual = () => pets.find((p) => p.id === config.pet) || pets.find((p) => p.id === "palito") || pets[0];
 function recarregarPets() {
-  fs.mkdirSync(pastaPetsUsuario(), { recursive: true });
+  copiarPetsPadrao(path.join(__dirname, "pets"), pastaPetsUsuario());
   pets = listarPets([path.join(__dirname, "pets"), pastaPetsUsuario()]);
 }
 
@@ -435,9 +440,15 @@ function registrarIpc() {
     const o = areaTotal();
     require("./src/cursor").moverCursor(o.x + x, o.y + y);
   });
-  handle("bilhete:criar", (_e, dados) =>
-    config.bagunca && bilhetes.size < 5 && dados && num(dados.x) && num(dados.y) ? criarBilhete(dados) : null
-  );
+  handle("bilhete:criar", (_e, dados) => {
+    if (!config.bagunca || !dados || !num(dados.x) || !num(dados.y)) return null;
+    if (bilhetes.size >= 5) {
+      log("main", "info", "bilhete: já tem 5 abertos na tela, feche algum para ele trazer outro");
+      return null;
+    }
+    log("main", "info", `bilhete: trazendo um novo (${bilhetes.size + 1} na tela)`);
+    return criarBilhete(dados);
+  });
   on("bilhete:mover", (_e, { id, x, y } = {}) => {
     if (!num(x) || !num(y)) return;
     const w = bilhetes.get(id);
