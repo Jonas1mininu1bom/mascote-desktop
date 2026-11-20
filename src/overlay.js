@@ -401,9 +401,15 @@ function moverBilhete() {
   // o papel fica do lado de fora da boca/mão (o lado oposto ao corpo dele)
   const ladoEsq = boca() ? m.x < P.x : P.olhando > 0;
   const x = ladoEsq ? m.x - b.largura + 8 : m.x - 8;
-  // se o pet está lá embaixo (na barra de tarefas), ele segura o papel pela borda de baixo, erguido
-  const y = Math.min(m.y - 24, tetoBilhete(x + b.largura / 2, b.altura));
-  window.api.enviar("bilhete:mover", { id: b.id, x, y });
+  // pendurado na boca ele ficaria baixo demais (pet lá embaixo, na barra de tarefas):
+  // aí ele carrega o papel em cima da cabeça, como uma placa (a cabeça fica na altura do chat)
+  P.bilheteNaCabeca = m.y - 24 > tetoBilhete(x + b.largura / 2, b.altura);
+  if (P.bilheteNaCabeca) {
+    const balanco = Math.sin(relogio * 9) * 3; // sobe e desce um pouquinho com os passos
+    const y = P.y - alturaPx() - b.altura + 12 + balanco;
+    return window.api.enviar("bilhete:mover", { id: b.id, x: P.x - b.largura / 2, y });
+  }
+  window.api.enviar("bilhete:mover", { id: b.id, x, y: m.y - 24 });
 }
 
 // Resgate: se ele ficar fora de todas as telas (ou a posição virar NaN), volta para casa.
@@ -564,7 +570,9 @@ function atualizar(dt) {
       moverBilhete();
       if (chegou || P.tempo <= 0 || !P.bilhete) {
         P.bilhete = null;
-        falar(escolha(["Trouxe pra você!", "Um presente 💌", "Leia isso!"]), 2.5);
+        // com o papel em cima da cabeça, o balão de fala cobriria o texto dele
+        if (!P.bilheteNaCabeca) falar(escolha(["Trouxe pra você!", "Um presente 💌", "Leia isso!"]), 2.5);
+        P.bilheteNaCabeca = false;
         mudar("feliz", 1.5);
       }
       return;
