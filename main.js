@@ -234,6 +234,7 @@ function infoTela() {
     altura: o.height,
     area: rel(wa), // tela da casa
     areas: permitidas.map((d) => rel(d.workArea)), // onde ele pode andar
+    monitores: permitidas.map((d) => rel(d.bounds)), // a tela inteira de cada um (com a barra de tarefas)
     casa,
     painel: chatAberto ? rel(boundsChat(true)) : null,
   };

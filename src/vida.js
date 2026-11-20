@@ -277,7 +277,7 @@ window.Vida = (() => {
     bola.vx *= atrito;
     bola.vy *= atrito;
     if (Math.hypot(bola.vx, bola.vy) < 8) bola.vx = bola.vy = 0;
-    const a = areaDe(bola.x);
+    const a = areaDe(bola.x, bola.y);
     if (bola.y < a.y + bola.r || bola.y > a.y + a.h - bola.r) {
       bola.y = Math.max(a.y + bola.r, Math.min(a.y + a.h - bola.r, bola.y));
       bola.vy = -bola.vy * 0.75;

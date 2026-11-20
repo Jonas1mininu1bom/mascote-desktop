@@ -150,11 +150,27 @@ function limites() {
   const l = areas();
   return { min: Math.min(...l.map((a) => a.x)), max: Math.max(...l.map((a) => a.x + a.w)) };
 }
-// Monitor em que um x está (ou o mais próximo, se cair num vão entre monitores).
-function areaDe(x) {
+// Monitor em que um x está (ou o mais próximo, se cair num vão entre monitores). Se dois monitores
+// têm o mesmo x (um em cima do outro), desempata pela altura em que o pet está.
+function areaDe(x, y = P.y) {
   const l = areas();
-  const dist = (a) => (x < a.x ? a.x - x : x > a.x + a.w ? x - a.x - a.w : 0);
+  const fora = (v, ini, tam) => (v < ini ? ini - v : v > ini + tam ? v - ini - tam : 0);
+  const dist = (a) => fora(x, a.x, a.w) * 10000 + fora(y, a.y, a.h + alturaPx());
   return l.reduce((melhor, a) => (dist(a) < dist(melhor) ? a : melhor), l[0]);
+}
+// Com monitores de tamanhos diferentes (ou um em pé, na vertical), o retângulo que junta todos tem
+// "buracos" sem monitor nenhum. Isto prende um ponto no monitor mais próximo, com uma folga para os
+// pés poderem ir até a borda de baixo (pegando o mouse lá embaixo, por exemplo).
+const monitores = () => (tela.monitores?.length ? tela.monitores : areas());
+function prenderNaTela(p, folgaX = 0, folgaBaixo = 0) {
+  const lista = monitores();
+  const caixa = (a) => ({ x0: a.x - folgaX, x1: a.x + a.w + folgaX, y0: a.y, y1: a.y + a.h + folgaBaixo });
+  const dist = (a) => {
+    const c = caixa(a);
+    return Math.hypot(Math.max(c.x0 - p.x, 0, p.x - c.x1), Math.max(c.y0 - p.y, 0, p.y - c.y1));
+  };
+  const c = caixa(lista.reduce((m, a) => (dist(a) < dist(m) ? a : m), lista[0]));
+  return { x: Math.max(c.x0, Math.min(c.x1, p.x)), y: Math.max(c.y0, Math.min(c.y1, p.y)) };
 }
 const dentro = (p, a) => p.x >= a.x && p.x <= a.x + a.w && p.y >= a.y && p.y <= a.y + a.h + 8;
 
@@ -338,8 +354,10 @@ function andarAte(alvo, dt, mult = 1, virar = true) {
     P.y = alvo.y;
     return true;
   }
-  P.x += (dx / d) * passo;
-  P.y += (dy / d) * passo;
+  // não entra nos "buracos" entre monitores: se o passo cair fora de todos, desliza pela borda
+  const q = prenderNaTela({ x: P.x + (dx / d) * passo, y: P.y + (dy / d) * passo }, larguraPx() / 2, alturaPx());
+  P.x = q.x;
+  P.y = q.y;
   return false;
 }
 
@@ -490,7 +508,6 @@ function atualizar(dt) {
       if (Math.abs(P.alvo.x - P.x) > 2) P.olhando = P.alvo.x > P.x ? -1 : 1;
       if (chegou) P.alvo = pontoAleatorio();
       const m = mao();
-      const area = { w: tela.largura, h: tela.altura };
       // O cursor escorrega de onde foi mordido para dentro do bico. A posição da boca em relação
       // ao corpo é suavizada (quando o pet vira, a boca dá a volta nele e o cursor dava um "chicote"),
       // mas o andar do pet não: assim o cursor não fica para trás quando ele corre.
@@ -499,10 +516,9 @@ function atualizar(dt) {
       P.offset.y *= Math.exp(-5 * dt);
       const rel = { x: m.x - P.x, y: m.y - P.y };
       P.bocaRel = P.bocaRel ? { x: P.bocaRel.x + (rel.x - P.bocaRel.x) * k, y: P.bocaRel.y + (rel.y - P.bocaRel.y) * k } : rel;
-      P.cursorEsperado = {
-        x: Math.max(0, Math.min(area.w - 1, P.x + P.bocaRel.x + P.offset.x)),
-        y: Math.max(0, Math.min(area.h - 1, P.y + P.bocaRel.y + P.offset.y)),
-      };
+      // sempre dentro de um monitor (senão o Windows prende o cursor na borda e ele desgruda do bico)
+      const c = prenderNaTela({ x: P.x + P.bocaRel.x + P.offset.x, y: P.y + P.bocaRel.y + P.offset.y });
+      P.cursorEsperado = { x: Math.round(c.x), y: Math.round(c.y) };
       window.api.enviar("pet:moverCursor", P.cursorEsperado);
       if (P.tempo <= 0 || !pegarMouseLigado()) {
         P.x = limitarX(P.x);
