@@ -322,5 +322,180 @@
     pintar(g, "rgba(255,255,255,0.35)");
   }
 
-  window.Vetor = { pato, palito, tartaruga };
+
+  // ---------- Visual 3D ----------
+  // Volume falso, sem 3D de verdade: cada parte é pintada como um tubo ou uma esfera iluminada,
+  // com luz vindo sempre do alto à esquerda da TELA, sombra de contato no chão e as partes de trás
+  // mais escuras. Custa quase o mesmo que o desenho 2D (nenhuma biblioteca, nada pré-renderizado).
+  // s.espelhado diz se o overlay virou o desenho, para a luz não trocar de lado quando ele vira.
+  const luzX = (s) => (s.espelhado ? 1 : -1); // lado da luz no espaço do desenho
+
+  // sombra no chão que encolhe e clareia quando ele sobe (pulo, queda)
+  function sombra3d(g, x, y, larg, altura = 0) {
+    const k = Math.max(0.45, 1 - altura / 60);
+    const gr = g.createRadialGradient(x, y, 0, x, y, larg * k);
+    gr.addColorStop(0, `rgba(20,22,35,${0.32 * k})`);
+    gr.addColorStop(0.6, `rgba(20,22,35,${0.14 * k})`);
+    gr.addColorStop(1, "rgba(20,22,35,0)");
+    g.save();
+    g.translate(x, y);
+    g.scale(1, 0.28);
+    g.translate(-x, -y);
+    g.beginPath();
+    g.arc(x, y, larg * k, 0, TAU);
+    g.fillStyle = gr;
+    g.fill();
+    g.restore();
+  }
+
+  // tubo iluminado ao longo de um caminho já montado com caminho(g)
+  function tubo(g, caminho, largura, cores, s, fundo = false) {
+    const [borda, base, brilho] = cores;
+    const lx = luzX(s);
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    caminho(g);
+    g.strokeStyle = borda;
+    g.lineWidth = largura + 1.6;
+    g.stroke();
+    caminho(g);
+    g.strokeStyle = base;
+    g.lineWidth = largura;
+    g.stroke();
+    // reflexo fino deslocado para o lado da luz
+    g.save();
+    g.translate(lx * largura * 0.22, -largura * 0.22);
+    caminho(g);
+    g.strokeStyle = brilho;
+    g.globalAlpha = fundo ? 0.25 : 0.55;
+    g.lineWidth = largura * 0.32;
+    g.stroke();
+    g.restore();
+  }
+
+  // esfera com gradiente radial, contorno e ponto de brilho
+  function esfera(g, x, y, rx, ry, cores, s, contorno = 1.4) {
+    const [clara, media, escura, borda] = cores;
+    const lx = luzX(s);
+    const gr = g.createRadialGradient(x + lx * rx * 0.38, y - ry * 0.42, rx * 0.08, x, y, Math.max(rx, ry) * 1.05);
+    gr.addColorStop(0, clara);
+    gr.addColorStop(0.55, media);
+    gr.addColorStop(1, escura);
+    oval(g, x, y, rx, ry);
+    pintar(g, gr, borda, contorno);
+    oval(g, x + lx * rx * 0.42, y - ry * 0.5, rx * 0.22, ry * 0.14, lx * -0.5);
+    pintar(g, "rgba(255,255,255,0.75)");
+  }
+
+  function olho3d(g, x, y, r, s, lado) {
+    if (s.modoOlho || s.olhosFechados) return olho(g, x, y, r, s, "#23253a", lado);
+    oval(g, x, y, r * 0.9, r * 1.1);
+    const gr = g.createRadialGradient(x, y - r * 0.4, 0, x, y, r * 1.2);
+    gr.addColorStop(0, "#4a4f73");
+    gr.addColorStop(1, "#151624");
+    pintar(g, gr);
+    oval(g, x - luzX(s) * -r * 0.3, y - r * 0.45, r * 0.36, r * 0.36);
+    pintar(g, "#ffffff");
+    oval(g, x - r * 0.25, y + r * 0.45, r * 0.15, r * 0.15);
+    pintar(g, "rgba(255,255,255,0.6)");
+  }
+
+  // ---------- Palito 3D ----------
+  function palito3d(g, s) {
+    const { w, h } = s;
+    const r = ritmo(s);
+    r.espelhado = s.espelhado;
+    g.scale(w / 64, h / 96);
+    const sobe = -r.quique - r.pulo;
+    sombra3d(g, 32, 93.5, 17, -sobe + (s.anim === "caindo" ? 30 : 0));
+    const MEMBRO = ["#14151f", "#363a55", "#9aa0c8"];
+    const MEMBRO_TRAS = ["#0f1018", "#262838", "#6b7092"];
+    const MAO = ["#7d82a8", "#3a3e5a", "#1d1f2e", "#14151f"];
+    const quadril = { x: 32, y: 68 + sobe };
+    // pernas: a de trás primeiro e mais escura
+    const pernas = [-1, 1].map((lado) => {
+      const desloc = r.passo * 9 * lado;
+      const pe = { x: 32 + lado * 6 + desloc, y: 91.5 - Math.max(0, r.passo * lado) * 3 };
+      return { lado, pe, joelho: { x: (quadril.x + pe.x) / 2 + 2.5, y: (quadril.y + pe.y) / 2 } };
+    });
+    for (const { lado, pe, joelho } of pernas) {
+      const tras = lado < 0;
+      tubo(g, (c) => { c.beginPath(); c.moveTo(quadril.x, quadril.y); c.quadraticCurveTo(joelho.x, joelho.y, pe.x, pe.y); }, 4, tras ? MEMBRO_TRAS : MEMBRO, r, tras);
+      // sapato: meia esfera achatada
+      esfera(g, pe.x + 2.5, pe.y + 0.2, 4.8, 2.7, tras ? ["#5b5f80", "#25273a", "#111219", "#0d0e14"] : MAO, r, 1);
+    }
+    g.translate(0, sobe);
+    const ombro = { x: 32, y: 47 };
+    const balanca = r.passo * 7;
+    const acena = ["acenando", "travessura"].includes(s.anim);
+    const maoTras = s.anim === "caindo" ? { x: 22, y: 30 } : { x: 14 - balanca * 0.4, y: 58 + Math.abs(balanca) * 0.2 };
+    const maoFrente = s.anim === "caindo"
+      ? { x: 43, y: 30 }
+      : acena
+        ? { x: 47 + Math.sin(s.t * 12) * 4, y: 32 }
+        : s.anim === "feliz"
+          ? { x: 48, y: 36 }
+          : { x: 50 + balanca * 0.4, y: 58 - Math.abs(balanca) * 0.2 };
+    const braco = (m, tras) => {
+      tubo(g, (c) => { c.beginPath(); c.moveTo(ombro.x, ombro.y); c.quadraticCurveTo((ombro.x + m.x) / 2, (ombro.y + m.y) / 2 + 3, m.x, m.y); }, 3.6, tras ? MEMBRO_TRAS : MEMBRO, r, tras);
+      esfera(g, m.x, m.y, 3, 3, tras ? ["#5b5f80", "#25273a", "#111219", "#0d0e14"] : MAO, r, 1);
+    };
+    braco(maoTras, true);
+    // tronco: tubo mais grosso
+    tubo(g, (c) => { c.beginPath(); c.moveTo(32, 40); c.lineTo(32, 68); }, 4.6, MEMBRO, r);
+    // cachecol: ponta balançando atrás + volta no pescoço
+    const vento = r.anda ? Math.sin(s.t * r.anda) * 2.5 : Math.sin((s.relogio || 0) * 2) * 0.8;
+    const caindo = s.anim === "caindo" ? -6 : 0;
+    g.beginPath();
+    g.moveTo(28, 40);
+    g.quadraticCurveTo(22, 44 + caindo, 17 - (r.anda ? 3 : 0), 47 + vento + caindo);
+    g.lineTo(15.5 - (r.anda ? 3 : 0), 52 + vento + caindo);
+    g.quadraticCurveTo(22, 49 + caindo, 29, 44);
+    g.closePath();
+    const grPonta = g.createLinearGradient(15, 40, 29, 52);
+    grPonta.addColorStop(0, "#9e1f3c");
+    grPonta.addColorStop(1, "#d93a5c");
+    pintar(g, grPonta, "#6e1229", 1.1);
+    const grCach = g.createLinearGradient(0, 36, 0, 44);
+    grCach.addColorStop(0, "#ff7a95");
+    grCach.addColorStop(0.45, "#ef476f");
+    grCach.addColorStop(1, "#a3203f");
+    g.beginPath();
+    g.ellipse(32.5, 40, 9.5, 3.6, 0, 0, TAU);
+    pintar(g, grCach, "#6e1229", 1.1);
+    linha(g, 26, 39, 39, 39.4, "rgba(255,255,255,0.35)", 0.9);
+    // cabeça: esfera branca com sombra própria
+    const cy = s.anim === "dormindo" ? 25 : 22;
+    esfera(g, 33, cy, 16, 15.5 + r.respira * 0.2, ["#ffffff", "#eceef5", "#aeb2c6", "#23253a"], r, 2);
+    // luz de borda fria do lado da sombra
+    g.save();
+    oval(g, 33, cy, 16, 15.5);
+    g.clip();
+    const rx = 33 - luzX(r) * 15, ry = cy + 8;
+    const borda = g.createRadialGradient(rx, ry, 0, rx, ry, 12);
+    borda.addColorStop(0, "rgba(150,175,255,0.22)");
+    borda.addColorStop(1, "rgba(150,175,255,0)");
+    oval(g, rx, ry, 12, 12);
+    pintar(g, borda);
+    g.restore();
+    olho3d(g, 31, cy - 2, 2.5, r, 1);
+    olho3d(g, 41, cy - 2, 2.5, r, -1);
+    bochecha(g, 27, cy + 4, 3.2);
+    bochecha(g, 44, cy + 4, 3.2);
+    g.beginPath();
+    if (r.mastiga) oval(g, 36, cy + 6, 2.6, 2.2);
+    else if (s.anim === "comendo") g.arc(36, cy + 6, 2.2, 0, TAU);
+    else if (s.anim === "bravo" || s.anim === "tonto") g.arc(36, cy + 9.5, 3.4, 1.15 * Math.PI, 1.85 * Math.PI);
+    else if (s.anim === "pensando") oval(g, 36, cy + 6, 1.6, 1.8);
+    else if (s.anim === "dormindo") g.arc(36, cy + 7, 1.4, 0, TAU);
+    else g.arc(36, cy + 3.5, 3.6, 0.2 * Math.PI, 0.8 * Math.PI);
+    g.strokeStyle = "#d63a60";
+    g.lineWidth = 1.7;
+    g.lineCap = "round";
+    g.stroke();
+    // braço da frente por cima de tudo
+    braco(maoFrente, false);
+  }
+
+  window.Vetor = { pato, palito, tartaruga, palito3d };
 })();

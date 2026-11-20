@@ -612,7 +612,8 @@ function desenhar(dt) {
   ctx.clearRect(0, 0, tela.largura, tela.altura);
   if (!sprites.parado) return;
 
-  const vetor = pet.desenho && window.Vetor?.[pet.desenho];
+  // Visual 3D: usa a versão "<desenho>3d" quando o pet tem uma (por enquanto só o Palito).
+  const vetor = pet.desenho && ((config.visual3d !== false && window.Vetor?.[pet.desenho + "3d"]) || window.Vetor?.[pet.desenho]);
   if (vetor) return desenharVetor(vetor, dt);
   const nome = animacao(P.anim);
   const quadros = sprites[nome];
@@ -681,7 +682,7 @@ function desenharVetor(vetor, dt) {
     ctx.scale(-1, 1);
   }
   try {
-    vetor(ctx, { w, h, anim: P.anim, t: P.tAnim, relogio });
+    vetor(ctx, { w, h, anim: P.anim, t: P.tAnim, relogio, espelhado: P.olhando < 0 });
   } catch (e) {
     console.error("[vetor] falhou, voltando para a pixel art:", e);
     pet.desenho = null;
