@@ -1,25 +1,28 @@
 # 🐾 Mascote Desktop
 
-Um bonequinho que mora no **cantinho da sua tela** e conversa com você usando o
-**Claude Code** por trás. O pet padrão é o **Palito**, um stickman de cachecol, e
-também vêm junto o **Pato** 🦆 e a **Tartaruga** 🐢 (troque em ⚙️ → Pet).
+Um bichinho que mora na **sua tela** e conversa com você usando o **Claude Code** por trás.
+Vêm três pets, todos desenhados com formas suaves e animados: o **Palito** (padrão), o **Pato** 🦆
+e a **Tartaruga** 🐢 (troque em ⚙️ → Pet). Cada um conversa com uma personalidade própria.
 
-- 💬 **Chat fixo no canto:** clique no botão redondo para conversar. Ele fica sempre
-  no mesmo lugar, então você não precisa caçar o pet pela tela.
-- 🧍 **Quietinho por padrão:** ele fica perto do chat, pisca, acena e cochila.
-- 🚶 **Passear (opcional):** deixe-o andar pela tela toda.
-- 😈 **Modo bagunça (opcional):** ele corre atrás do seu mouse, pega e arrasta o
-  cursor por aí (por todos os monitores) e traz bilhetinhos coloridos para a tela.
-- 🃏 **Travessuras (opcional, no modo bagunça):** de vez em quando ele aperta Alt+Tab de 1 a
-  5 vezes ou abre o navegador só para incomodar. Cada uma é ligada em ⚙️, e dá para criar as suas.
-- 💌 **Bilhetes da comunidade:** escreva as suas próprias mensagens, escolha as cores e
-  até coloque imagens (veja [abaixo](#bilhetes-da-comunidade)).
-- 🎨 **Pets personalizados:** qualquer pessoa pode criar o próprio pet com uma pasta
-  e um `pet.json` (veja [CRIAR_PET.md](CRIAR_PET.md)).
+![Pato, Palito e Tartaruga](docs/pets.png)
 
-![Palito, o chat e um bilhete](docs/chat-e-bilhete.png)
+- 💬 **Chat com o Claude Code:** clique no botão laranja para conversar. Ele lê arquivos e ajuda com
+  código na pasta que você escolher, sempre pedindo permissão antes de mexer em algo. Dá para
+  **colar imagens** (Ctrl+V) para ele ver.
+- 🧸 **Um bichinho de verdade:** ele pisca, acena, cochila e passeia (se você deixar). Clique para dar
+  carinho, use o **botão direito** para dar comida ou jogar bola, **chacoalhe** e ele fica tonto (e
+  depois bravo com você), e **solte ele lá do alto** para ver o paraquedas. 🪂
+- 🧱 **Chão:** ele anda pela tela inteira ou só em cima da barra de tarefas, em todos os monitores ou
+  em um só.
+- 😈 **Modo bagunça (opcional):** ele rouba o seu mouse (no estilo do Desktop Goose), traz bilhetinhos
+  coloridos e faz travessuras como apertar Alt+Tab ou abrir o navegador. Cada travessura liga e desliga
+  em ⚙️, e dá para criar as suas.
+- 💌 **Feito para a comunidade:** bilhetes, travessuras e pets próprios são só arquivos JSON (veja
+  [abaixo](#bilhetes-da-comunidade) e [CRIAR_PET.md](CRIAR_PET.md)).
+- 🖥️ **Aplicativo de verdade (Windows):** atalho no Menu Iniciar, minimizar para a bandeja e iniciar
+  junto com o PC.
 
-Mecânicas inspiradas nos pets de desktop clássicos, com personagem e código originais.
+Mecânicas inspiradas nos pets de desktop clássicos, com personagens e código originais.
 
 ## Requisitos
 
@@ -59,6 +62,8 @@ clicar para abrir, como qualquer programa, sem janela de terminal. Para tirar os
 | Escolher em que tela o pet fica | ⚙️ → Telas (todas, ou uma específica) |
 | Escolher em que pasta ele trabalha | Clique na linha 📁 no topo do chat |
 | Carinho | Clique no pet |
+| Dar comida / brincar de bola | Botão direito no pet |
+| Andar só em cima da barra de tarefas | ⚙️ → Chão |
 | Mudar o pet de lugar | Arraste o pet com o mouse |
 | Ligar passeio / modo bagunça | ⚙️ no chat, ou o ícone na bandeja do sistema |
 | Trocar de pet / abrir a pasta de pets | ⚙️ no chat |
@@ -67,8 +72,9 @@ clicar para abrir, como qualquer programa, sem janela de terminal. Para tirar os
 | Fazer o pet voltar para o canto | ⚙️ → Chamar de volta |
 | Minimizar | Botão **–** no topo do chat: pet, chat e bilhetes somem e fica só o ícone na bandeja (perto do relógio). Clique nele para trazer de volta |
 | Fechar | Botão **X** no topo do chat, ⚙️ → Fechar o app, a bandeja, ou **Ctrl+Alt+Shift+Q** |
+| Abrir de novo | Atalho **Mascote Desktop** (se já estiver aberto, ele volta da bandeja e abre o chat) |
 
-Quando o pet segura o seu mouse no modo bagunça, clique nele para ele soltar.
+Quando o pet rouba o seu mouse no modo bagunça, puxe o mouse com força para longe que ele solta.
 
 ### Imagens no chat
 
@@ -180,6 +186,7 @@ aprovar.
 ## Créditos
 
 - Ícones do chat: [Lucide](https://lucide.dev) (licença ISC, em `src/icones/LICENSE-lucide.txt`).
+- Pets, ícone do app e desenhos: originais deste projeto (`src/vetor.js`).
 
 ## Observações
 
