@@ -695,7 +695,7 @@ function desenharVetor(vetor, dt) {
     ctx.scale(-1, 1);
   }
   try {
-    vetor(ctx, { w, h, anim: P.anim, t: P.tAnim, relogio, espelhado: P.olhando < 0 });
+    vetor(ctx, { w, h, anim: P.anim, t: P.tAnim, relogio, espelhado: P.olhando < 0, planando: P.estado === "caindo" && P.aberto && !!window.Vida?.plana() });
   } catch (e) {
     console.error("[vetor] falhou, voltando para a pixel art:", e);
     pet.desenho = null;

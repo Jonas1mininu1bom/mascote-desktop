@@ -507,6 +507,7 @@
     r.espelhado = s.espelhado;
     g.scale(w / 64, h / 64);
     const danca = s.anim === "dancando";
+    const plana = !!s.planando; // caindo com as asas abertas (no lugar do paraquedas)
     const fase = s.t * TAU * 2; // 2 batidas por segundo
     const lado = danca ? Math.sin(fase / 2) : 0; // -1..1, um passo para cada lado por batida
     const quica = danca ? Math.abs(Math.sin(fase)) * 3.2 : 0;
@@ -517,8 +518,8 @@
     const LARANJA = ["#ffc58a", "#ff9a2e", "#d4691a", "#9c4a0f"];
     // pés: na dança, o pé do lado para onde ele vai levanta
     for (const [px, ld] of [[25, -1], [39, 1]]) {
-      const levanta = danca ? Math.max(0, lado * ld) * 3.5 : Math.max(0, -r.passo * ld) * 2.5;
-      const anda = r.passo * 4.5 * ld;
+      const levanta = plana ? 5 : danca ? Math.max(0, lado * ld) * 3.5 : Math.max(0, -r.passo * ld) * 2.5;
+      const anda = plana ? -4 : r.passo * 4.5 * ld;
       const fx = px + anda + lado * 2.5;
       const fy = 61.5 - levanta;
       tubo(g, (c) => { c.beginPath(); c.moveTo(px + lado * 3, 53 + sobe * 0.6); c.lineTo(fx, fy); }, 2.8, ["#9c4a0f", "#f08a26", "#ffd0a0"], r, ld < 0);
@@ -535,7 +536,7 @@
     g.save();
     // gira o corpo todo em volta dos pés (rebolado), quica e achata um pouco ao "pousar"
     g.translate(32, 60);
-    g.rotate(lado * 0.13);
+    g.rotate(lado * 0.13 + (plana ? 0.18 + Math.sin(s.t * 3) * 0.05 : 0));
     const achata = danca ? 1 - Math.max(0, Math.cos(fase)) * 0.05 : 1;
     g.scale(2 - achata, achata);
     g.translate(-32 + lado * 2.5, -60 + sobe);
@@ -544,8 +545,8 @@
     const asaTras = danca ? -Math.max(0, -lado) * 1.1 : 0;
     g.save();
     g.translate(40, 40);
-    g.rotate(0.35 - asaTras);
-    oval(g, 3, -2, 8, 5.5);
+    g.rotate(plana ? -0.9 + Math.sin(s.t * 3) * 0.08 : 0.35 - asaTras);
+    oval(g, plana ? 9 : 3, -2, plana ? 15 : 8, plana ? 5 : 5.5);
     pintar(g, "#d9a31a", "#a8780f", 1.1);
     g.restore();
     // rabinho
@@ -632,7 +633,9 @@
     g.restore();
 
     // asa da frente: na dança sobe e desce no ritmo, oposta à de trás
-    const bate = danca
+    const bate = plana
+      ? 1.0 + Math.sin(s.t * 3) * 0.08
+      : danca
       ? -Math.max(0, lado) * 1.2 - 0.15
       : s.anim === "caindo"
         ? Math.sin(s.t * 22) * 0.6 - 0.4
@@ -642,13 +645,169 @@
     g.save();
     g.translate(24, 39);
     g.rotate(-0.2 + bate);
-    esfera(g, 3, 3, 10.5, 6.8, ["#fff3a8", "#f7c832", "#d39a14", "#a8780f"], r, 1.3);
-    linha(g, -2, 4, 7, 5.5, "rgba(168,120,15,0.5)", 0.9);
-    linha(g, -1, 6.5, 6, 7.5, "rgba(168,120,15,0.4)", 0.9);
+    if (plana) {
+      // asa aberta: comprida, com as penas da ponta separadas
+      esfera(g, -8, 3, 17, 6.5, ["#fff3a8", "#f7c832", "#d39a14", "#a8780f"], r, 1.3);
+      for (const [dx, dy] of [[-24, 1.5], [-22, 5], [-19, 8]]) {
+        oval(g, dx, dy, 4, 1.8, 0.2);
+        pintar(g, "#f2bd2a", "#a8780f", 1);
+      }
+      linha(g, -18, 4, 0, 4.5, "rgba(168,120,15,0.5)", 0.9);
+    } else {
+      esfera(g, 3, 3, 10.5, 6.8, ["#fff3a8", "#f7c832", "#d39a14", "#a8780f"], r, 1.3);
+      linha(g, -2, 4, 7, 5.5, "rgba(168,120,15,0.5)", 0.9);
+      linha(g, -1, 6.5, 6, 7.5, "rgba(168,120,15,0.4)", 0.9);
+    }
     g.restore();
     g.restore();
   }
 
+
+  // ---------- Tartaruga 3D ----------
+  // Tartaruguinha de cabeção redondo e casco marrom em placas. Dormindo, caindo ou tonta
+  // (chacoalhada) ela recolhe cabeça, patas e rabo para dentro do casco.
+  function tartaruga3d(g, s) {
+    const { w, h } = s;
+    const r = ritmo(s);
+    r.espelhado = s.espelhado;
+    g.scale(w / 80, h / 48);
+    const escondida = ["dormindo", "caindo", "tonto"].includes(s.anim);
+    const k = escondida ? Math.min(1, s.t * 5) : 0; // quanto já entrou no casco (0..1)
+    const fora = escondida ? 1 - k : 1;
+    const sobe = escondida ? 0 : -r.quique * 0.5 - r.pulo * 0.6;
+    sombra3d(g, 40, 46.5, 30, -sobe + (s.anim === "caindo" ? 30 : 0));
+    const PELE = ["#e6f7a8", "#9fd65a", "#5f9e2c", "#3f7419"];
+    const PELE_TRAS = ["#c9e48a", "#86bd47", "#4d8423", "#335f14"];
+    const desce = escondida ? k * 4 : 0; // casco encosta no chão quando ela se esconde
+
+    // patas (4 toquinhos que andam em pares cruzados), encolhem para dentro
+    if (fora > 0.05) {
+      for (const [x, fase, tras] of [[24, 1, true], [52, -1, true], [30, -1, false], [58, 1, false]]) {
+        const d = r.passo * 3.5 * fase * fora;
+        const px = 40 + (x - 40) * (0.75 + 0.25 * fora) + d;
+        const py = 41 + (1 - fora) * 4 - Math.max(0, r.passo * fase) * 1.5;
+        esfera(g, px, py, 5.2 * fora + 1, 5 * fora + 0.5, tras ? PELE_TRAS : PELE, r, 1.2);
+        if (!tras && fora > 0.6) {
+          for (const dx of [-2, 0, 2]) {
+            oval(g, px + dx, py + 3.4, 0.6, 0.6);
+            pintar(g, "rgba(63,116,25,0.6)");
+          }
+        }
+      }
+    }
+    g.translate(0, sobe + desce);
+    // rabinho
+    if (fora > 0.2) {
+      g.beginPath();
+      g.moveTo(15, 34);
+      g.quadraticCurveTo(15 - 9 * fora, 36, 15 - 8 * fora, 39);
+      g.quadraticCurveTo(13, 38.5, 17, 38);
+      pintar(g, PELE[1], PELE[3], 1.1);
+    }
+    // cabeça: sai de baixo da frente do casco
+    const balanço = r.anda ? Math.sin(s.t * 9) * 0.8 : 0;
+    const hx = 57 + 9 * fora;
+    const hy = 31 - 4 * fora + balanço;
+    if (fora > 0.05) {
+      // pescoço
+      tubo(g, (c) => { c.beginPath(); c.moveTo(54, 35); c.quadraticCurveTo(58 + 4 * fora, 33, hx - 4 * fora, hy + 4 * fora); }, 7 * fora + 2, [PELE[3], PELE[1], PELE[0]], r);
+    }
+    // barriga (plastrão) creme aparecendo embaixo do casco
+    oval(g, 39, 37.5, 25, 4.6);
+    const gbar = g.createLinearGradient(0, 33, 0, 42);
+    gbar.addColorStop(0, "#fbe9b7");
+    gbar.addColorStop(1, "#d9b878");
+    pintar(g, gbar, "#a9874a", 1.2);
+    // casco: domo marrom com borda clara e placas
+    g.beginPath();
+    g.moveTo(11, 36);
+    g.bezierCurveTo(10, 6, 66, 4, 66, 36);
+    g.closePath();
+    const lx = luzX(r);
+    const gc = g.createRadialGradient(38 + lx * 9, 13, 2, 38, 26, 32);
+    gc.addColorStop(0, "#e9ad6c");
+    gc.addColorStop(0.5, "#b8692e");
+    gc.addColorStop(1, "#6e3814");
+    pintar(g, gc, "#4f280d", 1.7);
+    g.save();
+    g.clip();
+    // placas: hexágono do meio + vizinhas
+    const hexa = (cx, cy, rr) => {
+      g.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI / 6 + (i * Math.PI) / 3;
+        const px = cx + Math.cos(a) * rr * 1.25;
+        const py = cy + Math.sin(a) * rr * 0.8;
+        i ? g.lineTo(px, py) : g.moveTo(px, py);
+      }
+      g.closePath();
+      g.fillStyle = "rgba(255,220,170,0.10)";
+      g.fill();
+      g.strokeStyle = "rgba(70,34,10,0.75)";
+      g.lineWidth = 1.3;
+      g.stroke();
+    };
+    hexa(38, 20, 7);
+    for (const [cx, cy] of [[22, 27], [54, 27], [30, 9], [46, 9], [38, 33], [14, 18], [62, 18]]) hexa(cx, cy, 7);
+    g.restore();
+    // borda clara do casco
+    g.beginPath();
+    g.moveTo(10, 35);
+    g.quadraticCurveTo(38, 40.5, 67, 35);
+    g.quadraticCurveTo(68, 38.5, 64, 39);
+    g.quadraticCurveTo(38, 43.5, 12, 39);
+    g.quadraticCurveTo(8.5, 38, 10, 35);
+    const gb = g.createLinearGradient(0, 34, 0, 42);
+    gb.addColorStop(0, "#f0c98f");
+    gb.addColorStop(1, "#b98549");
+    pintar(g, gb, "#6e4416", 1.2);
+    // brilho no casco
+    oval(g, 38 + lx * 10, 15, 7, 2.4, lx * 0.3);
+    pintar(g, "rgba(255,240,215,0.4)");
+    // cabeça por cima do casco (o pescoço ficou atrás)
+    if (fora > 0.05) {
+      const rc = 4 + 9 * fora;
+      esfera(g, hx, hy, rc, rc * 0.95, PELE, r, 1.5);
+      if (fora > 0.7) {
+        const sR = { ...r };
+        olho3d(g, hx - 1, hy - 1.5, 2.3, sR, 1);
+        olho3d(g, hx + 6.5, hy - 1.5, 1.9, sR, -1);
+        if (s.anim === "bravo") {
+          linha(g, hx - 4, hy - 6.5, hx + 1.5, hy - 4.6, "#2f5512", 1.5);
+          linha(g, hx + 9, hy - 6.2, hx + 5, hy - 4.6, "#2f5512", 1.5);
+        }
+        bochecha(g, hx - 3.5, hy + 3.2, 2.2);
+        bochecha(g, hx + 8.5, hy + 3, 1.8);
+        g.beginPath();
+        if (r.mastiga) oval(g, hx + 3, hy + 4, 1.9, 1.7);
+        else if (s.anim === "bravo") g.arc(hx + 3, hy + 6.2, 2.2, 1.2 * Math.PI, 1.8 * Math.PI);
+        else g.arc(hx + 3, hy + 2, 2.4, 0.2 * Math.PI, 0.8 * Math.PI);
+        g.strokeStyle = "#2f5512";
+        g.lineWidth = 1.2;
+        g.lineCap = "round";
+        g.stroke();
+      }
+    }
+    // escondida: buraco escuro na frente; dormindo, os olhinhos fechados espiam lá de dentro
+    if (escondida && k > 0.6) {
+      oval(g, 62, 33.5, 4.6, 3.2);
+      pintar(g, "#2a1606");
+      if (s.anim === "dormindo") {
+        g.beginPath();
+        g.arc(61.2, 33, 1.1, 0.15 * Math.PI, 0.85 * Math.PI);
+        g.arc(63.6, 33, 1.1, 0.15 * Math.PI, 0.85 * Math.PI);
+        g.strokeStyle = "#9fd65a";
+        g.lineWidth = 0.9;
+        g.stroke();
+      } else if (s.anim === "tonto") {
+        for (const ex of [60.8, 63.4]) {
+          oval(g, ex, 33.3, 0.9, 0.9);
+          pintar(g, "#ffffff");
+        }
+      }
+    }
+  }
+
   pato3d.danca = true; // a dança já vem no desenho (os outros só balançam, pelo overlay)
-  window.Vetor = { pato, palito, tartaruga, palito3d, pato3d };
+  window.Vetor = { pato, palito, tartaruga, palito3d, pato3d, tartaruga3d };
 })();

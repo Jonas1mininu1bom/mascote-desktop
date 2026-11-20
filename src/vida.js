@@ -16,6 +16,8 @@ window.Vida = (() => {
   let bola = null; // { x, y, vx, vy, chao, giro }
 
   const ESTADOS = ["caindo", "tonto", "bravo", "comendo", "brincando"];
+  // o Pato não usa paraquedas: abre as asas e plana, indo para a frente
+  const plana = () => pet.desenho === "pato";
   const ocioso = () => ["parado", "andar", "acenando", "dormindo", "feliz", "dancando"].includes(P.estado);
   const chao = () => chaoDe(P.x);
   const coracao = (n = 5) => {
@@ -39,9 +41,10 @@ window.Vida = (() => {
     } else {
       P.paraquedas = Math.min(1, P.paraquedas + dt * 3);
       P.vy += (VEL_PARAQUEDAS - P.vy) * Math.min(1, dt * 4);
-      P.vx += Math.sin(relogio * 1.8) * 25 * dt; // balança com o vento
+      if (plana()) P.vx += (P.olhando * 110 - P.vx) * Math.min(1, dt * 2); // plana para a frente
+      else P.vx += Math.sin(relogio * 1.8) * 25 * dt; // balança com o vento
     }
-    P.vx *= 1 - Math.min(1, dt * (P.aberto ? 1.2 : 0.4));
+    if (!(P.aberto && plana())) P.vx *= 1 - Math.min(1, dt * (P.aberto ? 1.2 : 0.4));
     P.x = limitarX(P.x + P.vx * dt);
     P.y += P.vy * dt;
     if (Math.abs(P.vx) > 20) P.olhando = P.vx > 0 ? 1 : -1;
@@ -55,7 +58,7 @@ window.Vida = (() => {
       depoisDeCair = null;
       return ficarTonto();
     }
-    if (P.aberto) falar(escolha(["Ufa! 🪂", "Pouso perfeito!", "Que vista!"]), 2);
+    if (P.aberto) falar(escolha(plana() ? ["Quá! Pouso de pato!", "Voei!", "Quem precisa de paraquedas?"] : ["Ufa! 🪂", "Pouso perfeito!", "Que vista!"]), 2);
     mudar(P.aberto ? "feliz" : "parado", P.aberto ? 1.4 : 0.6);
   }
 
@@ -460,7 +463,7 @@ window.Vida = (() => {
     ctx.restore();
   }
   function desenhar(topo) {
-    if (P.estado === "caindo") desenharParaquedas(topo);
+    if (P.estado === "caindo" && !plana()) desenharParaquedas(topo);
     if (P.estado === "tonto" || (segurado && chacoalho.tonto)) desenharEstrelas(topo);
     if (P.estado === "bravo") desenharFumaca(topo);
     ctx.save();
@@ -483,6 +486,6 @@ window.Vida = (() => {
 
   return {
     precisaCair, cair, pegou, segurando, soltou, carinhoRecusado,
-    abrirMenu, abrirMenuBrinquedos, sobreMenu, cliqueNoMenu, sobreBola, cliqueNaBola, atualizar, desenhar,
+    abrirMenu, abrirMenuBrinquedos, sobreMenu, cliqueNoMenu, sobreBola, cliqueNaBola, atualizar, desenhar, plana,
   };
 })();
