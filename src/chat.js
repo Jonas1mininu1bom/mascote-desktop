@@ -107,33 +107,53 @@ async function carregarTravessuras() {
     const c = document.createElement("input");
     c.type = "checkbox";
     c.checked = t.ligada;
-    c.disabled = Boolean(t.bloqueada); // precisa de administrador: fica desligada até a pessoa dar permissão
+    c.disabled = Boolean(t.bloqueada); // precisa de administrador/Acessibilidade: fica desligada até a pessoa dar permissão
     c.onchange = () => ponte.enviar("travessuras:ligar", { id: t.id, ligada: c.checked });
     const s = document.createElement("span");
     s.append(icone({ abrir: "globo", mouse: "mouse", seguir: "pegadas", admin: "escudo" }[t.tipo] || "teclado"), t.nome);
-    if (t.precisaAdmin) {
+    if (t.selo) {
       const selo = document.createElement("span");
       selo.className = "selo";
-      selo.append(icone(t.bloqueada ? "cadeado" : "escudo"), t.bloqueada ? "precisa de administrador" : "admin");
+      selo.append(icone(t.bloqueada ? "cadeado" : "escudo"), t.selo);
       s.append(selo);
     }
     l.classList.toggle("bloqueada", Boolean(t.bloqueada));
-    if (t.bloqueada) l.title = "Use o botão \"Pedir permissão ao Windows\" aqui embaixo para liberar.";
+    if (t.bloqueada) {
+      l.title = t.precisaAcessibilidade
+        ? "Use o botão \"Abrir os Ajustes do Mac\" aqui embaixo para liberar."
+        : "Use o botão \"Pedir permissão ao Windows\" aqui embaixo para liberar.";
+    }
     l.append(c, s);
     caixa.appendChild(l);
   }
   if (!lista.length) caixa.textContent = "Nenhuma disponível.";
-  carregarSistema(lista.some((t) => t.precisaAdmin));
+  carregarSistema(lista.some((t) => t.precisaAdmin), lista.some((t) => t.precisaAcessibilidade));
 }
 
-// "Iniciar com o Windows" e a caixa de permissão de administrador (só no Windows).
-async function carregarSistema(temAdmin) {
+// "Iniciar com o sistema" e as permissões de cada sistema:
+// administrador (Windows), Acessibilidade (Mac) e o aviso do Wayland (Linux).
+let temAdminAntes = true;
+let temTeclasAntes = true;
+async function carregarSistema(temAdmin, temTeclas) {
   const e = await ponte.invocar("sistema:estado");
-  mostrarSistema(e, temAdmin);
+  mostrarSistema(e, temAdmin, temTeclas);
 }
-function mostrarSistema(e, temAdmin = true) {
-  $("linhaIniciar").hidden = !e.windows;
-  $("iniciarComWindows").checked = e.iniciarComWindows;
+const NOME_INICIAR = { Windows: "Iniciar com o Windows", macOS: "Abrir ao entrar no Mac", Linux: "Iniciar com o Linux" };
+const NOME_BARRA = { Windows: "Só em cima da barra de tarefas", macOS: "Só no pé da tela (em cima do Dock)", Linux: "Só no pé da tela (em cima do painel)" };
+function mostrarSistema(e, temAdmin = temAdminAntes, temTeclas = temTeclasAntes) {
+  temAdminAntes = temAdmin;
+  temTeclasAntes = temTeclas;
+  $("linhaIniciar").hidden = !e.iniciarDisponivel;
+  $("iniciarTexto").textContent = NOME_INICIAR[e.sistema] || "Iniciar com o sistema";
+  $("opcaoBarra").textContent = NOME_BARRA[e.sistema] || NOME_BARRA.Windows;
+  $("iniciarComSistema").checked = e.iniciarComSistema;
+  $("avisoWayland").hidden = !e.wayland;
+  $("acessibilidade").hidden = e.acessibilidade === null || !temTeclas;
+  $("acessibilidade").classList.toggle("ativo", e.acessibilidade === true);
+  $("pedirAcessibilidade").hidden = e.acessibilidade === true;
+  $("acessibilidadeTexto").textContent = e.acessibilidade
+    ? "Ligada. As travessuras de teclado (como Cmd+Tab) já podem ser usadas."
+    : "Opcional. O macOS só deixa o pet apertar teclas (Cmd+Tab das travessuras) se o Mascote Desktop estiver ligado em Ajustes do Sistema → Privacidade e Segurança → Acessibilidade. Depois de ligar, feche e abra ⚙️ de novo.";
   $("admin").hidden = !e.windows || !temAdmin;
   $("admin").classList.toggle("ativo", e.admin);
   $("pedirAdmin").hidden = e.admin;
@@ -142,7 +162,14 @@ function mostrarSistema(e, temAdmin = true) {
     ? "Ligado. As opções com escudo já podem ser usadas. Atenção: o chat também roda como administrador agora, então leia bem cada pedido de permissão antes de aceitar."
     : "Opcional. Sem ela, o Windows não deixa o pet apertar teclas quando uma janela de administrador está na frente (Gerenciador de Tarefas, por exemplo). O app reabre e o Windows pergunta se você permite.";
 }
-$("iniciarComWindows").onchange = async (ev) => mostrarSistema(await ponte.invocar("sistema:iniciarComWindows", ev.target.checked));
+$("iniciarComSistema").onchange = async (ev) => mostrarSistema(await ponte.invocar("sistema:iniciarComSistema", ev.target.checked));
+$("pedirAcessibilidade").onclick = async () => {
+  mostrarSistema(await ponte.invocar("sistema:pedirAcessibilidade"));
+  // a pessoa liga nos Ajustes e volta: confere de novo quando a janela recebe o foco
+  window.addEventListener("focus", carregarTravessuras, { once: true });
+};
+// No Mac, colar é Cmd+V
+if (navigator.platform.startsWith("Mac")) $("entrada").placeholder = "Fale com o pet… (Cmd+V cola imagens)";
 $("pedirAdmin").onclick = async () => {
   $("pedirAdmin").disabled = true;
   $("pedirAdmin").lastChild.textContent = "Esperando o Windows…";

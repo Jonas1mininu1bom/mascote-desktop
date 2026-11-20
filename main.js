@@ -10,9 +10,31 @@ const { criarCofre } = require("./src/provedores/chaves");
 const bilhetesMod = require("./src/bilhetes");
 const travessuras = require("./src/travessuras");
 const admin = require("./src/admin");
+const plataforma = require("./src/plataforma");
 const { validarImagens } = require("./src/imagens");
 
-if (process.platform === "linux") app.commandLine.appendSwitch("enable-transparent-visuals");
+// Mesma pasta de dados rodando pelo código (npm start) ou instalado (o nome do app instalado tem espaço):
+// ajustes, pets e bilhetes da pessoa continuam os mesmos.
+// Quem passar --user-data-dir (testes, desenvolvimento) usa a pasta que escolheu, separada da sua.
+if (!app.commandLine.hasSwitch("user-data-dir")) {
+  app.setPath("userData", path.join(app.getPath("appData"), "mascote-desktop"));
+}
+
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("enable-transparent-visuals");
+  // No Wayland, um app não consegue escolher onde a própria janela fica nem saber onde o mouse está:
+  // o pet não teria como cobrir a tela. Pelo XWayland (X11) isso funciona. Essa escolha só vale na
+  // linha de comando (npm start e o atalho já mandam); se faltou, o app abre de novo com ela.
+  // MASCOTE_WAYLAND=1 desliga isso.
+  const temX11 = process.argv.some((a) => a === "--ozone-platform=x11");
+  if (plataforma.wayland() && !temX11 && process.env.MASCOTE_WAYLAND !== "1") {
+    app.relaunch({
+      execPath: process.env.APPIMAGE || process.execPath, // AppImage: abre o arquivo .AppImage de novo
+      args: [...process.argv.slice(1), "--ozone-platform=x11"],
+    });
+    app.exit(0);
+  }
+}
 // No Windows, o Chromium para de PINTAR janelas que ele acha que estão cobertas por outras
 // (ex.: navegador maximizado). A janela do pet é transparente e cobre as telas todas, então ele
 // erra a conta: o pet "anda" por dentro mas a imagem congela, e os bilhetes não aparecem.
@@ -116,9 +138,17 @@ const PAINEL = { w: 360, h: 520 };
 
 const tela = () => screen.getPrimaryDisplay();
 
+// Monitores que o overlay cobre: todos, menos no Mac com "Monitores têm Spaces separados" (o padrão),
+// em que uma janela só aparece num monitor. Aí é o monitor do chat.
+function telasDoOverlay() {
+  const todas = screen.getAllDisplays();
+  if (todas.length > 1 && plataforma.macMonitoresSeparados()) return [telaDoChat()];
+  return todas;
+}
+
 // O overlay cobre todos os monitores juntos; as coordenadas do pet são relativas a este retângulo.
 function areaTotal() {
-  const ds = screen.getAllDisplays().map((d) => d.bounds);
+  const ds = telasDoOverlay().map((d) => d.bounds);
   const x = Math.min(...ds.map((b) => b.x));
   const y = Math.min(...ds.map((b) => b.y));
   return {
@@ -173,7 +203,7 @@ function casaPara(r) {
 
 // Telas em que o pet pode ficar: todas, ou só a escolhida em ⚙️ (config.telas = id do monitor).
 function telasPermitidas() {
-  const ds = screen.getAllDisplays();
+  const ds = telasDoOverlay();
   const escolhida = config.telas !== "todas" && ds.find((d) => String(d.id) === String(config.telas));
   return escolhida ? [escolhida] : ds; // se a tela escolhida foi desconectada, volta para todas
 }
@@ -241,6 +271,7 @@ function criarOverlay() {
     resizable: false,
     movable: false,
     alwaysOnTop: true,
+    enableLargerThanScreen: true, // no Mac, sem isso a janela não passa do tamanho de um monitor
     backgroundColor: "#00000000",
     webPreferences: prefsSeguras(),
   });
@@ -321,7 +352,10 @@ function abrirChat(aberto) {
   chatAberto = aberto;
   posicionarChat();
   chat.webContents.send("chat:estado", aberto);
-  if (aberto) chat.focus();
+  if (aberto) {
+    if (plataforma.MAC) app.focus({ steal: true }); // sem ícone no Dock, o Mac não passa o teclado sozinho
+    chat.focus();
+  }
 }
 
 let posicionando = false;
@@ -329,6 +363,10 @@ function posicionarChat() {
   posicionando = true;
   chat.setBounds(boundsChat(chatAberto));
   setTimeout(() => (posicionando = false), 100);
+  // no Mac com monitores separados, o overlay muda de monitor junto com o chat
+  const a = areaTotal();
+  const b = overlay && !overlay.isDestroyed() ? overlay.getBounds() : a;
+  if (a.x !== b.x || a.y !== b.y || a.width !== b.width || a.height !== b.height) overlay.setBounds(a);
   // o pet acompanha o chat (e não fica escondido atrás do painel)
   overlay?.webContents.send("tela", infoTela());
 }
@@ -382,6 +420,8 @@ function iniciarCursor() {
 }
 
 // ---------- bandeja ----------
+// A barra de menus do Mac é baixinha (ícones de 18 pontos); Windows e Linux usam 32 e reduzem sozinhos.
+const LADO_BANDEJA = process.platform === "darwin" ? 18 : 32;
 function iconeBandeja() {
   const pet = petAtual();
   try {
@@ -392,9 +432,9 @@ function iconeBandeja() {
       const quadrado = Buffer.alloc(lado * lado * 4);
       const ox = Math.floor((lado - w) / 2), oy = Math.floor((lado - h) / 2);
       for (let y = 0; y < h; y++) buf.copy(quadrado, ((y + oy) * lado + ox) * 4, y * w * 4, (y + 1) * w * 4);
-      return nativeImage.createFromBitmap(quadrado, { width: lado, height: lado }).resize({ width: 32, height: 32, quality: "best" });
+      return nativeImage.createFromBitmap(quadrado, { width: lado, height: lado }).resize({ width: LADO_BANDEJA, height: LADO_BANDEJA, quality: "best" });
     }
-    return nativeImage.createFromPath(new URL(pet.animacoes.parado.quadros[0]).pathname).resize({ height: 32 });
+    return nativeImage.createFromPath(new URL(pet.animacoes.parado.quadros[0]).pathname).resize({ height: LADO_BANDEJA });
   } catch {
     return nativeImage.createEmpty();
   }
@@ -405,7 +445,7 @@ function montarBandeja() {
     { label: petAtual().nome, enabled: false },
     escondido
       ? { label: "Mostrar o mascote", click: () => esconderMascote(false) }
-      : { label: "Minimizar para a bandeja", click: () => esconderMascote(true) },
+      : { label: plataforma.MAC ? "Minimizar para a barra de menus" : "Minimizar para a bandeja", click: () => esconderMascote(true) },
     { label: "Abrir o chat", click: () => (escondido && esconderMascote(false), abrirChat(true)) },
     { label: "Chamar o pet de volta", click: () => overlay.webContents.send("pet:voltar") },
     { label: "Chat de volta para o canto", click: () => ((config.chatPos = undefined), salvarConfig(), posicionarChat()) },
@@ -552,7 +592,13 @@ function registrarIpc() {
     { id: "seguir-mouse", nome: "Seguir o mouse", tipo: "seguir", padrao: false },
     { id: "admin-janelas", nome: "Também em janelas de administrador", tipo: "admin", padrao: false, admin: true, precisa: () => travessuras.teclasDisponiveis() && admin.disponivel() },
   ];
-  const ligada = (t) => (t.admin && !admin.ehAdmin() ? false : (config.travessuras?.[t.id] ?? t.padrao) === true);
+  // Por que uma travessura está com cadeado: falta administrador (Windows) ou Acessibilidade (Mac).
+  const bloqueio = (t) => {
+    if (t.admin && !admin.ehAdmin()) return "precisa de administrador";
+    if (t.tipo === "teclas" && plataforma.MAC && !plataforma.acessibilidade()) return "precisa de Acessibilidade";
+    return null;
+  };
+  const ligada = (t) => (bloqueio(t) ? false : (config.travessuras?.[t.id] ?? t.padrao) === true);
   const todasTravessuras = () => [
     ...DO_PET.filter((t) => !t.precisa || t.precisa()),
     ...listaTravessuras().map((t) => ({ ...t, padrao: false })),
@@ -564,26 +610,43 @@ function registrarIpc() {
       tipo: t.tipo,
       ligada: ligada(t),
       precisaAdmin: Boolean(t.admin),
-      bloqueada: Boolean(t.admin) && !admin.ehAdmin(),
+      precisaAcessibilidade: t.tipo === "teclas" && plataforma.MAC,
+      bloqueada: Boolean(bloqueio(t)),
+      selo: bloqueio(t) || (t.admin ? "admin" : null),
     }))
   );
   on("travessuras:ligar", (_e, { id, ligada: valor } = {}) => {
     const t = todasTravessuras().find((x) => x.id === id);
     if (typeof valor !== "boolean" || !t) return;
-    if (valor && t.admin && !admin.ehAdmin()) return; // com cadeado: precisa pedir permissão antes
+    if (valor && bloqueio(t)) return; // com cadeado: precisa pedir permissão antes
     mudarConfig({ travessuras: { ...config.travessuras, [id]: valor } });
   });
 
-  // ---------- permissão de administrador e iniciar com o Windows ----------
-  const itemLogin = () => ({ path: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] });
+  // ---------- permissões e iniciar com o sistema (Windows, Mac e Linux) ----------
   const estadoSistema = () => ({
-    windows: process.platform === "win32",
+    sistema: plataforma.nomeSistema(),
+    windows: plataforma.WIN,
     admin: admin.ehAdmin(),
-    iniciarComWindows: process.platform === "win32" && app.getLoginItemSettings(itemLogin()).openAtLogin,
+    iniciarDisponivel: plataforma.iniciarDisponivel(),
+    iniciarComSistema: plataforma.iniciarComSistema(),
+    // Mac: permissão de Acessibilidade para as travessuras de teclado
+    acessibilidade: plataforma.MAC ? plataforma.acessibilidade() : null,
+    // Linux com Wayland: teclado e mouse dos outros programas ficam de fora (limite do próprio Wayland)
+    wayland: plataforma.wayland(),
   });
   handle("sistema:estado", estadoSistema);
-  handle("sistema:iniciarComWindows", (_e, valor) => {
-    if (process.platform === "win32" && typeof valor === "boolean") app.setLoginItemSettings({ ...itemLogin(), openAtLogin: valor });
+  handle("sistema:iniciarComSistema", (_e, valor) => {
+    if (typeof valor === "boolean") {
+      try {
+        plataforma.definirIniciarComSistema(valor);
+      } catch (e) {
+        log("main", "error", "iniciar com o sistema falhou:", e);
+      }
+    }
+    return estadoSistema();
+  });
+  handle("sistema:pedirAcessibilidade", () => {
+    plataforma.pedirAcessibilidade();
     return estadoSistema();
   });
   handle("sistema:pedirAdmin", async () => {
@@ -757,7 +820,7 @@ function filtrarConfigDaPagina(parcial) {
 }
 
 // ---------- início ----------
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   log("main", "info", `iniciando v${app.getVersion()} (Electron ${process.versions.electron}), telas:`, screen.getAllDisplays().map((d) => d.bounds));
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, ok) => ok(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
@@ -770,6 +833,10 @@ app.whenReady().then(() => {
     return app.quit();
   }
   registrarIpc();
+  // Mac: o mascote mora na barra de menus, sem ícone no Dock (como os outros pets de desktop)
+  if (plataforma.MAC) app.dock?.hide();
+  // Linux: janelas transparentes criadas logo de cara às vezes saem com fundo preto
+  if (plataforma.LINUX) await new Promise((r) => setTimeout(r, 300));
   // teste do "chamar de volta": o overlay põe o pet longe e aqui chamamos pelo mesmo canal do botão
   if (process.env.MASCOTE_DEBUG === "voltar") setTimeout(() => overlay?.webContents.send("pet:voltar"), 4000);
   criarOverlay();

@@ -1,0 +1,87 @@
+# Gera os instaladores do Mascote Desktop para Windows, macOS e Linux.
+# - Em todo PR e push na main: gera e guarda os arquivos na aba "Actions" (por 14 dias).
+# - Numa tag v* (ex.: v0.2.0): também publica uma Release no GitHub com todos eles.
+name: Gerar instaladores
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.nome }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nome: Linux (AppImage e deb)
+            os: ubuntu-latest
+            alvo: dist:linux
+            arquivos: |
+              dist/*.AppImage
+              dist/*.deb
+          # Cada Mac gera para o próprio processador: o Claude Code e o koffi vêm compilados por arquitetura.
+          - nome: macOS Apple Silicon (dmg)
+            os: macos-latest
+            alvo: dist:mac
+            arquivos: |
+              dist/*.dmg
+              dist/*.zip
+          - nome: macOS Intel (dmg)
+            os: macos-15-intel
+            alvo: dist:mac
+            arquivos: |
+              dist/*.dmg
+              dist/*.zip
+          - nome: Windows (instalador)
+            os: windows-latest
+            alvo: dist:win
+            arquivos: |
+              dist/*.exe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Gerar
+        run: npm run ${{ matrix.alvo }}
+        env:
+          # sem certificado: o Mac recebe assinatura ad-hoc (veja o README) e o Windows vai sem assinatura
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mascote-${{ matrix.os }}
+          path: ${{ matrix.arquivos }}
+          retention-days: 14
+          if-no-files-found: error
+
+  release:
+    name: Publicar Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: instaladores
+          merge-multiple: true
+      # fixada por SHA (= v2): ela tem permissão de escrita, e uma tag pode ser movida pelo dono
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          files: instaladores/*
+          generate_release_notes: true
