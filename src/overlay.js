@@ -618,7 +618,7 @@ function desenhar(dt) {
   ctx.clearRect(0, 0, tela.largura, tela.altura);
   if (!sprites.parado) return;
 
-  // Visual 3D: usa a versão "<desenho>3d" quando o pet tem uma (por enquanto só o Palito).
+  // Visual 3D: usa a versão "<desenho>3d" quando o pet tem uma (Palito, Pato e Tartaruga).
   const vetor = pet.desenho && ((config.visual3d !== false && window.Vetor?.[pet.desenho + "3d"]) || window.Vetor?.[pet.desenho]);
   if (vetor) return desenharVetor(vetor, dt);
   const nome = animacao(P.anim);
