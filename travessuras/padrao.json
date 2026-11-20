@@ -1,0 +1,17 @@
+{
+ "travessuras": [
+  { "id": "alt-tab", "nome": "Alt+Tab (troca de janela)", "tipo": "teclas", "teclas": ["alt", "tab"], "vezes": [1, 5] },
+  {
+   "id": "navegador",
+   "nome": "Abrir o navegador",
+   "tipo": "abrir",
+   "links": [
+    "https://www.google.com/search?q=como+parar+de+procrastinar",
+    "https://www.google.com/search?q=fotos+de+patos+fofos&tbm=isch",
+    "https://www.google.com/search?q=por+que+meu+pet+de+desktop+me+odeia",
+    "https://pt.wikipedia.org/wiki/Especial:Aleat%C3%B3ria",
+    "https://www.youtube.com/results?search_query=lofi+para+estudar"
+   ]
+  }
+ ]
+}

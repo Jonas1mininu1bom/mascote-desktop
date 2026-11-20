@@ -2,7 +2,7 @@
 const cv = document.getElementById("tela");
 const ctx = cv.getContext("2d");
 
-let pet, config, tela, mouseNativo;
+let pet, config, tela, mouseNativo, debug;
 let sprites = {}; // nome da animação -> [{normal, espelhado}]
 let tamGrade = { w: 16, h: 24 }; // tamanho do sprite em "pixels do pet"
 
@@ -26,6 +26,9 @@ const escolha = (lista) => lista[Math.floor(Math.random() * lista.length)];
 const larguraPx = () => tamGrade.w * pet.escala;
 const alturaPx = () => tamGrade.h * pet.escala;
 const velocidade = () => pet.velocidade * 60; // pixels por segundo
+const VEL_PERSEGUIR = 520; // px/s correndo atrás do mouse
+const RAIO_PEGAR = 18; // distância da mão até o mouse para "pegar"
+const VEL_ARRASTAR = 260; // px/s arrastando o mouse roubado
 
 // ---------- sprites ----------
 function quadroPixel(linhas) {
@@ -98,6 +101,7 @@ const RESERVA = {
   correndo: ["andando"], segurando: ["correndo", "andando"], arrastando: ["andando"],
   carregado: ["feliz", "parado"], acenando: ["feliz", "parado"], pensando: ["parado"],
   dormindo: ["parado"], feliz: ["parado"], trabalhando: ["correndo", "andando"],
+  travessura: ["acenando", "feliz", "parado"],
 };
 function animacao(nome) {
   if (sprites[nome]) return nome;
@@ -107,6 +111,7 @@ function animacao(nome) {
 
 // ---------- estados ----------
 function mudar(estado, tempo, extra = {}) {
+  if (debug && estado !== P.estado) console.warn(`[debug] ${P.estado} -> ${estado} x=${Math.round(P.x)} y=${Math.round(P.y)} cursor=${cursor.x},${cursor.y}`);
   P.estado = estado;
   P.tempo = tempo;
   Object.assign(P, extra);
@@ -119,16 +124,35 @@ function falar(texto, segundos = 3.5) {
   P.fala = { texto, ate: relogio + segundos };
 }
 
+// ---------- onde ele pode andar ----------
+// Passeando: só no monitor principal. Modo bagunça: em todos os monitores.
+const areas = () => (config?.bagunca && tela.areas?.length ? tela.areas : [tela.area]);
+function limites() {
+  const l = areas();
+  return { min: Math.min(...l.map((a) => a.x)), max: Math.max(...l.map((a) => a.x + a.w)) };
+}
+// Monitor em que um x está (ou o mais próximo, se cair num vão entre monitores).
+function areaDe(x) {
+  const l = areas();
+  const dist = (a) => (x < a.x ? a.x - x : x > a.x + a.w ? x - a.x - a.w : 0);
+  return l.reduce((melhor, a) => (dist(a) < dist(melhor) ? a : melhor), l[0]);
+}
+const dentro = (p, a) => p.x >= a.x && p.x <= a.x + a.w && p.y >= a.y && p.y <= a.y + a.h + 8;
+
 function limitarX(x) {
   const m = larguraPx() / 2;
-  return Math.max(m, Math.min(tela.largura - m, x));
+  const { min, max } = limites();
+  return Math.max(min + m, Math.min(max - m, x));
 }
-function limitarY(y) {
-  return Math.max(tela.area.y + alturaPx(), Math.min(tela.area.y + tela.area.h, y));
+function limitarY(y, x = P.x) {
+  const a = areaDe(x);
+  return Math.max(a.y + alturaPx(), Math.min(a.y + a.h, y));
 }
 
 function pontoAleatorio() {
-  return { x: limitarX(rand(0, tela.largura)), y: limitarY(rand(tela.area.y + tela.area.h * 0.15, tela.area.y + tela.area.h)) };
+  const a = escolha(areas());
+  const x = limitarX(rand(a.x, a.x + a.w));
+  return { x, y: limitarY(rand(a.y + a.h * 0.15, a.y + a.h), x) };
 }
 
 function proximoEstado() {
@@ -136,6 +160,8 @@ function proximoEstado() {
   if (P.humor === "trabalhando") return mudar("trabalhando", 999, { alvo: { x: limitarX(P.x + rand(-40, 40)), y: P.y } });
 
   const r = Math.random();
+  if (debug === "perseguir" && mouseNativo) return mudar("perseguir", 10);
+  if (debug === "travessura" && config.bagunca) pedirTravessura();
   if (!config.passear) {
     const a = P.ancora || tela.casa;
     if (r < 0.5) return mudar("parado", rand(3, 7));
@@ -146,17 +172,107 @@ function proximoEstado() {
     return mudar("parado", 3.5);
   }
 
-  if (config.bagunca && mouseNativo && r < 0.12) return mudar("perseguir", 7);
-  if (config.bagunca && r < 0.2) {
-    const lado = P.x < tela.largura / 2 ? -1 : 1;
-    const x = lado < 0 ? larguraPx() / 2 - larguraPx() * 0.6 : tela.largura - larguraPx() / 2 + larguraPx() * 0.6;
-    return mudar("buscar", 15, { alvo: { x, y: limitarY(rand(tela.area.y + 220, tela.area.y + tela.area.h)) }, lado });
+  if (config.bagunca && mouseNativo && r < 0.25) return mudar("perseguir", 10);
+  if (config.bagunca && r >= 0.35 && r < 0.4) pedirTravessura(); // raro (e o app ainda limita a 1 a cada 3 min)
+  if (config.bagunca && r < 0.35) {
+    const { min, max } = limites();
+    const lado = P.x < (min + max) / 2 ? -1 : 1;
+    const x = lado < 0 ? min + larguraPx() / 2 - larguraPx() * 0.6 : max - larguraPx() / 2 + larguraPx() * 0.6;
+    const a = areaDe(x);
+    return mudar("buscar", 20, { alvo: { x, y: limitarY(rand(a.y + 220, a.y + a.h), x) }, lado });
   }
   if (r < 0.45) return mudar("parado", rand(2, 5));
   if (r < 0.85) return mudar("andar", 12, { alvo: pontoAleatorio() });
   if (r < 0.92) return mudar("dormindo", rand(6, 12));
   falar(escolha(pet.falas.length ? pet.falas : ["🙂"]));
   return mudar("parado", 3.5);
+}
+
+// ---------- travessuras ----------
+let travessura = null; // { token, tipo, rotulos, vezes, tocadas, apertadaAte }
+let pedindo = false;
+async function pedirTravessura() {
+  if (pedindo || travessura) return;
+  pedindo = true;
+  const t = await window.api.invocar("travessura:pedir").finally(() => (pedindo = false));
+  if (!t || travessura || segurado || ["perseguir", "segurando", "buscar", "arrastando"].includes(P.estado)) return;
+  travessura = { ...t, tocadas: 0, apertadaAte: 0 };
+  falar(escolha(t.tipo === "abrir" ? ["Olha isso! 😈", "Pesquisei pra você 🌐"] : ["Hehe 😈", "Ops...", "Segura essa!"]), 2.5);
+  mudar("travessura", 15);
+  // um tempinho para a pessoa ver as teclas antes de ele apertar
+  setTimeout(() => travessura && window.api.enviar("travessura:executar", travessura.token), 1300);
+}
+window.api.ouvir("travessura:tecla", (i) => {
+  if (!travessura) return;
+  travessura.tocadas = i + 1;
+  travessura.apertadaAte = relogio + 0.22;
+  P.tAnim = 0;
+});
+window.api.ouvir("travessura:fim", () => {
+  if (!travessura) return;
+  travessura = null;
+  if (P.estado === "travessura") {
+    falar(escolha(["Hihi 🙃", "Não fui eu!", "Foi sem querer 😇"]), 2);
+    mudar("feliz", 1.5);
+  }
+});
+
+// Teclas desenhadas ao lado do pet: metade de cada lado (Alt de um lado, Tab do outro).
+function desenharTeclas(topo) {
+  if (!travessura || P.estado !== "travessura") return;
+  const apertada = relogio < travessura.apertadaAte;
+  const r = travessura.rotulos;
+  ctx.font = "bold 13px system-ui, sans-serif";
+  const larg = r.map((t) => Math.max(38, ctx.measureText(t).width + 18));
+  // metade de cada lado; se do lado direito não couber (chat ou fim da tela), vão todas para a esquerda
+  let metade = Math.ceil(r.length / 2);
+  const direita = r.slice(metade).reduce((s, _t, i) => s + larg[metade + i] + 6, 0);
+  const pertoDoChat = P.y > tela.casa.y - 120 && P.x < tela.casa.x + 40; // na altura do botão, à esquerda dele
+  const limiteDir = Math.min(limites().max, limiteBalao ?? Infinity, pertoDoChat ? tela.casa.x + 34 : Infinity);
+  if (P.x + larguraPx() / 2 + 10 + direita > limiteDir) metade = r.length;
+  const y0 = P.y - 34;
+  const pos = [];
+  let xe = P.x - larguraPx() / 2 - 10;
+  for (let i = metade - 1; i >= 0; i--) {
+    xe -= larg[i];
+    pos[i] = xe;
+    xe -= 6;
+  }
+  let xd = P.x + larguraPx() / 2 + 10;
+  for (let i = metade; i < r.length; i++) {
+    pos[i] = xd;
+    xd += larg[i] + 6;
+  }
+  r.forEach((rotulo, i) => {
+    // as seguradas ficam afundadas depois do 1º toque; a última pisca a cada toque
+    const afundada = i < r.length - 1 ? travessura.tocadas > 0 : apertada;
+    const d = afundada ? 3 : 0;
+    ctx.fillStyle = "#9aa0b4";
+    ctx.beginPath();
+    ctx.roundRect(pos[i], y0 + 3, larg[i], 28, 6);
+    ctx.fill();
+    ctx.fillStyle = afundada ? "#dfe3ee" : "#f7f8fc";
+    ctx.strokeStyle = "#2b2d42";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(pos[i], y0 + d, larg[i], 28 - (afundada ? 0 : 3), 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#2b2d42";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    ctx.fillText(rotulo, pos[i] + larg[i] / 2, y0 + d + 12);
+    ctx.textAlign = "start";
+  });
+  // contador em cima da tecla que está sendo tocada (fica longe do balão de fala)
+  if (travessura.tipo === "teclas" && travessura.vezes > 1) {
+    const u = r.length - 1;
+    ctx.font = "bold 12px system-ui, sans-serif";
+    ctx.fillStyle = "#ef476f";
+    ctx.textAlign = "center";
+    ctx.fillText(`${travessura.tocadas}/${travessura.vezes}`, pos[u] + larg[u] / 2, y0 - 10);
+    ctx.textAlign = "start";
+  }
 }
 
 // Anda em direção ao alvo; devolve true quando chega.
@@ -196,7 +312,22 @@ function moverBilhete() {
   window.api.enviar("bilhete:mover", { id: b.id, x, y: m.y - 24 });
 }
 
+// Resgate: se ele ficar fora de todas as telas (ou a posição virar NaN), volta para casa.
+let foraHa = 0;
+function resgatar(dt) {
+  const quebrado = !Number.isFinite(P.x) || !Number.isFinite(P.y);
+  const visivel = !quebrado && tela.areas.some((a) => P.x > a.x - larguraPx() / 2 && P.x < a.x + a.w + larguraPx() / 2 && P.y > a.y && P.y < a.y + a.h + alturaPx());
+  foraHa = visivel ? 0 : foraHa + dt;
+  if (quebrado || foraHa > 3) {
+    console.warn(`[resgate] pet sumiu (estado=${P.estado}, x=${P.x}, y=${P.y}); voltando para casa`);
+    Object.assign(P, { x: tela.casa.x, y: tela.casa.y, ancora: { ...tela.casa }, bilhete: null });
+    foraHa = 0;
+    mudar("acenando", 2);
+  }
+}
+
 function atualizar(dt) {
+  if (!segurado && P.estado !== "buscar" && P.estado !== "arrastando") resgatar(dt);
   P.tempo -= dt;
   P.tAnim += dt;
 
@@ -219,10 +350,16 @@ function atualizar(dt) {
       return;
     case "perseguir": {
       const m = mao();
-      const alvo = { x: P.x + (cursor.x - m.x), y: P.y + (cursor.y - m.y) };
-      if (andarAte(alvo, dt, 2.2)) {
+      // mouse fora da área onde ele pode andar (ex.: em cima da barra de tarefas): espera na beirada
+      const xAlvo = limitarX(P.x + (cursor.x - m.x));
+      const alvo = { x: xAlvo, y: limitarY(P.y + (cursor.y - m.y), xAlvo) };
+      // corre rápido, independente da velocidade do pet (senão um pet lento nunca alcança o mouse)
+      const mult = Math.max(2.2, VEL_PERSEGUIR / velocidade());
+      andarAte(alvo, dt, mult);
+      const m2 = mao();
+      if (Math.hypot(cursor.x - m2.x, cursor.y - m2.y) < RAIO_PEGAR) {
         falar(escolha(["Peguei! 😈", "É meu agora!", "Hehe"]), 2);
-        return mudar("segurando", rand(2.5, 4.5), { alvo: pontoAleatorio() });
+        return mudar("segurando", rand(3, 6), { alvo: pontoAleatorio() });
       }
       if (P.tempo <= 0) {
         falar("Ufa, cansei...", 2);
@@ -231,7 +368,8 @@ function atualizar(dt) {
       return;
     }
     case "segurando": {
-      andarAte(P.alvo, dt, 0.9);
+      // leva o mouse para longe; chegando, escolhe outro lugar
+      if (andarAte(P.alvo, dt, Math.max(1, VEL_ARRASTAR / velocidade()))) P.alvo = pontoAleatorio();
       const m = mao();
       window.api.enviar("pet:moverCursor", { x: m.x, y: m.y });
       if (P.tempo <= 0) mudar("feliz", 1.2);
@@ -241,11 +379,13 @@ function atualizar(dt) {
       if (andarAte(P.alvo, dt, 1.3)) {
         mudar("parado", 99);
         const ladoInicial = P.lado;
-        window.api.invocar("bilhete:criar", { x: ladoInicial < 0 ? -260 : tela.largura + 20, y: P.y - 60, conteudo: escolha(pet.bilhetes.length ? pet.bilhetes : [{ texto: "Oi!" }]) }).then((b) => {
+        const lim = limites();
+        window.api.invocar("bilhete:criar", { x: ladoInicial < 0 ? lim.min - 260 : lim.max + 20, y: P.y - 60 }).then((b) => {
           if (!b || P.estado !== "parado") return proximoEstado();
           P.bilhete = b;
           P.olhando = -ladoInicial;
-          mudar("arrastando", 20, { alvo: { x: limitarX(rand(tela.largura * 0.25, tela.largura * 0.75)), y: P.y } });
+          const { min, max } = limites();
+          mudar("arrastando", 20, { alvo: { x: limitarX(rand(min + (max - min) * 0.25, min + (max - min) * 0.75)), y: P.y } });
         });
       } else if (P.tempo <= 0) proximoEstado();
       return;
@@ -262,6 +402,12 @@ function atualizar(dt) {
       }
       return;
     }
+    case "travessura":
+      if (P.tempo <= 0) {
+        travessura = null;
+        proximoEstado();
+      }
+      return;
     default:
       if (P.tempo <= 0) proximoEstado();
   }
@@ -300,7 +446,8 @@ window.addEventListener("mouseup", () => {
     if (P.humor === "pensando" || P.humor === "trabalhando") return mudar(P.humor, 999);
     return mudar("feliz", 1.4);
   }
-  P.y = Math.max(P.y, tela.area.y + alturaPx());
+  P.x = limitarX(P.x);
+  P.y = limitarY(Math.max(P.y, areaDe(P.x).y + alturaPx()));
   P.ancora = { x: P.x, y: P.y };
   falar(escolha(["Uhul!", "Ei! 😤", "De novo!"]), 1.8);
   mudar("feliz", 1.2);
@@ -364,6 +511,7 @@ function desenhar(dt) {
   ctx.drawImage(img, dx, dy);
 
   const topo = dy;
+  desenharTeclas(topo);
   if (P.estado === "dormindo") {
     ctx.font = "bold 14px system-ui, sans-serif";
     ctx.fillStyle = "#5c6b8a";
@@ -426,8 +574,13 @@ window.api.ouvir("config", (c) => {
   if (!config.passear && ["andar", "perseguir", "segurando", "buscar", "arrastando"].includes(P.estado)) {
     P.bilhete = null;
     mudar("voltar", 20, { alvo: P.ancora || tela.casa });
+  } else if (!config.bagunca && !dentro(P, tela.area) && !segurado) {
+    P.bilhete = null;
+    mudar("voltar", 20, { alvo: { ...tela.casa } });
   }
 });
+window.addEventListener("error", (e) => console.error("[overlay]", e.message, e.filename + ":" + e.lineno));
+window.addEventListener("unhandledrejection", (e) => console.error("[overlay] promessa:", e.reason?.message || e.reason));
 window.api.ouvir("tela", (t) => {
   tela = t;
   ajustarCanvas();
@@ -470,6 +623,8 @@ window.api.ouvir("pet:humor", (h) => {
   config = d.config;
   tela = d.tela;
   mouseNativo = d.mouseNativo;
+  debug = d.debug;
+  if (debug) console.warn("[debug] modo", debug, "mouseNativo=", mouseNativo, "telas=", JSON.stringify(d.tela.areas));
   ajustarCanvas();
   P.x = tela.casa.x;
   P.y = tela.casa.y;

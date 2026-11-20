@@ -6,15 +6,61 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { listarPets, quadroParaBitmap } = require("./src/pets");
 const { ChatClaude } = require("./src/claude");
+const bilhetesMod = require("./src/bilhetes");
+const travessuras = require("./src/travessuras");
 
 if (process.platform === "linux") app.commandLine.appendSwitch("enable-transparent-visuals");
 if (!app.requestSingleInstanceLock()) app.quit();
 
+// ---------- log ----------
+// Grava em <userData>/logs/mascote.log tudo do processo principal e das páginas (overlay, chat).
+let arqLog = null;
+function log(origem, nivel, ...partes) {
+  const linha = `${new Date().toISOString()} [${origem}] ${nivel}: ${partes.map((p) => (p instanceof Error ? p.stack : typeof p === "string" ? p : JSON.stringify(p))).join(" ")}`;
+  (nivel === "error" ? console.error : console.log)(linha);
+  try {
+    if (!arqLog) {
+      const pasta = path.join(app.getPath("userData"), "logs");
+      fs.mkdirSync(pasta, { recursive: true });
+      arqLog = path.join(pasta, "mascote.log");
+      if (fs.existsSync(arqLog) && fs.statSync(arqLog).size > 1024 * 1024) fs.renameSync(arqLog, arqLog + ".1");
+    }
+    fs.appendFileSync(arqLog, linha + "\n");
+  } catch {}
+}
+process.on("uncaughtException", (e) => log("main", "error", e));
+process.on("unhandledRejection", (e) => log("main", "error", e));
+
+// Repassa o console de uma página para o log, e avisa se ela cair ou travar.
+function vigiar(nome, w) {
+  const wc = w.webContents;
+  wc.on("console-message", (e) => {
+    if (e.level === "debug" || e.level === "info") return;
+    log(nome, e.level, e.message, `(${path.basename(e.sourceId || "")}:${e.lineNumber})`);
+  });
+  wc.on("render-process-gone", (_e, d) => log(nome, "error", "a página caiu:", d.reason, "código", d.exitCode));
+  w.on("unresponsive", () => log(nome, "warning", "a página parou de responder"));
+  w.on("responsive", () => log(nome, "info", "a página voltou a responder"));
+}
+
 // ---------- configuração ----------
-const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir() };
+const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir(), travessuras: {} };
 let config = { ...PADRAO };
 const arqConfig = () => path.join(app.getPath("userData"), "config.json");
 const pastaPetsUsuario = () => path.join(app.getPath("userData"), "pets");
+const pastaBilhetesUsuario = () => path.join(app.getPath("userData"), "bilhetes");
+const pastaTravessurasUsuario = () => path.join(app.getPath("userData"), "travessuras");
+const listaTravessuras = () =>
+  travessuras.listar({ arqPadrao: path.join(__dirname, "travessuras", "padrao.json"), pastaUsuario: pastaTravessurasUsuario() });
+function abrirPastaTravessuras() {
+  travessuras.prepararPasta(pastaTravessurasUsuario());
+  shell.openPath(pastaTravessurasUsuario());
+}
+function abrirPastaBilhetes() {
+  bilhetesMod.prepararPasta(pastaBilhetesUsuario());
+  travessuras.prepararPasta(pastaTravessurasUsuario());
+  shell.openPath(pastaBilhetesUsuario());
+}
 
 function carregarConfig() {
   try {
@@ -23,6 +69,7 @@ function carregarConfig() {
     config = { ...PADRAO };
   }
   if (!fs.existsSync(config.pasta)) config.pasta = os.homedir();
+  if (!config.travessuras || typeof config.travessuras !== "object" || Array.isArray(config.travessuras)) config.travessuras = {};
 }
 function salvarConfig() {
   fs.mkdirSync(path.dirname(arqConfig()), { recursive: true });
@@ -50,6 +97,19 @@ const PAINEL = { w: 360, h: 520 };
 
 const tela = () => screen.getPrimaryDisplay();
 
+// O overlay cobre todos os monitores juntos; as coordenadas do pet são relativas a este retângulo.
+function areaTotal() {
+  const ds = screen.getAllDisplays().map((d) => d.bounds);
+  const x = Math.min(...ds.map((b) => b.x));
+  const y = Math.min(...ds.map((b) => b.y));
+  return {
+    x,
+    y,
+    width: Math.max(...ds.map((b) => b.x + b.width)) - x,
+    height: Math.max(...ds.map((b) => b.y + b.height)) - y,
+  };
+}
+
 function boundsChat(aberto) {
   const wa = tela().workArea;
   const w = aberto ? PAINEL.w : BOTAO;
@@ -59,14 +119,15 @@ function boundsChat(aberto) {
 
 // Informações da tela no sistema de coordenadas do overlay.
 function infoTela() {
-  const d = tela();
-  const o = d.bounds;
-  const wa = d.workArea;
+  const o = areaTotal();
+  const wa = tela().workArea;
   const b = boundsChat(false);
+  const rel = (r) => ({ x: r.x - o.x, y: r.y - o.y, w: r.width, h: r.height });
   return {
     largura: o.width,
     altura: o.height,
-    area: { x: wa.x - o.x, y: wa.y - o.y, w: wa.width, h: wa.height },
+    area: rel(wa), // monitor principal
+    areas: screen.getAllDisplays().map((d) => rel(d.workArea)), // todos (modo bagunça)
     // o pet nasce (e mora) ao lado do botão de chat
     casa: { x: b.x - o.x - 40, y: wa.y - o.y + wa.height - 6 },
   };
@@ -97,9 +158,8 @@ const num = (v) => typeof v === "number" && Number.isFinite(v);
 const naoFocavel = { focusable: false, skipTaskbar: true, hasShadow: false };
 
 function criarOverlay() {
-  const { bounds } = tela();
   overlay = new BrowserWindow({
-    ...bounds,
+    ...areaTotal(),
     ...naoFocavel,
     transparent: true,
     frame: false,
@@ -112,7 +172,19 @@ function criarOverlay() {
   overlay.setAlwaysOnTop(true, "screen-saver");
   overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlay.setIgnoreMouseEvents(true, { forward: true });
+  // o Windows limita janelas novas ao tamanho de um monitor; reaplicar depois de criada cobre todos
+  overlay.setBounds(areaTotal());
+  overlay.once("ready-to-show", () => overlay.setBounds(areaTotal()));
   overlay.loadFile(path.join(__dirname, "src/overlay.html"));
+  vigiar("overlay", overlay);
+  // se a página do pet cair, cria de novo (senão ele some até reiniciar o app)
+  overlay.webContents.on("render-process-gone", () => {
+    setTimeout(() => {
+      if (overlay && !overlay.isDestroyed()) overlay.destroy();
+      criarOverlay();
+      log("overlay", "warning", "overlay recriado depois de cair");
+    }, 1000);
+  });
 }
 
 function criarChat() {
@@ -130,6 +202,7 @@ function criarChat() {
   chat.setAlwaysOnTop(true, "screen-saver");
   chat.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   chat.loadFile(path.join(__dirname, "src/chat.html"));
+  vigiar("chat", chat);
 }
 
 function abrirChat(aberto) {
@@ -137,7 +210,7 @@ function abrirChat(aberto) {
   chat.setBounds(boundsChat(aberto));
   chat.webContents.send("chat:estado", aberto);
   // o pet anda para o lado do chat, para não ficar escondido atrás dele
-  overlay?.webContents.send("chat:estado", { aberto, esquerda: boundsChat(aberto).x - tela().bounds.x });
+  overlay?.webContents.send("chat:estado", { aberto, esquerda: boundsChat(aberto).x - areaTotal().x });
   if (aberto) chat.focus();
 }
 
@@ -150,7 +223,7 @@ function iniciarCursor() {
   setInterval(() => {
     if (!overlay || overlay.isDestroyed()) return;
     const p = screen.getCursorScreenPoint();
-    const o = tela().bounds;
+    const o = areaTotal();
     overlay.webContents.send("cursor", { x: p.x - o.x, y: p.y - o.y });
   }, 16);
 }
@@ -183,6 +256,8 @@ function montarBandeja() {
       submenu: pets.map((p) => ({ label: p.nome, type: "radio", checked: p.id === petAtual().id, click: () => escolherPet(p.id) })),
     },
     { label: "Abrir pasta de pets…", click: () => shell.openPath(pastaPetsUsuario()) },
+    { label: "Abrir pasta de bilhetes…", click: abrirPastaBilhetes },
+    { label: "Abrir pasta de travessuras…", click: abrirPastaTravessuras },
     { label: "Recarregar pets", click: () => escolherPet(config.pet) },
     { type: "separator" },
     { label: "Sair", click: () => app.quit() },
@@ -213,9 +288,14 @@ function escolherPet(id) {
 }
 
 // ---------- bilhetes ----------
-function criarBilhete({ x, y, conteudo }) {
+function criarBilhete({ x, y }) {
+  const conteudo = bilhetesMod.sortear({
+    arqPadrao: path.join(__dirname, "bilhetes", "padrao.json"),
+    pastaUsuario: pastaBilhetesUsuario(),
+    pet: petAtual(),
+  });
   const id = proxIdBilhete++;
-  const o = tela().bounds;
+  const o = areaTotal();
   const w = new BrowserWindow({
     x: Math.round(o.x + x),
     y: Math.round(o.y + y),
@@ -229,7 +309,7 @@ function criarBilhete({ x, y, conteudo }) {
     webPreferences: prefsSeguras(),
   });
   w.setAlwaysOnTop(true, "floating");
-  w.loadFile(path.join(__dirname, "src/bilhete.html"), { query: { dados: JSON.stringify(conteudo || {}) } });
+  w.loadFile(path.join(__dirname, "src/bilhete.html"), { query: { dados: JSON.stringify(conteudo) } });
   w.once("ready-to-show", () => w.showInactive());
   w.on("closed", () => {
     bilhetes.delete(id);
@@ -247,11 +327,11 @@ let proxPermissao = 1;
 function registrarIpc() {
   const on = (canal, fn) => ipcMain.on(canal, (e, ...a) => origemConfiavel(e) && fn(e, ...a));
   const handle = (canal, fn) => ipcMain.handle(canal, (e, ...a) => (origemConfiavel(e) ? fn(e, ...a) : null));
-  handle("inicio", () => ({ pet: petAtual(), config, tela: infoTela(), mouseNativo: require("./src/cursor").disponivel() }));
+  handle("inicio", () => ({ pet: petAtual(), config, tela: infoTela(), mouseNativo: require("./src/cursor").disponivel(), debug: process.env.MASCOTE_DEBUG || null }));
   on("pet:ignorar", (_e, ignorar) => overlay?.setIgnoreMouseEvents(ignorar === true, { forward: true }));
   on("pet:moverCursor", (_e, { x, y } = {}) => {
     if (!config.bagunca || !num(x) || !num(y)) return;
-    const o = tela().bounds;
+    const o = areaTotal();
     require("./src/cursor").moverCursor(o.x + x, o.y + y);
   });
   handle("bilhete:criar", (_e, dados) =>
@@ -260,7 +340,7 @@ function registrarIpc() {
   on("bilhete:mover", (_e, { id, x, y } = {}) => {
     if (!num(x) || !num(y)) return;
     const w = bilhetes.get(id);
-    const o = tela().bounds;
+    const o = areaTotal();
     if (w && !w.isDestroyed()) w.setPosition(Math.round(o.x + x), Math.round(o.y + y));
   });
   on("bilhete:fechar", (e) => BrowserWindow.fromWebContents(e.sender)?.close());
@@ -272,6 +352,35 @@ function registrarIpc() {
   handle("pets:listar", () => pets.map((p) => ({ id: p.id, nome: p.nome })));
   on("pets:escolher", (_e, id) => typeof id === "string" && pets.some((p) => p.id === id) && escolherPet(id));
   on("pets:abrirPasta", () => shell.openPath(pastaPetsUsuario()));
+  on("bilhetes:abrirPasta", abrirPastaBilhetes);
+  on("travessuras:abrirPasta", abrirPastaTravessuras);
+
+  // ---------- travessuras ----------
+  handle("travessuras:listar", () =>
+    listaTravessuras().map((t) => ({ id: t.id, nome: t.nome, tipo: t.tipo, ligada: config.travessuras?.[t.id] === true }))
+  );
+  on("travessuras:ligar", (_e, { id, ligada } = {}) => {
+    if (typeof ligada !== "boolean" || !listaTravessuras().some((t) => t.id === id)) return;
+    mudarConfig({ travessuras: { ...config.travessuras, [id]: ligada } });
+  });
+  handle("travessura:pedir", () => {
+    if (!config.bagunca) return null;
+    const t = travessuras.sortear(listaTravessuras(), config.travessuras || {}, { semIntervalo: process.env.MASCOTE_DEBUG === "travessura" });
+    if (t) log("main", "info", "travessura:", t.nome, "x" + t.vezes);
+    return t;
+  });
+  on("travessura:executar", async (_e, token) => {
+    if (!config.bagunca || typeof token !== "string") return;
+    try {
+      await travessuras.executar(token, {
+        abrirLink: (url) => shell.openExternal(url),
+        aoTocar: (i) => overlay?.webContents.send("travessura:tecla", i),
+      });
+    } catch (e) {
+      log("main", "error", "travessura falhou:", e);
+    }
+    overlay?.webContents.send("travessura:fim");
+  });
   on("pet:voltar", () => overlay?.webContents.send("pet:voltar"));
   on("app:sair", () => app.quit());
 
@@ -348,10 +457,13 @@ function filtrarConfigDaPagina(parcial) {
 
 // ---------- início ----------
 app.whenReady().then(() => {
+  log("main", "info", `iniciando v${app.getVersion()} (Electron ${process.versions.electron}), telas:`, screen.getAllDisplays().map((d) => d.bounds));
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, ok) => ok(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   carregarConfig();
   recarregarPets();
+  bilhetesMod.prepararPasta(pastaBilhetesUsuario());
+  travessuras.prepararPasta(pastaTravessurasUsuario());
   if (pets.length === 0) {
     dialog.showErrorBox("Mascote Desktop", "Nenhum pet encontrado na pasta pets/.");
     return app.quit();
@@ -362,11 +474,13 @@ app.whenReady().then(() => {
   montarBandeja();
   iniciarCursor();
   globalShortcut.register("CommandOrControl+Alt+Shift+Q", () => app.quit());
-  screen.on("display-metrics-changed", () => {
-    overlay?.setBounds(tela().bounds);
+  const telasMudaram = () => {
+    log("main", "info", "telas mudaram:", screen.getAllDisplays().map((d) => d.bounds));
+    overlay?.setBounds(areaTotal());
     chat?.setBounds(boundsChat(chatAberto));
     overlay?.webContents.send("tela", infoTela());
-  });
+  };
+  for (const ev of ["display-metrics-changed", "display-added", "display-removed"]) screen.on(ev, telasMudaram);
 });
 
 app.on("will-quit", () => globalShortcut.unregisterAll());

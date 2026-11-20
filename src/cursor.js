@@ -47,6 +47,7 @@ try {
   motivo = e.message;
 }
 
+if (process.env.MASCOTE_DEBUG) console.log("[cursor] mover disponível:", Boolean(mover), motivo);
 if (!mover) console.warn(`[cursor] o pet não vai conseguir pegar o mouse: ${motivo}`);
 
 module.exports = {

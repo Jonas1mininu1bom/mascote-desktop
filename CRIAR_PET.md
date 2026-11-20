@@ -79,7 +79,7 @@ deixa a ampliação nítida (bom para pixel art).
 | `mao` | `[coluna, linha]` da mão da frente, no desenho virado para a direita. É onde ele segura o mouse. |
 | `maoTras` | `[coluna, linha]` da mão de trás. É onde ele segura os bilhetes. |
 | `falas` | Frases que ele diz de vez em quando num balãozinho. |
-| `bilhetes` | Textos (ou `{ "imagem": "arquivo.png" }`) que ele traz no modo bagunça. |
+| `bilhetes` | Textos, `{ "texto": "...", "cor": "#ffd6e0" }` ou `{ "imagem": "arquivo.png" }` (imagem dentro da pasta do pet) que ele traz no modo bagunça, junto com os bilhetes padrão e os da comunidade. |
 
 ### Animações
 

@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
+const { normalizarLista, estaDentro } = require("./bilhetes");
 
 const OBRIGATORIAS = ["parado", "andando"];
 
@@ -47,7 +48,7 @@ function lerPet(pasta) {
     } else if (pet.tipo === "imagens") {
       anim.quadros = anim.quadros.map((arquivo) => {
         const abs = path.resolve(pasta, arquivo);
-        if (!abs.startsWith(path.resolve(pasta))) throw new Error(`imagem fora da pasta do pet: ${arquivo}`);
+        if (!estaDentro(pasta, abs)) throw new Error(`imagem fora da pasta do pet: ${arquivo}`);
         if (!fs.existsSync(abs)) throw new Error(`imagem não encontrada: ${arquivo}`);
         return pathToFileURL(abs).href;
       });
@@ -56,14 +57,7 @@ function lerPet(pasta) {
     }
   }
 
-  pet.bilhetes = pet.bilhetes.map((b) => {
-    if (typeof b === "string") return { texto: b };
-    if (b.imagem) {
-      const abs = path.resolve(pasta, b.imagem);
-      return { ...b, imagem: fs.existsSync(abs) ? pathToFileURL(abs).href : undefined };
-    }
-    return b;
-  });
+  pet.bilhetes = normalizarLista(pet.bilhetes, pasta);
   [...new Set(avisos)].forEach((a) => console.warn(`[pet ${id}] ${a}`));
   return pet;
 }

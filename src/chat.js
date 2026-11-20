@@ -54,9 +54,28 @@ async function carregarPets() {
 
 $("botao").onclick = () => ponte.enviar("chat:abrir", true);
 $("fechar").onclick = () => ponte.enviar("chat:abrir", false);
+async function carregarTravessuras() {
+  const lista = await ponte.invocar("travessuras:listar");
+  const caixa = $("listaTravessuras");
+  caixa.replaceChildren();
+  for (const t of lista) {
+    const l = document.createElement("label");
+    const c = document.createElement("input");
+    c.type = "checkbox";
+    c.checked = t.ligada;
+    c.onchange = () => ponte.enviar("travessuras:ligar", { id: t.id, ligada: c.checked });
+    const s = document.createElement("span");
+    s.textContent = (t.tipo === "abrir" ? "🌐 " : "⌨️ ") + t.nome;
+    l.append(c, s);
+    caixa.appendChild(l);
+  }
+  if (!lista.length) caixa.textContent = "Nenhuma disponível.";
+}
+
 $("btnAjustes").onclick = () => {
   $("ajustes").classList.toggle("visivel");
   carregarPets();
+  carregarTravessuras();
 };
 $("nova").onclick = () => {
   ponte.enviar("chat:nova");
@@ -73,6 +92,8 @@ $("bagunca").onchange = (e) => ponte.enviar("config:mudar", { bagunca: e.target.
 $("pets").onchange = (e) => ponte.enviar("pets:escolher", e.target.value);
 $("voltar").onclick = () => ponte.enviar("pet:voltar");
 $("abrirPets").onclick = () => ponte.enviar("pets:abrirPasta");
+$("abrirBilhetes").onclick = () => ponte.enviar("bilhetes:abrirPasta");
+$("abrirTravessuras").onclick = () => ponte.enviar("travessuras:abrirPasta");
 $("sair").onclick = () => ponte.enviar("app:sair");
 
 $("form").onsubmit = (e) => {
