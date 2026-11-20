@@ -12,7 +12,7 @@ e a **Tartaruga** 🐢 (troque em ⚙️ → Pet). Cada um conversa com uma pers
 - 🧸 **Um bichinho de verdade:** ele pisca, acena, cochila e passeia (se você deixar). Clique para dar
   carinho, use o **botão direito** para dar comida ou jogar bola, **chacoalhe** e ele fica tonto (e
   depois bravo com você), e **solte ele lá do alto** para ver o paraquedas. 🪂
-- 🧊 **Visual 3D (beta):** os três pets ganham volume, luz e sombra no chão. O Pato (de óculos escuros) dança de vez em quando e plana com as asas abertas em vez de usar paraquedas; a Tartaruga se esconde no casco dormindo, caindo ou sendo chacoalhada. Liga e desliga em ⚙️ → Visual 3D.
+- 🧊 **Visual 3D (beta):** os pets são modelos 3D de verdade (three.js), vistos de cima na diagonal e girando para qualquer direção em que andam. O Pato (branco, de pescoço comprido) dança de vez em quando e plana com as asas abertas em vez de usar paraquedas; a Tartaruga se esconde no casco dormindo, caindo ou sendo chacoalhada. Liga e desliga em ⚙️ → Visual 3D (sem placa de vídeo compatível, ele volta para o 2D sozinho).
 - 🧱 **Chão:** ele anda pela tela inteira ou só em cima da barra de tarefas, em todos os monitores ou
   em um só.
 - 😈 **Modo bagunça (opcional):** ele rouba o seu mouse (no estilo do Desktop Goose), traz bilhetinhos

@@ -618,7 +618,9 @@ function desenhar(dt) {
   ctx.clearRect(0, 0, tela.largura, tela.altura);
   if (!sprites.parado) return;
 
-  // Visual 3D: usa a versão "<desenho>3d" quando o pet tem uma (Palito, Pato e Tartaruga).
+  // Visual 3D: modelo 3D de verdade (pet3d.js, three.js). Se o WebGL falhar, usa o desenho
+  // com volume falso "<desenho>3d" de vetor.js, e por último o 2D.
+  if (config.visual3d !== false && window.Pet3D?.tem(pet.desenho) && desenhar3D(dt)) return;
   const vetor = pet.desenho && ((config.visual3d !== false && window.Vetor?.[pet.desenho + "3d"]) || window.Vetor?.[pet.desenho]);
   if (vetor) return desenharVetor(vetor, dt);
   const nome = animacao(P.anim);
@@ -668,6 +670,34 @@ function desenharExtras(topo, dt) {
     ctx.fillText("♥", c.x, c.y);
   }
   ctx.globalAlpha = 1;
+}
+
+function desenhar3D(dt) {
+  let img;
+  try {
+    img = window.Pet3D.desenhar({
+      desenho: pet.desenho, anim: P.anim, estado: P.estado, t: P.tAnim, relogio, x: P.x, y: P.y,
+      olhando: P.olhando, alturaPx: alturaPx(), dpr: window.devicePixelRatio || 1,
+      planando: P.estado === "caindo" && P.aberto && !!window.Vida?.plana(),
+    });
+  } catch (e) {
+    console.error("[3d] falhou, voltando para o 2D:", e);
+    window.Pet3D = null;
+    return false;
+  }
+  if (!img) return false;
+  // sombra macia no chão (encolhe quando ele está no ar)
+  const noAr = P.estado === "caindo" ? 0.6 : 1;
+  ctx.save();
+  ctx.fillStyle = "rgba(20,22,35,0.18)";
+  ctx.beginPath();
+  ctx.ellipse(P.x, P.y, larguraPx() * 0.42 * noAr, larguraPx() * 0.12 * noAr, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(img.canvas, img.x, img.y, img.w, img.h);
+  ctx.restore();
+  desenharExtras(Math.round(img.topo), dt);
+  return true;
 }
 
 // Pets com "desenho": formas vetoriais suaves (vetor.js) em vez de pixel art.
