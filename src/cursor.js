@@ -2,6 +2,7 @@
 // Usa a biblioteca koffi para chamar a função nativa de cada sistema.
 // Se algo falhar, o pet simplesmente não pega o mouse.
 const { screen } = require("electron");
+const plataforma = require("./plataforma");
 
 let mover = null;
 let motivo = "";
@@ -20,12 +21,14 @@ try {
     const CGPoint = koffi.struct("CGPoint", { x: "double", y: "double" });
     const warp = cg.func("int CGWarpMouseCursorPosition(CGPoint p)");
     const assoc = cg.func("int CGAssociateMouseAndMouseCursorPosition(int conectado)");
+    // coordenadas do Mac: pontos, com (0,0) no canto do monitor principal, iguais às do Electron
     mover = (x, y) => {
       warp({ x, y });
       assoc(1);
     };
-  } else if (process.env.WAYLAND_DISPLAY && !process.env.DISPLAY) {
-    motivo = "Wayland não permite que apps movam o mouse";
+  } else if (plataforma.wayland()) {
+    // mesmo pelo XWayland: o X11 "de mentira" não manda no mouse de verdade
+    motivo = "o Wayland não permite que apps movam o mouse";
   } else {
     const x11 = koffi.load("libX11.so.6");
     const XOpenDisplay = x11.func("void *XOpenDisplay(const char *nome)");

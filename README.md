@@ -8,7 +8,7 @@ e a **Tartaruga** 🐢 (troque em ⚙️ → Pet). Cada um conversa com uma pers
 
 - 💬 **Chat com o Claude Code:** clique no botão laranja para conversar. Ele lê arquivos e ajuda com
   código na pasta que você escolher, sempre pedindo permissão antes de mexer em algo. Dá para
-  **colar imagens** (Ctrl+V) para ele ver.
+  **colar imagens** (Ctrl+V, ou Cmd+V no Mac) para ele ver.
 - 🧸 **Um bichinho de verdade:** ele pisca, acena, cochila e passeia (se você deixar). Clique para dar
   carinho, use o **botão direito** para dar comida ou jogar bola, **chacoalhe** e ele fica tonto (e
   depois bravo com você), e **solte ele lá do alto** para ver o paraquedas. 🪂
@@ -19,8 +19,8 @@ e a **Tartaruga** 🐢 (troque em ⚙️ → Pet). Cada um conversa com uma pers
   em ⚙️, e dá para criar as suas.
 - 💌 **Feito para a comunidade:** bilhetes, travessuras e pets próprios são só arquivos JSON (veja
   [abaixo](#bilhetes-da-comunidade) e [CRIAR_PET.md](CRIAR_PET.md)).
-- 🖥️ **Aplicativo de verdade (Windows):** atalho no Menu Iniciar, minimizar para a bandeja e iniciar
-  junto com o PC.
+- 🖥️ **Aplicativo de verdade no Windows, macOS e Linux:** instalador (`.exe`, `.dmg`, AppImage e `.deb`),
+  ícone na bandeja (ou na barra de menus do Mac) e iniciar junto com o computador.
 
 Mecânicas inspiradas nos pets de desktop clássicos, com personagens e código originais.
 
@@ -41,7 +41,34 @@ npm install
 npm start
 ```
 
-### Abrir como um aplicativo (Windows)
+### Instalar como aplicativo (Windows, macOS e Linux)
+
+Os instaladores são gerados automaticamente pelo GitHub Actions (aba **Actions** → "Gerar
+instaladores" → baixe o do seu sistema; nas versões com tag eles também ficam em **Releases**).
+Para gerar no seu próprio computador:
+
+```bash
+npm install
+npm run dist        # gera para o sistema em que você está, na pasta dist/
+```
+
+| Sistema | Arquivo | Como instalar |
+|---|---|---|
+| Windows | `Mascote Desktop Setup x.y.z.exe` | Abra e siga o instalador |
+| macOS (Apple Silicon) | `Mascote Desktop-x.y.z-arm64.dmg` | Abra e arraste para Aplicativos |
+| macOS (Intel) | `Mascote Desktop-x.y.z.dmg` | Abra e arraste para Aplicativos |
+| Linux (qualquer distro) | `Mascote Desktop-x.y.z.AppImage` | `chmod +x` no arquivo e abra |
+| Ubuntu, Debian, Mint | `mascote-desktop_x.y.z_amd64.deb` | `sudo apt install ./mascote-desktop_x.y.z_amd64.deb` |
+
+**Mac, primeira vez:** o app não é assinado por um desenvolvedor Apple (custa US$ 99/ano), então o
+macOS avisa que não pode verificar o app. Clique com o botão direito no Mascote Desktop em Aplicativos
+→ **Abrir** → **Abrir**. Se aparecer "está danificado", rode uma vez no Terminal:
+`xattr -cr "/Applications/Mascote Desktop.app"`.
+
+O instalador já traz o Claude Code dentro dele (por isso é grande, ~250 MB). Você só precisa fazer o
+login uma vez (`claude` no terminal) ou definir `ANTHROPIC_API_KEY`.
+
+### Abrir pelo código como um aplicativo (Windows e Linux)
 
 Para não precisar do terminal toda vez, crie os atalhos uma vez:
 
@@ -49,9 +76,11 @@ Para não precisar do terminal toda vez, crie os atalhos uma vez:
 npm run atalho
 ```
 
-Isso coloca **Mascote Desktop**, com ícone próprio, no Menu Iniciar e na Área de Trabalho. É só
-clicar para abrir, como qualquer programa, sem janela de terminal. Para tirar os atalhos:
-`npm run atalho -- --remover`. Para ele abrir sozinho junto com o PC, use ⚙️ → Iniciar com o Windows.
+No Windows, isso coloca **Mascote Desktop**, com ícone próprio, no Menu Iniciar e na Área de Trabalho.
+No Linux, coloca no menu de aplicativos. É só clicar para abrir, como qualquer programa, sem janela de
+terminal. (No Mac, use `npm run dist`, acima.) Para tirar os atalhos:
+`npm run atalho -- --remover`. Para ele abrir sozinho junto com o computador, use ⚙️ → Iniciar com o Windows (no Mac, "Abrir
+ao entrar no Mac"; no Linux, "Iniciar com o Linux").
 
 ## Como usar
 
@@ -72,7 +101,7 @@ clicar para abrir, como qualquer programa, sem janela de terminal. Para tirar os
 | Ligar travessuras (pegar o mouse, Alt+Tab, navegador) / criar novas | ⚙️ → Travessuras / Pasta de travessuras |
 | Fazer o pet voltar para o canto | ⚙️ → Chamar de volta |
 | Minimizar | Botão **–** no topo do chat: pet, chat e bilhetes somem e fica só o ícone na bandeja (perto do relógio). Clique nele para trazer de volta |
-| Fechar | Botão **X** no topo do chat, ⚙️ → Fechar o app, a bandeja, ou **Ctrl+Alt+Shift+Q** |
+| Fechar | Botão **X** no topo do chat, ⚙️ → Fechar o app, a bandeja, ou **Ctrl+Alt+Shift+Q** (no Mac, **Cmd+Option+Shift+Q**) |
 | Abrir de novo | Atalho **Mascote Desktop** (se já estiver aberto, ele volta da bandeja e abre o chat) |
 
 Quando o pet rouba o seu mouse no modo bagunça, puxe o mouse com força para longe que ele solta.
@@ -140,7 +169,9 @@ e edite o `travessuras.json`:
 
 - **teclas:** as primeiras ficam seguradas e a última é apertada `vezes` vezes (número ou
   `[mín, máx]`, até 10). Só são aceitas teclas que não apagam, enviam ou fecham nada:
-  `alt, tab, shift, win, esquerda, cima, direita, baixo, d, m`. Por enquanto só no Windows.
+  `alt, tab, shift, win, esquerda, cima, direita, baixo, d, m`. Funciona no Windows, no macOS e no
+  Linux com X11. No Mac, `alt` vira Command (Alt+Tab vira Cmd+Tab) e `win` vira Control, que só vale
+  com setas (Ctrl+setas troca de Space); combinações perigosas no Mac, como Cmd+D, são puladas.
 - **abrir:** sorteia um dos links (só `http://` ou `https://`).
 - **"admin": true:** a travessura aparece com cadeado e só pode ser ligada com o app rodando como
   administrador.
@@ -162,9 +193,44 @@ Permitir/Negar continuam aparecendo, então leia bem cada um.
 
 **⚙️ → Iniciar com o Windows** faz o mascote abrir sozinho quando você liga o PC (não precisa de admin).
 
+## macOS e Linux
+
+Tudo funciona nos três sistemas, com estas diferenças (que vêm dos próprios sistemas):
+
+| Função | Windows | macOS | Linux (X11/Xorg) | Linux (Wayland) |
+|---|---|---|---|---|
+| Pet, chat, bilhetes, brincadeiras | Sim | Sim | Sim | Sim |
+| Ícone perto do relógio | Bandeja | Barra de menus | Bandeja (no GNOME, precisa da extensão AppIndicator, que o Ubuntu já traz) | Igual ao X11 |
+| Iniciar com o sistema | Sim | Sim (app instalado) | Sim | Sim |
+| Pegar o mouse | Sim | Sim | Sim | Não |
+| Travessuras de teclado | Sim | Sim, com Acessibilidade | Sim | Não |
+| Abrir o navegador | Sim | Sim | Sim | Sim |
+| Pet percebe o mouse em qualquer lugar | Sim | Sim | Sim | Só em cima das janelas do próprio app |
+| Andar em cima da barra | Barra de tarefas | Em cima do Dock | Em cima do painel de baixo | Igual ao X11 |
+| Permissão extra | Administrador (opcional) | Acessibilidade (só para teclas) | Nenhuma | — |
+
+**Mac, permissão de Acessibilidade:** o macOS só deixa um app apertar teclas por você se ele estiver
+em Ajustes do Sistema → Privacidade e Segurança → **Acessibilidade**. As travessuras de teclado
+aparecem com cadeado até você ligar; o botão **⚙️ → Abrir os Ajustes do Mac** leva direto para lá.
+Pegar o mouse e todo o resto funcionam sem ela. O pet mora na barra de menus, sem ícone no Dock.
+
+**Mac com dois monitores:** com "Monitores têm Spaces separados" ligado (o padrão do macOS), uma janela
+não aparece em dois monitores ao mesmo tempo. Então o pet mora no monitor do chat; arraste o chat para
+outro monitor e ele vai junto. Com a opção desligada (Ajustes → Mesa e Dock), ele anda por todos.
+
+**Linux com Wayland** (padrão no Ubuntu e Fedora novos): o app abre sozinho pelo XWayland, porque o
+Wayland não deixa um app escolher onde a própria janela fica. Mesmo assim, o Wayland não deixa nenhum
+app comum apertar teclas, mover o mouse ou saber onde ele está fora das próprias janelas. Isso é uma
+regra de segurança do Wayland, não dá para contornar de dentro do app. Para ter tudo, escolha a
+sessão **"Ubuntu em Xorg"** (ou "GNOME em Xorg", "Plasma (X11)") na engrenagem da tela de login.
+O aviso aparece em ⚙️ quando você está no Wayland.
+
+**Linux, transparência:** precisa de um compositor (o padrão no GNOME, KDE, Cinnamon e XFCE novos).
+Sem ele, o fundo do pet fica preto.
+
 ## Problemas?
 
-O app grava um log em `%APPDATA%mascote-desktoplogsmascote.log` (Windows),
+O app grava um log em `%APPDATA%\mascote-desktop\logs\mascote.log` (Windows),
 `~/Library/Application Support/mascote-desktop/logs` (macOS) ou `~/.config/mascote-desktop/logs` (Linux),
 incluindo erros das páginas. Se o pet sumir da tela, ele volta sozinho para o canto em ~3 s.
 
@@ -186,9 +252,9 @@ aprovar.
 ## Limitações conhecidas (protótipo)
 
 - Com monitores de escalas (DPI) diferentes, o desenho pode ficar maior num deles.
-- No Linux com Wayland, o pet não consegue pegar o mouse (o resto funciona).
+- No Linux com Wayland, o pet não pega o mouse nem aperta teclas (veja [macOS e Linux](#macos-e-linux)).
 - No Linux, a transparência precisa de um compositor (o padrão no GNOME e KDE).
-- No macOS, pegar o mouse pode pedir permissão de Acessibilidade.
+- O app do Mac não tem assinatura de desenvolvedor Apple: na primeira vez, abra com botão direito → Abrir.
 
 ## Créditos
 

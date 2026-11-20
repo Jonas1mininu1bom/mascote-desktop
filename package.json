@@ -4,9 +4,13 @@
   "description": "Um bichinho que mora no canto da sua tela e conversa com você usando o Claude Code por trás.",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron . --ozone-platform=x11",
     "validar-pet": "node tools/validar-pet.js",
-    "atalho": "node scripts/criar-atalho.js"
+    "atalho": "node scripts/criar-atalho.js",
+    "dist": "electron-builder --publish never",
+    "dist:linux": "electron-builder --linux --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:win": "electron-builder --win --publish never"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.329"
@@ -15,7 +19,86 @@
     "koffi": "^3.3.8"
   },
   "devDependencies": {
-    "electron": "^45.4.1"
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "author": {
+    "name": "Jonatas"
+  },
+  "homepage": "https://github.com/Jonas1mininu1bom/mascote-desktop",
+  "build": {
+    "appId": "io.github.jonas1mininu1bom.mascote-desktop",
+    "productName": "Mascote Desktop",
+    "copyright": "MIT",
+    "directories": {
+      "output": "dist"
+    },
+    "asar": false,
+    "files": [
+      "main.js",
+      "package.json",
+      "src/**",
+      "pets/**",
+      "bilhetes/**",
+      "travessuras/**",
+      "assets/**",
+      "!node_modules/@anthropic-ai/claude-agent-sdk-linux-*-musl/**",
+      "!node_modules/electron-builder/**"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg"
+        },
+        {
+          "target": "zip"
+        }
+      ],
+      "category": "public.app-category.entertainment",
+      "icon": "assets/icone.png",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "extendInfo": {
+        "LSUIElement": true
+      }
+    },
+    "dmg": {
+      "title": "Mascote Desktop"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "icon": "assets/icone.png",
+      "executableArgs": [
+        "--ozone-platform=x11"
+      ],
+      "synopsis": "Um bichinho que mora na sua tela",
+      "maintainer": "Jonatas"
+    },
+    "deb": {
+      "depends": [
+        "libxtst6",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libatspi2.0-0",
+        "libsecret-1-0"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icone.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Mascote Desktop"
+    }
+  }
 }

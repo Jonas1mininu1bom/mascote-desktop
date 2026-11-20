@@ -3,7 +3,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 const INVOCAR = new Set(["inicio", "bilhete:criar", "pets:listar", "chat:escolherPasta", "travessuras:listar", "travessura:pedir", "chat:arrastar", "telas:listar",
-  "sistema:estado", "sistema:iniciarComWindows", "sistema:pedirAdmin"]);
+  "sistema:estado", "sistema:iniciarComSistema", "sistema:pedirAdmin", "sistema:pedirAcessibilidade"]);
 const ENVIAR = new Set([
   "app:sair", "app:minimizar", "brinquedos:abrir", "chat:abrir", "chat:enviar", "chat:nova", "chat:parar", "chat:responderPermissao",
   "config:mudar", "pet:voltar", "pets:abrirPasta", "bilhetes:abrirPasta", "pets:escolher",

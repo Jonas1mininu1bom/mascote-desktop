@@ -58,6 +58,10 @@
   #listaTravessuras label.bloqueada { opacity: 0.55; cursor: not-allowed; }
   #listaTravessuras .selo { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; font-size: 11px; color: var(--destaque-forte); }
   #listaTravessuras .selo .ic { width: 12px; height: 12px; margin: 0; color: inherit; }
+  #acessibilidade, #avisoWayland { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 8px; }
+  #acessibilidade b .ic, #acessibilidade button .ic { width: 15px; height: 15px; display: inline-block; vertical-align: -3px; margin-right: 4px; }
+  #acessibilidade small, #avisoWayland small { margin: 4px 0 6px; }
+  #acessibilidade.ativo b { color: var(--destaque-forte); }
   #admin { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 8px; }
   #admin b .ic, #admin button .ic { width: 15px; height: 15px; display: inline-block; vertical-align: -3px; margin-right: 4px; }
   #admin small { margin: 4px 0 6px; }
@@ -135,11 +139,22 @@
     <label style="display:block">Telas: <select id="telas"></select></label>
     <label style="display:block">Chão: <select id="chao">
       <option value="tela">Anda pela tela inteira</option>
-      <option value="barra">Só em cima da barra de tarefas</option>
+      <option value="barra" id="opcaoBarra">Só em cima da barra de tarefas</option>
     </select></label>
     <small class="dica">Botão direito no pet abre um menu para dar comida e brincar. No modo barra de tarefas, solte ele lá de cima para ver o paraquedas.</small>
-    <label id="linhaIniciar" hidden><input type="checkbox" id="iniciarComWindows"><span>Iniciar com o Windows<small>Abre sozinho quando você liga o computador.</small></span></label>
+    <label id="linhaIniciar" hidden><input type="checkbox" id="iniciarComSistema"><span><span id="iniciarTexto">Iniciar com o sistema</span><small>Abre sozinho quando você liga o computador.</small></span></label>
     <div id="travessuras"><b>Travessuras</b><small>De vez em quando, só no modo bagunça.</small><div id="listaTravessuras"></div></div>
+    <div id="acessibilidade" hidden>
+      <b><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>Permissão de Acessibilidade</b>
+      <small id="acessibilidadeTexto"></small>
+      <button id="pedirAcessibilidade" type="button"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>Abrir os Ajustes do Mac</button>
+    </div>
+    <div id="avisoWayland" hidden>
+      <b>Sessão Wayland</b>
+      <small>O Wayland não deixa nenhum app apertar teclas, mover o mouse ou saber onde ele está fora das
+      próprias janelas. Por isso, aqui as travessuras de teclado e o "pegar o mouse" ficam de fora, e o pet
+      pode não perceber o mouse em cima dele. Para ter tudo, entre na sessão "X11" ou "Xorg" na tela de login.</small>
+    </div>
     <div id="admin" hidden>
       <b><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>Permissão de administrador</b>
       <small id="adminTexto"></small>

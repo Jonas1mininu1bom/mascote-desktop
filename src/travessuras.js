@@ -5,33 +5,17 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const teclado = require("./teclado");
+
 // ---------- teclas permitidas ----------
 // Só teclas que não apagam, não enviam e não fecham nada. Sem Ctrl, Enter, Delete, F4, letras soltas...
-// [código virtual do Windows, é "estendida"?]
-const TECLAS = {
-  alt: [0x12, false], tab: [0x09, false], shift: [0x10, false], win: [0x5b, true],
-  esquerda: [0x25, true], cima: [0x26, true], direita: [0x27, true], baixo: [0x28, true],
-  d: [0x44, false], m: [0x4d, false],
-};
-const ROTULOS = { alt: "Alt", tab: "Tab", shift: "Shift", win: "⊞ Win", esquerda: "←", cima: "↑", direita: "→", baixo: "↓", d: "D", m: "M" };
+// Cada sistema traduz do seu jeito (veja teclado.js): no Mac, "alt" vira Command.
+const TECLAS = Object.fromEntries(teclado.NOMES.map((n) => [n, true]));
 const MAX_VEZES = 10;
 const INTERVALO_MIN = 3 * 60 * 1000; // no mínimo 3 minutos entre travessuras
 
-// ---------- apertar teclas (só Windows por enquanto) ----------
-let keybd = null;
-try {
-  if (process.platform === "win32") {
-    const koffi = require("koffi");
-    const user32 = koffi.load("user32.dll");
-    const f = user32.func("void __stdcall keybd_event(uint8_t vk, uint8_t scan, uint32_t flags, uintptr_t extra)");
-    keybd = (nome, soltar) => {
-      const [vk, ext] = TECLAS[nome];
-      f(vk, 0, (soltar ? 2 : 0) | (ext ? 1 : 0), 0);
-    };
-  }
-} catch (e) {
-  console.warn("[travessuras] teclado indisponível:", e.message);
-}
+// ---------- apertar teclas (Windows, macOS e Linux com X11) ----------
+const keybd = (nome, soltar) => teclado.apertar(nome, soltar);
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Segura todas as teclas menos a última e toca a última "vezes" vezes (Alt segurado + Tab, Tab, Tab).
@@ -109,7 +93,7 @@ const LEIA_ME = `Travessuras do modo bagunça 😈
 Edite travessuras.json para criar as suas. Depois ligue cada uma em ⚙️ no chat.
 Uma travessura com o mesmo "id" de uma padrão substitui a padrão.
 
-Apertar teclas (só no Windows por enquanto):
+Apertar teclas (Windows, macOS e Linux com X11; no Wayland não dá):
   { "id": "minimiza-tudo", "nome": "Minimizar tudo", "tipo": "teclas", "teclas": ["win", "d"], "vezes": 1 }
   { "id": "alt-tab-doido", "nome": "Alt+Tab doido", "tipo": "teclas", "teclas": ["alt", "tab"], "vezes": [3, 8] }
 
@@ -117,6 +101,9 @@ Apertar teclas (só no Windows por enquanto):
     (um número, ou [mínimo, máximo] para sortear). Máximo: ${MAX_VEZES}.
   - Teclas permitidas: ${Object.keys(TECLAS).join(", ")}.
     (Ctrl, Enter, Delete, F4 e letras ficam de fora para ele nunca apagar, enviar ou fechar nada.)
+  - No Mac, "alt" vira Command (Alt+Tab vira Cmd+Tab) e "win" vira Control, que só vale com
+    setas (Ctrl+setas troca de Space). Combinações perigosas no Mac, como Cmd+D, são puladas.
+    O Mac pede a permissão de Acessibilidade para isso (botão em ⚙️).
 
 Abrir um link no navegador:
   { "id": "patos", "nome": "Fotos de patos", "tipo": "abrir", "links": ["https://www.google.com/search?q=patos+fofos"] }
@@ -125,7 +112,7 @@ Abrir um link no navegador:
 
 "id": letras minúsculas, números e "-". Ele faz no máximo uma travessura a cada 3 minutos.
 
-Precisa de administrador? Coloque "admin": true. Ela aparece com cadeado em ⚙️ e só pode ser
+Precisa de administrador (só Windows)? Coloque "admin": true. Ela aparece com cadeado em ⚙️ e só pode ser
 ligada depois que a pessoa der permissão de administrador ao app (botão em ⚙️).
 `;
 const EXEMPLO = { travessuras: [] };
@@ -142,7 +129,10 @@ function prepararPasta(pasta) {
 function listar({ arqPadrao, pastaUsuario }) {
   const mapa = new Map();
   for (const t of [...lerArquivo(arqPadrao), ...lerArquivo(path.join(pastaUsuario, "travessuras.json"))]) mapa.set(t.id, t);
-  return [...mapa.values()].filter((t) => t.tipo !== "teclas" || keybd);
+  // teclas: só as que existem (e são inofensivas) neste sistema; o nome sai do jeito dele ("Cmd+Tab" no Mac)
+  return [...mapa.values()]
+    .filter((t) => t.tipo !== "teclas" || teclado.suportada(t.teclas))
+    .map((t) => (t.tipo === "teclas" ? { ...t, nome: teclado.nomeLocal(t.nome) } : t));
 }
 
 // ---------- sorteio com intervalo mínimo ----------
@@ -158,7 +148,7 @@ function sortear(lista, ligadas, { semIntervalo = false, admin = false } = {}) {
   const vezes = t.tipo === "teclas" ? t.vezes[0] + Math.floor(Math.random() * (t.vezes[1] - t.vezes[0] + 1)) : 1;
   ultima = Date.now();
   pendente = { ...t, vezes, token: Math.random().toString(36).slice(2), ate: Date.now() + 15000 };
-  const rotulos = t.tipo === "teclas" ? t.teclas.map((k) => ROTULOS[k]) : ["🌐"];
+  const rotulos = t.tipo === "teclas" ? t.teclas.map((k) => teclado.rotulo(k)) : ["🌐"];
   return { token: pendente.token, tipo: t.tipo, nome: t.nome, rotulos, vezes };
 }
 
@@ -168,7 +158,7 @@ async function executar(token, { abrirLink, aoTocar, podeTeclar = () => true }) 
   const t = pendente;
   if (!t || t.token !== token || Date.now() > t.ate) return false;
   pendente = null;
-  if (t.tipo === "teclas" && !podeTeclar()) return false;
+  if (t.tipo === "teclas" && (!teclado.disponivel() || !podeTeclar())) return false;
   if (t.tipo === "teclas") await apertar(t.teclas, t.vezes, aoTocar);
   else {
     aoTocar?.(0);
@@ -177,4 +167,4 @@ async function executar(token, { abrirLink, aoTocar, podeTeclar = () => true }) 
   return true;
 }
 
-module.exports = { listar, sortear, executar, prepararPasta, teclasDisponiveis: () => Boolean(keybd) };
+module.exports = { listar, sortear, executar, prepararPasta, teclasDisponiveis: () => teclado.disponivel() };
