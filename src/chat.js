@@ -40,6 +40,7 @@ function mostrarConfig(c) {
   $("bagunca").checked = c.bagunca;
   $("pastaNome").textContent = c.pasta;
   $("pets").value = c.pet;
+  $("chao").value = c.chao === "barra" ? "barra" : "tela";
 }
 
 async function carregarPets() {
@@ -87,6 +88,7 @@ async function carregarTelas() {
   $("telas").value = opcoes.some((t) => t.id === String(config.telas)) ? String(config.telas) : "todas";
 }
 $("telas").onchange = (e) => ponte.enviar("config:mudar", { telas: e.target.value });
+$("chao").onchange = (e) => ponte.enviar("config:mudar", { chao: e.target.value });
 
 async function carregarTravessuras() {
   const lista = await ponte.invocar("travessuras:listar");

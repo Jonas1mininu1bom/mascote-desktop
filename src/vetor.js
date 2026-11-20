@@ -39,6 +39,25 @@
     }
   }
   function olho(g, x, y, r, s, cor = "#2b2d42") {
+    if (s.modoOlho === "espiral") {
+      // tonto: olho em espiral girando
+      g.beginPath();
+      for (let a = 0; a < Math.PI * 4; a += 0.3) {
+        const rr = (a / (Math.PI * 4)) * r * 1.2;
+        const ang = a + (s.relogio || 0) * 8;
+        const px = x + Math.cos(ang) * rr;
+        const py = y + Math.sin(ang) * rr;
+        a === 0 ? g.moveTo(px, py) : g.lineTo(px, py);
+      }
+      g.strokeStyle = cor;
+      g.lineWidth = 1.2;
+      g.stroke();
+      return;
+    }
+    if (s.modoOlho === "bravo") {
+      // sobrancelha franzida (desce para a frente do rosto)
+      linha(g, x - r * 1.3, y - r * 2.1, x + r * 1.3, y - r * 1.2, cor, 1.6);
+    }
     if (s.olhosFechados) {
       g.beginPath();
       g.arc(x, y - r * 0.3, r, 0.15 * Math.PI, 0.85 * Math.PI);
@@ -64,11 +83,28 @@
     const fase = s.t * anda;
     const passo = anda ? Math.sin(fase) : 0;
     const quique = anda ? Math.abs(Math.sin(fase)) * (anda > 10 ? 2.2 : 1.4) : 0;
-    const pulo = s.anim === "feliz" || s.anim === "carregado" ? Math.abs(Math.sin(s.t * 7)) * 5 : 0;
+    const pulo =
+      s.anim === "feliz" || s.anim === "carregado"
+        ? Math.abs(Math.sin(s.t * 7)) * 5
+        : s.anim === "bravo"
+          ? Math.abs(Math.sin(s.t * 12)) * 2.5 // batendo o pé
+          : 0;
     const respira = Math.sin(s.t * 2.2) * 0.6;
     // pisca pelo relógio geral (o t da animação zera a cada troca de estado)
     const pisca = s.anim !== "dormindo" && (s.relogio ?? s.t) % 3.7 > 3.58;
-    return { passo, quique, pulo, respira, olhosFechados: s.anim === "dormindo" || pisca, anda };
+    const caindo = s.anim === "caindo";
+    return {
+      passo: caindo ? Math.sin(s.t * 18) * 0.5 : passo, // pernas balançando no ar
+      quique,
+      pulo,
+      respira,
+      olhosFechados: s.anim === "dormindo" || (pisca && !["tonto", "bravo"].includes(s.anim)),
+      anda,
+      modoOlho: s.anim === "tonto" ? "espiral" : s.anim === "bravo" ? "bravo" : null,
+      mastiga: s.anim === "comendo" && Math.sin(s.t * 11) > 0,
+      relogio: s.relogio ?? s.t,
+      anim: s.anim,
+    };
   }
 
   // ---------- Pato ----------
@@ -114,7 +150,7 @@
     oval(g, 41, 31, 6.2, 7.5);
     pintar(g, "#ffd84d"); // esconde a emenda do contorno
     // asa (bate quando acena ou está feliz)
-    const bate = ["acenando", "feliz", "travessura"].includes(s.anim) ? Math.sin(s.t * 14) * 0.5 - 0.3 : r.anda ? Math.sin(s.t * 9) * 0.08 : 0;
+    const bate = s.anim === "caindo" ? Math.sin(s.t * 22) * 0.6 - 0.4 : ["acenando", "feliz", "travessura"].includes(s.anim) ? Math.sin(s.t * 14) * 0.5 - 0.3 : r.anda ? Math.sin(s.t * 9) * 0.08 : 0;
     g.save();
     g.translate(24, 37);
     g.rotate(-0.25 + bate);
@@ -129,7 +165,14 @@
     g.quadraticCurveTo(58, by + 3.5, 52, by + 3);
     g.closePath();
     pintar(g, "#ff9a2e", "#d4691a", 1.2);
-    linha(g, 53, by + 0.3, 60, by + 0.6, "#d4691a", 0.9);
+    if (r.mastiga) {
+      // bico aberto: a parte de baixo desce
+      g.beginPath();
+      g.moveTo(52, by + 0.5);
+      g.quadraticCurveTo(58, by + 6, 52, by + 6.5);
+      g.closePath();
+      pintar(g, "#e8771f", "#d4691a", 1);
+    } else linha(g, 53, by + 0.3, 60, by + 0.6, "#d4691a", 0.9);
     // rosto
     olho(g, 46, cabY - 3, 2.4, r);
     bochecha(g, 47.5, cabY + 3.5, 2.8);
@@ -167,7 +210,13 @@
     const balanca = r.passo * 7;
     const acena = ["acenando", "travessura"].includes(s.anim);
     const maoTras = { x: 14 - balanca * 0.4, y: 58 + Math.abs(balanca) * 0.2 };
-    const maoFrente = acena
+    if (s.anim === "caindo") {
+      maoTras.x = 22;
+      maoTras.y = 30;
+    }
+    const maoFrente = s.anim === "caindo"
+      ? { x: 43, y: 30 }
+      : acena
       ? { x: 47 + Math.sin(s.t * 12) * 4, y: 32 }
       : s.anim === "feliz"
         ? { x: 48, y: 36 }
@@ -193,7 +242,10 @@
     bochecha(g, 44, cy + 4, 3.2);
     // boca: sorriso (ou "o" pensando, ou boquinha de dormir)
     g.beginPath();
-    if (s.anim === "pensando") oval(g, 36, cy + 6, 1.6, 1.8);
+    if (r.mastiga) oval(g, 36, cy + 6, 2.6, 2.2);
+    else if (s.anim === "comendo") g.arc(36, cy + 6, 2.2, 0, TAU);
+    else if (s.anim === "bravo" || s.anim === "tonto") g.arc(36, cy + 9.5, 3.4, 1.15 * Math.PI, 1.85 * Math.PI); // boca torta
+    else if (s.anim === "pensando") oval(g, 36, cy + 6, 1.6, 1.8);
     else if (s.anim === "dormindo") g.arc(36, cy + 7, 1.4, 0, TAU);
     else g.arc(36, cy + 3.5, 3.6, 0.2 * Math.PI, 0.8 * Math.PI);
     g.strokeStyle = "#ef476f";
@@ -236,7 +288,9 @@
     olho(g, hx + 3.5, hy - 2, 2.1, r);
     bochecha(g, hx + 5, hy + 3, 2.2);
     g.beginPath();
-    g.arc(hx + 4.5, hy + 1.5, 2.6, 0.15 * Math.PI, 0.7 * Math.PI);
+    if (r.mastiga) oval(g, hx + 5, hy + 3.5, 2, 1.8);
+    else if (s.anim === "bravo" || s.anim === "tonto") g.arc(hx + 4.5, hy + 5.5, 2.4, 1.2 * Math.PI, 1.8 * Math.PI);
+    else g.arc(hx + 4.5, hy + 1.5, 2.6, 0.15 * Math.PI, 0.7 * Math.PI);
     g.strokeStyle = "#3d5a1f";
     g.lineWidth = 1.1;
     g.stroke();

@@ -74,6 +74,18 @@ Quando o pet segura o seu mouse no modo bagunça, clique nele para ele soltar.
 Cole uma imagem com **Ctrl+V** no campo de mensagem (ou arraste o arquivo para o chat). Vão até 4 por
 mensagem (PNG, JPG, GIF ou WEBP, até 5 MB cada), e o Claude Code vê a imagem junto com o seu texto.
 
+### Brincar com o pet
+
+- **Chão** (⚙️ → Chão): ele pode andar pela **tela inteira** ou **só em cima da barra de tarefas**, como
+  se ela fosse o chão.
+- **Derrubar:** no modo barra de tarefas, arraste o pet lá para cima e solte. Ele cai e abre um
+  paraquedas. 🪂
+- **Chacoalhar:** segure o pet e sacuda o mouse de um lado para o outro. Ele fica tonto (estrelinhas e
+  olhos em espiral) e depois fica bravo com você. Bravo, ele recusa carinho e brincadeira por um tempo.
+  Uma comidinha resolve.
+- **Menu** (botão direito no pet): **Dar comida** (ele vai até a comida e come), **Brincar** (ele joga
+  bola) e **Carinho**. Se ficar muito tempo sem comer, ele avisa que está com fome.
+
 ## Bilhetes da comunidade
 
 No modo bagunça o pet traz bilhetes. Ele já vem com 40 mensagens, e você pode colocar as suas:

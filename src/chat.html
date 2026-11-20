@@ -69,6 +69,7 @@
   #ajustes.visivel { display: block; }
   #ajustes label { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; cursor: pointer; }
   #ajustes small { color: var(--suave); display: block; }
+  #ajustes small.dica { margin: 2px 0 6px; font-size: 11.5px; }
   #ajustes select, #ajustes .acoes button { font: inherit; margin-top: 4px; }
   #ajustes .acoes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   #ajustes .acoes button { background: var(--bolha-pet); color: var(--texto); border: 1px solid var(--borda); border-radius: 8px; padding: 4px 8px; cursor: pointer; }
@@ -110,6 +111,11 @@
     <label><input type="checkbox" id="bagunca"><span>Modo bagunça<small>Pega o seu mouse e traz bilhetes para a tela.</small></span></label>
     <label style="display:block">Pet: <select id="pets"></select></label>
     <label style="display:block">Telas: <select id="telas"></select></label>
+    <label style="display:block">Chão: <select id="chao">
+      <option value="tela">Anda pela tela inteira</option>
+      <option value="barra">Só em cima da barra de tarefas</option>
+    </select></label>
+    <small class="dica">Botão direito no pet abre um menu para dar comida e brincar. No modo barra de tarefas, solte ele lá de cima para ver o paraquedas.</small>
     <label id="linhaIniciar" hidden><input type="checkbox" id="iniciarComWindows"><span>Iniciar com o Windows<small>Abre sozinho quando você liga o computador.</small></span></label>
     <div id="travessuras"><b>Travessuras</b><small>De vez em quando, só no modo bagunça.</small><div id="listaTravessuras"></div></div>
     <div id="admin" hidden>

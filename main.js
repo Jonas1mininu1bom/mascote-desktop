@@ -51,7 +51,7 @@ function vigiar(nome, w) {
 }
 
 // ---------- configuração ----------
-const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir(), travessuras: {}, telas: "todas" };
+const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir(), travessuras: {}, telas: "todas", chao: "tela" };
 let config = { ...PADRAO };
 const arqConfig = () => path.join(app.getPath("userData"), "config.json");
 const pastaPetsUsuario = () => path.join(app.getPath("userData"), "pets");
@@ -658,6 +658,8 @@ function filtrarConfigDaPagina(parcial) {
   for (const chave of CONFIG_DA_PAGINA) {
     if (typeof parcial[chave] === "boolean") limpo[chave] = parcial[chave];
   }
+  // chão: tela inteira ou só em cima da barra de tarefas
+  if (parcial.chao === "tela" || parcial.chao === "barra") limpo.chao = parcial.chao;
   // telas: "todas" ou o id de um monitor conectado
   if (parcial.telas === "todas" || (typeof parcial.telas === "string" && listarTelas().some((t) => t.id === parcial.telas))) {
     limpo.telas = parcial.telas;

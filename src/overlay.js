@@ -40,7 +40,7 @@ let ficarAte = 0; // depois de "chamar de volta", fica em casa até este tempo (
 // Quando a casa só muda de lugar (chat aberto, fechado ou arrastado), ele vai junto e continua passeando.
 function chamarDeVolta(segundos, { ficar = true } = {}) {
   if (ficar) ficarAte = relogio + 45;
-  mudar("voltar", segundos, { alvo: { ...tela.casa } });
+  mudar("voltar", segundos, { alvo: { x: tela.casa.x, y: noChao() ? limitarY(tela.casa.y, tela.casa.x) : tela.casa.y } });
 }
 const seguirMouseLigado = () => config.bagunca && config.travessuras?.["seguir-mouse"] === true;
 const pegarMouseLigado = () => config.bagunca && mouseNativo && config.travessuras?.["pegar-mouse"] !== false;
@@ -117,6 +117,8 @@ const RESERVA = {
   carregado: ["feliz", "parado"], acenando: ["feliz", "parado"], pensando: ["parado"],
   dormindo: ["parado"], feliz: ["parado"], trabalhando: ["correndo", "andando"],
   travessura: ["acenando", "feliz", "parado"],
+  caindo: ["carregado", "acenando", "parado"], tonto: ["parado"], bravo: ["parado"],
+  comendo: ["feliz", "parado"], brincando: ["correndo", "andando"],
 };
 function animacao(nome) {
   if (sprites[nome]) return nome;
@@ -159,8 +161,13 @@ function limitarX(x) {
   const { min, max } = limites();
   return Math.max(min + m, Math.min(max - m, x));
 }
+// "Chão" em ⚙️: "barra" = anda só em cima da barra de tarefas (o fim da área útil da tela);
+// "tela" = anda pela tela inteira.
+const noChao = () => config?.chao === "barra";
+const chaoDe = (x = P.x) => { const a = areaDe(x); return a.y + a.h; };
 function limitarY(y, x = P.x) {
   const a = areaDe(x);
+  if (noChao()) return a.y + a.h;
   return Math.max(a.y + alturaPx(), Math.min(a.y + a.h, y));
 }
 
@@ -181,7 +188,10 @@ function proximoEstado() {
     const a = P.ancora || tela.casa;
     if (r < 0.5) return mudar("parado", rand(3, 7));
     if (r < 0.62) return mudar("acenando", 1.6);
-    if (r < 0.9) return mudar("andar", 6, { alvo: { x: limitarX(a.x + rand(-60, 60)), y: a.y } });
+    if (r < 0.9) {
+      const x = limitarX(a.x + rand(-60, 60));
+      return mudar("andar", 6, { alvo: { x, y: noChao() ? limitarY(a.y, x) : a.y } });
+    }
     if (r < 0.96) return mudar("dormindo", rand(6, 12));
     falar(escolha(pet.falas.length ? pet.falas : ["🙂"]));
     return mudar("parado", 3.5);
@@ -354,8 +364,10 @@ function atualizar(dt) {
   if (segurado) {
     P.x = cursor.x - segurado.dx;
     P.y = cursor.y - segurado.dy;
+    window.Vida?.segurando(dt); // percebe se a pessoa está chacoalhando
     return;
   }
+  if (window.Vida?.atualizar(dt)) return; // queda, tontura, bravo, comer, brincar, menu
 
   switch (P.estado) {
     case "andar":
@@ -414,6 +426,7 @@ function atualizar(dt) {
       } else P.olhando = cursor.x >= P.x ? 1 : -1;
       if (P.tempo <= 0) {
         P.x = limitarX(P.x);
+        if (window.Vida?.precisaCair()) return Vida.cair();
         P.y = limitarY(P.y);
         proximoEstado();
       }
@@ -436,8 +449,9 @@ function atualizar(dt) {
       };
       if (!puxou) window.api.enviar("pet:moverCursor", P.cursorEsperado);
       if (puxou || P.tempo <= 0 || !pegarMouseLigado()) {
-        mudar("feliz", 1.2);
         P.x = limitarX(P.x);
+        if (window.Vida?.precisaCair()) return Vida.cair();
+        mudar("feliz", 1.2);
         P.y = limitarY(P.y); // se estava no topo/barra de tarefas, volta para o chão
       }
       return;
@@ -487,8 +501,14 @@ function sobreOPet(p) {
   return p.x > P.x - w / 2 - 4 && p.x < P.x + w / 2 + 4 && p.y > P.y - h - 4 && p.y < P.y + 4;
 }
 
+// botão direito no pet: menuzinho (comida, brincar, carinho)
+window.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  if (sobreOPet(cursor)) window.Vida?.abrirMenu();
+});
+
 function atualizarCliques() {
-  const deveIgnorar = !(segurado || sobreOPet(cursor));
+  const deveIgnorar = !(segurado || sobreOPet(cursor) || window.Vida?.sobreMenu(cursor));
   if (deveIgnorar !== ignorando) {
     ignorando = deveIgnorar;
     window.api.enviar("pet:ignorar", ignorando);
@@ -496,7 +516,9 @@ function atualizarCliques() {
 }
 
 window.addEventListener("mousedown", (e) => {
+  if (e.button === 0 && window.Vida?.cliqueNoMenu(cursor)) return;
   if (e.button !== 0 || !sobreOPet(cursor)) return;
+  window.Vida?.pegou();
   segurado = { dx: cursor.x - P.x, dy: cursor.y - P.y, inicio: { ...cursor } };
   if (P.bilhete) P.bilhete = null;
   mudar("carregado", 999);
@@ -506,7 +528,9 @@ window.addEventListener("mouseup", () => {
   if (!segurado) return;
   const moveu = Math.hypot(cursor.x - segurado.inicio.x, cursor.y - segurado.inicio.y) > 5;
   segurado = null;
+  if (window.Vida?.soltou(moveu)) return; // caiu, ficou tonto...
   if (!moveu) {
+    if (window.Vida?.carinhoRecusado()) return; // bravo: nada de carinho
     // clique: carinho!
     for (let i = 0; i < 5; i++) coracoes.push({ x: P.x + rand(-15, 15), y: P.y - alturaPx(), vy: rand(30, 60), vx: rand(-15, 15), vida: 1.4 });
     if (Math.random() < 0.4 && pet.falas.length) falar(escolha(pet.falas));
@@ -584,6 +608,7 @@ function desenhar(dt) {
 }
 
 function desenharExtras(topo, dt) {
+  window.Vida?.desenhar(topo, dt);
   desenharTeclas(topo);
   if (P.estado === "dormindo") {
     ctx.font = "bold 14px system-ui, sans-serif";
@@ -618,6 +643,12 @@ function desenharVetor(vetor, dt) {
   ctx.save();
   ctx.imageSmoothingEnabled = true;
   ctx.translate(Math.round(P.x - w / 2), Math.round(P.y - h));
+  if (P.estado === "tonto") {
+    // cambaleia de um lado para o outro, girando nos pés
+    ctx.translate(w / 2, h);
+    ctx.rotate(Math.sin(relogio * 7) * 0.12);
+    ctx.translate(-w / 2, -h);
+  }
   if (P.olhando < 0) {
     ctx.translate(w, 0);
     ctx.scale(-1, 1);
