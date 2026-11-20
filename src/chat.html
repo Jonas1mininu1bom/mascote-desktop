@@ -18,7 +18,8 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: transparent; font: 14px system-ui, sans-serif; color: var(--texto); overflow: hidden; }
 
-  #botao { position: absolute; inset: 4px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); cursor: pointer;
+  /* janela fechada: [brinquedos] [chat]. O chat fica à direita, o de brinquedos menor à esquerda, embaixo. */
+  #botao { position: absolute; top: 4px; right: 4px; width: 56px; height: 56px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); cursor: pointer;
     background: radial-gradient(circle at 30% 25%, #e4906f, var(--destaque) 55%, var(--destaque-forte));
     color: #fff; display: grid; place-items: center; box-shadow: 0 4px 14px rgba(140,60,30,.35);
     transition: transform .15s ease, box-shadow .15s ease; }
@@ -27,7 +28,14 @@
   #botao:hover { transform: scale(1.07); box-shadow: 0 6px 18px rgba(140,60,30,.45); }
   #painel { display: none; position: absolute; inset: 4px; background: var(--fundo); border-radius: 16px;
     box-shadow: 0 6px 24px rgba(0,0,0,.25); flex-direction: column; overflow: hidden; border: 1px solid var(--borda); }
-  body.aberto #botao { display: none; }
+  #brinquedos { position: absolute; left: 4px; bottom: 6px; width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+    border: 2px solid rgba(255,255,255,.3); color: #fff; display: grid; place-items: center;
+    background: radial-gradient(circle at 30% 25%, #f2b8a0, #e08a68 60%, var(--destaque-forte));
+    box-shadow: 0 3px 10px rgba(140,60,30,.3); transition: transform .15s ease; }
+  #brinquedos .ic { width: 17px; height: 17px; }
+  #brinquedos:hover { transform: scale(1.1); }
+  #brinquedos.arrastando { cursor: grabbing; }
+  body.aberto #botao, body.aberto #brinquedos { display: none; }
   body.aberto #painel { display: flex; }
 
   header { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px 14px; border-bottom: 1px solid var(--borda); cursor: grab; user-select: none; }
@@ -107,6 +115,7 @@
 </style>
 </head>
 <body>
+<button id="brinquedos" title="Brinquedos: comida e bola (arraste para mudar de lugar)"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><rect width="18" height="12" x="3" y="8" rx="1" /><path d="M10 8V5c0-.6-.4-1-1-1H6a1 1 0 0 0-1 1v3" /><path d="M19 8V5c0-.6-.4-1-1-1h-3a1 1 0 0 0-1 1v3" /></svg></button>
 <button id="botao" title="Conversar com o pet (arraste para mudar de lugar)"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /><path d="M8 12h.01" /><path d="M12 12h.01" /><path d="M16 12h.01" /></svg></button>
 
 <section id="painel">

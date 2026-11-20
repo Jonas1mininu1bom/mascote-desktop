@@ -534,7 +534,7 @@ window.addEventListener("contextmenu", (e) => {
 });
 
 function atualizarCliques() {
-  const deveIgnorar = !(segurado || sobreOPet(cursor) || window.Vida?.sobreMenu(cursor));
+  const deveIgnorar = !(segurado || sobreOPet(cursor) || window.Vida?.sobreMenu(cursor) || window.Vida?.sobreBola(cursor));
   if (deveIgnorar !== ignorando) {
     ignorando = deveIgnorar;
     window.api.enviar("pet:ignorar", ignorando);
@@ -543,6 +543,7 @@ function atualizarCliques() {
 
 window.addEventListener("mousedown", (e) => {
   if (e.button === 0 && window.Vida?.cliqueNoMenu(cursor)) return;
+  if (e.button === 0 && window.Vida?.cliqueNaBola(cursor)) return; // chutou a bola
   if (e.button !== 0 || !sobreOPet(cursor)) return;
   window.Vida?.pegou();
   segurado = { dx: cursor.x - P.x, dy: cursor.y - P.y, inicio: { ...cursor } };
@@ -748,6 +749,7 @@ window.api.ouvir("tela", (t) => {
   }
 });
 window.api.ouvir("pet:trocar", trocarPet);
+window.api.ouvir("brinquedos:abrir", (p) => window.Vida?.abrirMenuBrinquedos(p));
 window.api.ouvir("pet:voltar", () => {
   P.bilhete = null;
   travessura = null;

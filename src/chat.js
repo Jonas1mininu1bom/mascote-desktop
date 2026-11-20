@@ -55,24 +55,30 @@ async function carregarPets() {
   $("pets").value = config.pet;
 }
 
-// Botão: clique abre o chat; segurar e arrastar muda o lugar dele (quem move a janela é o processo principal).
-$("botao").addEventListener("pointerdown", (e) => {
-  if (e.button !== 0) return;
-  $("botao").setPointerCapture(e.pointerId);
-  $("botao").classList.add("arrastando");
-  ponte.invocar("chat:arrastar", true);
-});
-$("botao").addEventListener("pointerup", async () => {
-  $("botao").classList.remove("arrastando");
-  const arrastou = await ponte.invocar("chat:arrastar", false);
-  if (!arrastou) ponte.enviar("chat:abrir", true);
-});
-$("botao").addEventListener("lostpointercapture", () => {
-  if ($("botao").classList.contains("arrastando")) {
-    $("botao").classList.remove("arrastando");
-    ponte.invocar("chat:arrastar", false);
-  }
-});
+// Botões do canto: clique faz a ação; segurar e arrastar muda o lugar dos dois juntos
+// (eles estão na mesma janela, e quem move a janela é o processo principal).
+function botaoArrastavel(id, aoClicar) {
+  const b = $(id);
+  b.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    b.setPointerCapture(e.pointerId);
+    b.classList.add("arrastando");
+    ponte.invocar("chat:arrastar", true);
+  });
+  b.addEventListener("pointerup", async () => {
+    b.classList.remove("arrastando");
+    const arrastou = await ponte.invocar("chat:arrastar", false);
+    if (!arrastou) aoClicar();
+  });
+  b.addEventListener("lostpointercapture", () => {
+    if (b.classList.contains("arrastando")) {
+      b.classList.remove("arrastando");
+      ponte.invocar("chat:arrastar", false);
+    }
+  });
+}
+botaoArrastavel("botao", () => ponte.enviar("chat:abrir", true));
+botaoArrastavel("brinquedos", () => ponte.enviar("brinquedos:abrir"));
 // o cabeçalho do painel aberto também arrasta (sem atrapalhar os botões dele)
 document.querySelector("header").addEventListener("pointerdown", (e) => {
   if (e.button !== 0 || e.target.closest("button")) return;

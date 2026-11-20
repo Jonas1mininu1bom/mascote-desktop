@@ -127,14 +127,27 @@ window.Vida = (() => {
       { id: "carinho", rotulo: "💗  Carinho" },
     ];
     const w = 138;
-    const h = itens.length * 28 + 10;
     const { min, max } = limites();
     let x = P.x + larguraPx() / 2 + 8;
     if (x + w > max - 4) x = P.x - larguraPx() / 2 - 8 - w;
-    x = Math.max(min + 4, x);
-    const y = Math.max(4, Math.min(tela.altura - h - 4, P.y - alturaPx() - 6));
-    menu = { x, y, w, h, itens, ate: relogio + 8 };
+    montarMenu(itens, Math.max(min + 4, x), P.y - alturaPx() - 6);
     if (ocioso()) mudar("parado", 8);
+  }
+  // Menu do botão de brinquedos (ao lado do chat): aparece logo acima do botão.
+  function abrirMenuBrinquedos(ponto) {
+    if (P.estado === "caindo" || P.estado === "tonto") return;
+    const itens = [
+      { id: "comida", rotulo: `${COMIDAS[pet.id] || "🍎"}  Comida` },
+      { id: "brincar", rotulo: "⚽  Bola de futebol" },
+    ];
+    const w = 150;
+    montarMenu(itens, ponto.x - w / 2, ponto.y - 17 - 8 - (itens.length * 28 + 10), w);
+  }
+  function montarMenu(itens, x, y, w = 138) {
+    const h = itens.length * 28 + 10;
+    x = Math.max(4, Math.min(tela.largura - w - 4, x));
+    y = Math.max(4, Math.min(tela.altura - h - 4, y));
+    menu = { x, y, w, h, itens, ate: relogio + 8 };
   }
   function fecharMenu() {
     menu = null;
@@ -202,49 +215,80 @@ window.Vida = (() => {
   }
 
   // ---------- bola ----------
+  // Você chuta clicando nela (ela vai para o lado oposto de onde você clicou, como um chute de verdade);
+  // o pet corre atrás e chuta de volta na direção do seu mouse. Sem chutes seus por 15 s, ele cansa.
+  const R_BOLA = 11;
   function brincar() {
     if (relogio < bravoAte) {
       falar("Não quero brincar com você agora. 😤", 2);
       return mudar("bravo", 1.5);
     }
     const x = limitarX(P.x + (P.olhando || 1) * 70);
-    const c = noChao() ? chaoDe(x) : P.y;
-    bola = { x, y: c - alturaPx() - 60, vx: 0, vy: 0, chao: c, giro: 0, r: 10 };
+    bola = { x, y: P.y - alturaPx() - 60, vx: 0, vy: 0, giro: 0, r: R_BOLA, chutePet: 0 };
     falar(escolha(["Bola! ⚽", "Vamos jogar!", "Chuta pra mim!"]), 1.8);
-    mudar("brincando", 12);
+    mudar("brincando", 15);
+  }
+  const sobreBola = (p) => Boolean(bola) && Math.hypot(p.x - bola.x, p.y - bola.y) <= bola.r + 8;
+  function cliqueNaBola(p) {
+    if (!sobreBola(p)) return false;
+    let dx = bola.x - p.x;
+    let dy = bola.y - p.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 2) [dx, dy] = [rand(-0.3, 0.3), -1]; // bem no meio: vai para cima
+    else [dx, dy] = [dx / d, dy / d];
+    bola.vx = dx * 780;
+    bola.vy = dy * 780 - 160; // um pouco de "levantada", como num chute
+    P.tempo = Math.max(P.tempo, 15); // você está jogando: ele continua
+    if (debug) console.warn(`[debug] chute seu: vx=${Math.round(bola.vx)} vy=${Math.round(bola.vy)}`);
+    if (Math.random() < 0.35) falar(escolha(["Uau, que chute!", "Lá vou eu!", "Essa é minha!"]), 1.4);
+    return true;
   }
   function atualizarBola(dt) {
     if (!bola) return mudar("parado", 1);
+    if (debug && relogio - (bola.log || 0) > 0.15) {
+      bola.log = relogio;
+      console.warn(`[debug] bola ${Math.round(bola.x)},${Math.round(bola.y)}`);
+    }
     const { min, max } = limites();
+    const chaoBola = chaoDe(bola.x);
     bola.vy += GRAVIDADE * dt;
     bola.x += bola.vx * dt;
     bola.y += bola.vy * dt;
     bola.giro += (bola.vx / bola.r) * dt;
-    if (bola.y >= bola.chao - bola.r) {
-      bola.y = bola.chao - bola.r;
+    if (bola.y >= chaoBola - bola.r) {
+      bola.y = chaoBola - bola.r;
       bola.vy = Math.abs(bola.vy) > 80 ? -bola.vy * 0.55 : 0;
       bola.vx *= 1 - Math.min(1, dt * 1.6); // atrito no chão
+    }
+    if (bola.y < bola.r) {
+      bola.y = bola.r; // bateu no teto
+      bola.vy = Math.abs(bola.vy) * 0.6;
     }
     if (bola.x < min + bola.r || bola.x > max - bola.r) {
       bola.x = Math.max(min + bola.r, Math.min(max - bola.r, bola.x));
       bola.vx = -bola.vx * 0.7;
     }
-    if (noChao()) bola.chao = chaoDe(bola.x);
-    // o pet corre atrás e chuta quando alcança
-    const perto = Math.abs(bola.x - P.x) < larguraPx() / 2 + bola.r && bola.y > bola.chao - bola.r - 30;
-    if (perto) {
-      const lado = bola.x >= P.x ? 1 : -1;
-      bola.vx = lado * rand(260, 460);
-      bola.vy = -rand(280, 520);
-      P.olhando = lado;
-      if (Math.random() < 0.3) falar(escolha(["Gol! ⚽", "Toma!", "Hehe!"]), 1.2);
-    } else {
-      andarAte({ x: limitarX(bola.x), y: noChao() ? chaoDe(bola.x) : P.y }, dt, 2.2);
+    // o pet corre pelo chão atrás da bola e chuta de volta na direção do seu mouse
+    const alcance = Math.abs(bola.x - P.x) < larguraPx() / 2 + bola.r && bola.y > chaoBola - alturaPx() * 0.8;
+    if (alcance && relogio - bola.chutePet > 0.6) {
+      bola.chutePet = relogio;
+      let dx = cursor.x - bola.x;
+      let dy = cursor.y - bola.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const forca = Math.min(820, 380 + d * 0.6); // mouse longe: chute mais forte
+      bola.vx = (dx / d) * forca;
+      bola.vy = Math.min((dy / d) * forca, -300); // sempre sobe um pouco
+      P.olhando = dx >= 0 ? 1 : -1;
+      P.anim = "feliz";
+      if (debug) console.warn(`[debug] chute do pet para o mouse: vx=${Math.round(bola.vx)} vy=${Math.round(bola.vy)}`);
+      if (Math.random() < 0.3) falar(escolha(["Toma! ⚽", "Pra você!", "Gol!"]), 1.2);
+    } else if (!alcance) {
+      andarAte({ x: limitarX(bola.x), y: chaoDe(bola.x) }, dt, 2.4);
       P.anim = "correndo";
     }
     if (P.tempo <= 0) {
       bola = null;
-      falar(escolha(["De novo amanhã!", "Cansei, foi divertido!", "Ufa! Valeu! ❤"]), 2.2);
+      falar(escolha(["Cansei, foi divertido!", "Ufa! Valeu! ❤", "De novo depois?"]), 2.2);
       coracao(4);
       mudar("feliz", 1.4);
     }
@@ -409,5 +453,8 @@ window.Vida = (() => {
     desenharMenu();
   }
 
-  return { precisaCair, cair, pegou, segurando, soltou, carinhoRecusado, abrirMenu, sobreMenu, cliqueNoMenu, atualizar, desenhar };
+  return {
+    precisaCair, cair, pegou, segurando, soltou, carinhoRecusado,
+    abrirMenu, abrirMenuBrinquedos, sobreMenu, cliqueNoMenu, sobreBola, cliqueNaBola, atualizar, desenhar,
+  };
 })();

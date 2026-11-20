@@ -109,6 +109,8 @@ const bilhetes = new Map();
 let proxIdBilhete = 1;
 const MARGEM = 16;
 const BOTAO = 64;
+// O botão de brinquedos fica à esquerda do botão do chat, na mesma janela (assim os dois se movem juntos).
+const EXTRA_BRINQUEDOS = 42;
 const PAINEL = { w: 360, h: 520 };
 
 const tela = () => screen.getPrimaryDisplay();
@@ -135,7 +137,7 @@ function posBotao() {
   if (p && num(p.x) && num(p.y)) {
     const wa = screen.getDisplayNearestPoint(centroBotao(p)).workArea; // se o monitor sumiu, cai no mais próximo
     return {
-      x: Math.round(limitar(p.x, wa.x, wa.x + wa.width - BOTAO)),
+      x: Math.round(limitar(p.x, wa.x + EXTRA_BRINQUEDOS, wa.x + wa.width - BOTAO)),
       y: Math.round(limitar(p.y, wa.y, wa.y + wa.height - BOTAO)),
     };
   }
@@ -147,7 +149,7 @@ const telaDoChat = () => screen.getDisplayNearestPoint(centroBotao(posBotao()));
 // O painel abre a partir do botão, crescendo para o lado em que há mais espaço.
 function boundsChat(aberto) {
   const b = posBotao();
-  if (!aberto) return { ...b, width: BOTAO, height: BOTAO };
+  if (!aberto) return { x: b.x - EXTRA_BRINQUEDOS, y: b.y, width: BOTAO + EXTRA_BRINQUEDOS, height: BOTAO };
   const wa = telaDoChat().workArea;
   const c = centroBotao(b);
   const x = c.x < wa.x + wa.width / 2 ? b.x : b.x + BOTAO - PAINEL.w;
@@ -356,7 +358,7 @@ function arrastarChat(ativo) {
       const bx = x + PAINEL.w / 2 < wa.x + wa.width / 2 ? x : x + PAINEL.w - BOTAO;
       const by = y + PAINEL.h / 2 < wa.y + wa.height / 2 ? y : y + PAINEL.h - BOTAO;
       config.chatPos = { x: bx, y: by };
-    } else config.chatPos = { x, y };
+    } else config.chatPos = { x: x + EXTRA_BRINQUEDOS, y }; // a janela começa no botão de brinquedos
     salvarConfig();
     posicionarChat();
     return true;
@@ -623,6 +625,13 @@ function registrarIpc() {
     overlay?.webContents.send("travessura:fim");
   });
   on("pet:voltar", () => overlay?.webContents.send("pet:voltar"));
+  // botão de brinquedos: o overlay mostra o menu (comida, bola) logo acima dele
+  on("brinquedos:abrir", () => {
+    if (!overlay || overlay.isDestroyed() || chatAberto) return;
+    const b = boundsChat(false);
+    const o = areaTotal();
+    overlay.webContents.send("brinquedos:abrir", { x: b.x + 4 + 17 - o.x, y: b.y + BOTAO - 6 - 17 - o.y });
+  });
   on("app:sair", () => app.quit());
   on("app:minimizar", () => esconderMascote(true));
 

@@ -58,11 +58,12 @@ clicar para abrir, como qualquer programa, sem janela de terminal. Para tirar os
 | Ação | Como |
 |---|---|
 | Conversar | Clique no botão laranja no canto inferior direito |
-| Mudar o chat de lugar | Arraste o botão (ou o topo do painel aberto). ⚙️ → Chat no canto desfaz |
+| Mudar o chat de lugar | Arraste o botão do chat ou o de brinquedos, que andam juntos (ou o topo do painel aberto). ⚙️ → Chat no canto desfaz |
 | Escolher em que tela o pet fica | ⚙️ → Telas (todas, ou uma específica) |
 | Escolher em que pasta ele trabalha | Clique na linha 📁 no topo do chat |
 | Carinho | Clique no pet |
-| Dar comida / brincar de bola | Botão direito no pet |
+| Dar comida / brincar de bola | Botão pequeno de brinquedos, ao lado do chat (ou botão direito no pet) |
+| Chutar a bola | Clique nela: ela vai para o lado oposto de onde você clicou. O pet chuta de volta na direção do seu mouse |
 | Andar só em cima da barra de tarefas | ⚙️ → Chão |
 | Mudar o pet de lugar | Arraste o pet com o mouse |
 | Ligar passeio / modo bagunça | ⚙️ no chat, ou o ícone na bandeja do sistema |
@@ -90,8 +91,11 @@ mensagem (PNG, JPG, GIF ou WEBP, até 5 MB cada), e o Claude Code vê a imagem j
 - **Chacoalhar:** segure o pet e sacuda o mouse de um lado para o outro. Ele fica tonto (estrelinhas e
   olhos em espiral) e depois fica bravo com você. Bravo, ele recusa carinho e brincadeira por um tempo.
   Uma comidinha resolve.
-- **Menu** (botão direito no pet): **Dar comida** (ele vai até a comida e come), **Brincar** (ele joga
-  bola) e **Carinho**. Se ficar muito tempo sem comer, ele avisa que está com fome.
+- **Brinquedos** (botão pequeno ao lado do chat, ou botão direito no pet): **Comida** (ele vai até a
+  comida e come) e **Bola de futebol**. Clique na bola para chutar: ela vai para o lado oposto de onde
+  você clicou, e o pet corre atrás e chuta de volta na direção do seu mouse. Se você parar de jogar,
+  depois de uns 15 s ele cansa. Pelo botão direito também tem **Carinho**. Se ficar muito tempo sem
+  comer, ele avisa que está com fome.
 
 ## Bilhetes da comunidade
 
