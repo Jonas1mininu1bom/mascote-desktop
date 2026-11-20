@@ -121,7 +121,7 @@ const RESERVA = {
 };
 // Pets que sabem dançar: o desenho vetorial tem a dancinha (Pato) ou o pet.json tem "dancando".
 const sabeDancar = () => pet.desenho === "pato" || !!pet.animacoes?.dancando;
-const CHANCE_DANCAR = 0.08;
+const CHANCE_DANCAR = 0.04; // aleatória, fora do intervalo das bagunças
 function animacao(nome) {
   if (sprites[nome]) return nome;
   for (const r of RESERVA[nome] || []) if (sprites[r]) return r;
@@ -179,12 +179,13 @@ function pontoAleatorio() {
   return { x, y: limitarY(rand(a.y + a.h * 0.15, a.y + a.h), x) };
 }
 
-// Atividades (pegar/seguir o mouse, buscar bilhete, travessura, dançar): uma de cada vez, com
-// ~3 minutos entre uma e a próxima. O resto (andar, cochilar, acenar) continua normal.
-const INTERVALO_ATIVIDADE = 180;
-let proximaAtividade = 90; // a primeira, 1min30 depois de abrir
-const podeAtividade = () => Boolean(debug) || relogio >= proximaAtividade;
-const comecouAtividade = () => (proximaAtividade = relogio + INTERVALO_ATIVIDADE);
+// Atividades (pegar/seguir o mouse, buscar bilhete, travessura): uma de cada vez, com um intervalo
+// entre uma e a próxima que a pessoa escolhe em Configurações → Frequência (3 min por padrão).
+// A primeira vem na metade do intervalo depois de abrir. Andar, cochilar, acenar e dançar são livres.
+const intervaloAtividade = () => (Number(config.frequencia) || 3) * 60;
+let ultimaAtividade = null;
+const podeAtividade = () => Boolean(debug) || relogio >= (ultimaAtividade ?? -intervaloAtividade() / 2) + intervaloAtividade();
+const comecouAtividade = () => (ultimaAtividade = relogio);
 
 function proximoEstado() {
   if (P.humor === "pensando") return mudar("pensando", 999);
@@ -197,10 +198,7 @@ function proximoEstado() {
   if (debug === "travessura" && config.bagunca) pedirTravessura();
   if (!config.passear || relogio < ficarAte) {
     const a = P.ancora || tela.casa;
-    if (sabeDancar() && podeAtividade() && Math.random() < CHANCE_DANCAR) {
-      comecouAtividade();
-      return mudar("dancando", 5.1); // um ciclo inteiro da dança
-    }
+    if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", 5.1); // um ciclo inteiro da dança
     if (r < 0.5) return mudar("parado", rand(3, 7));
     if (r < 0.62) return mudar("acenando", 1.6);
     if (r < 0.9) {
@@ -222,7 +220,7 @@ function proximoEstado() {
     comecouAtividade();
     return mudar("seguir", rand(6, 10));
   }
-  if (config.bagunca && podeAtividade() && r >= 0.35 && r < 0.4) pedirTravessura(); // raro (e o app ainda limita a 1 a cada 3 min)
+  if (config.bagunca && podeAtividade() && r >= 0.35 && r < 0.4) pedirTravessura(); // raro (e o app ainda respeita o mesmo intervalo)
   if (config.bagunca && ((podeAtividade() && r < 0.35) || debug === "bilhete")) {
     comecouAtividade();
     const { min, max } = limites();
@@ -231,10 +229,7 @@ function proximoEstado() {
     const a = areaDe(x);
     return mudar("buscar", 20, { alvo: { x, y: limitarY(rand(a.y + 220, a.y + a.h), x) }, lado });
   }
-  if (sabeDancar() && podeAtividade() && Math.random() < CHANCE_DANCAR) {
-    comecouAtividade();
-    return mudar("dancando", 5.1); // um ciclo inteiro da dança
-  }
+  if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", 5.1); // dança quando der vontade
   if (r < 0.45) return mudar("parado", rand(2, 5));
   if (r < 0.85) return mudar("andar", 12, { alvo: pontoAleatorio() });
   if (r < 0.92) return mudar("dormindo", rand(6, 12));
@@ -458,7 +453,7 @@ function atualizar(dt) {
         falar(escolha(["Peguei! 😈", "É meu agora!", "Hehe"]), 2);
         // o mouse não "pula" para a mão: fica onde foi mordido, e anda junto com ela
         const offset = { x: cursor.x - m2.x, y: cursor.y - m2.y };
-        return mudar("segurando", rand(2.5, 4), { alvo: pontoAleatorio(), offset, cursorEsperado: { ...cursor } });
+        return mudar("segurando", rand(2.5, 4), { alvo: pontoAleatorio(), offset, bocaRel: null, cursorEsperado: { ...cursor } });
       }
       if (P.tempo <= 0) {
         const m3 = mao();
@@ -496,9 +491,17 @@ function atualizar(dt) {
       if (chegou) P.alvo = pontoAleatorio();
       const m = mao();
       const area = { w: tela.largura, h: tela.altura };
+      // O cursor escorrega de onde foi mordido para dentro do bico. A posição da boca em relação
+      // ao corpo é suavizada (quando o pet vira, a boca dá a volta nele e o cursor dava um "chicote"),
+      // mas o andar do pet não: assim o cursor não fica para trás quando ele corre.
+      const k = 1 - Math.exp(-12 * dt);
+      P.offset.x *= Math.exp(-5 * dt);
+      P.offset.y *= Math.exp(-5 * dt);
+      const rel = { x: m.x - P.x, y: m.y - P.y };
+      P.bocaRel = P.bocaRel ? { x: P.bocaRel.x + (rel.x - P.bocaRel.x) * k, y: P.bocaRel.y + (rel.y - P.bocaRel.y) * k } : rel;
       P.cursorEsperado = {
-        x: Math.max(0, Math.min(area.w - 1, m.x + P.offset.x)),
-        y: Math.max(0, Math.min(area.h - 1, m.y + P.offset.y)),
+        x: Math.max(0, Math.min(area.w - 1, P.x + P.bocaRel.x + P.offset.x)),
+        y: Math.max(0, Math.min(area.h - 1, P.y + P.bocaRel.y + P.offset.y)),
       };
       window.api.enviar("pet:moverCursor", P.cursorEsperado);
       if (P.tempo <= 0 || !pegarMouseLigado()) {
@@ -597,7 +600,7 @@ window.addEventListener("mouseup", () => {
   P.x = limitarX(P.x);
   P.y = limitarY(Math.max(P.y, areaDe(P.x).y + alturaPx()));
   P.ancora = { x: P.x, y: P.y };
-  falar(escolha(["Uhul!", "Ei! 😤", "De novo!"]), 1.8);
+  falar(escolha(["Uhul!", "De novo!", "Que passeio!"]), 1.8); // só se irrita no chacoalhão
   mudar("feliz", 1.2);
 });
 

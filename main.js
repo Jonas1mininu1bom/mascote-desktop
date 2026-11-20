@@ -81,7 +81,7 @@ function vigiar(nome, w) {
 }
 
 // ---------- configuração ----------
-const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir(), travessuras: {}, telas: "todas", chao: "tela" };
+const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir(), travessuras: {}, telas: "todas", chao: "tela", frequencia: 3 };
 let config = { ...PADRAO };
 const arqConfig = () => path.join(app.getPath("userData"), "config.json");
 const pastaPetsUsuario = () => path.join(app.getPath("userData"), "pets");
@@ -707,6 +707,7 @@ function registrarIpc() {
     const t = travessuras.sortear(listaTravessuras(), config.travessuras || {}, {
       semIntervalo: process.env.MASCOTE_DEBUG === "travessura",
       admin: admin.ehAdmin(),
+      intervalo: (config.frequencia || 3) * 60 * 1000,
     });
     if (t) log("main", "info", "travessura:", t.nome, "x" + t.vezes);
     return t;
@@ -842,6 +843,7 @@ app.on("web-contents-created", (_e, wc) => {
 
 // O que a página do chat pode mudar na configuração.
 // (a pasta de trabalho e o pet têm canais próprios, com diálogo/validação no processo principal)
+const FREQUENCIAS = [1, 3, 5, 10];
 const CONFIG_DA_PAGINA = ["passear", "bagunca"]; // allowlist: chave nova fica bloqueada por padrão
 function filtrarConfigDaPagina(parcial) {
   if (!parcial || typeof parcial !== "object" || Array.isArray(parcial)) return {};
@@ -851,6 +853,8 @@ function filtrarConfigDaPagina(parcial) {
   }
   // chão: tela inteira ou só em cima da barra de tarefas
   if (parcial.chao === "tela" || parcial.chao === "barra") limpo.chao = parcial.chao;
+  // minutos entre uma bagunça e outra
+  if (FREQUENCIAS.includes(parcial.frequencia)) limpo.frequencia = parcial.frequencia;
   // telas: "todas" ou o id de um monitor conectado
   if (parcial.telas === "todas" || (typeof parcial.telas === "string" && listarTelas().some((t) => t.id === parcial.telas))) {
     limpo.telas = parcial.telas;

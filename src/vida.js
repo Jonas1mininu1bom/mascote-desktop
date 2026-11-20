@@ -340,7 +340,7 @@ window.Vida = (() => {
     fome = Math.min(100, fome + dt / 20); // ~1 ponto a cada 20 s
     if (fome > 70 && ocioso() && relogio - ultimaQueixa > 90) {
       ultimaQueixa = relogio;
-      falar(escolha(["Tô com fome... 🍽️", "Minha barriga roncou...", "Me dá comida? (botão direito em mim)"]), 3);
+      falar(escolha(["Tô com fome... 🍽️", "Minha barriga roncou...", "Me dá comida?"]), 3);
     }
     if (bola) {
       fisicaBola(dt);

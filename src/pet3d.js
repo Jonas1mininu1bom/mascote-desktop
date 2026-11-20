@@ -440,7 +440,8 @@ window.Pet3D = (() => {
   // Devolve { canvas, x, y, w, h } (em px de tela) para o overlay copiar, ou null se não deu.
   // ponto do mundo 3D que segura as coisas (já com a posição/rotação deste quadro)
   function pontoDaBoca(m) {
-    if (m.tipo === "pato") return m.bicoCima.localToWorld(new T.Vector3(0, 0, 0.9));
+    // um pouco além da ponta do bico: a seta do mouse fica na frente da cara, e não por cima da cabeça
+    if (m.tipo === "pato") return m.bicoCima.localToWorld(new T.Vector3(0, -0.5, 2.2));
     if (m.tipo === "tartaruga") return m.cabeca.localToWorld(new T.Vector3(0.03, -0.07, 0.33));
     if (m.tipo === "palito") return m.bracos[1].localToWorld(new T.Vector3(0, -0.36, 0));
     return null;
