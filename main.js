@@ -8,6 +8,7 @@ const { listarPets, copiarPetsPadrao, quadroParaBitmap } = require("./src/pets")
 const { ChatClaude } = require("./src/claude");
 const bilhetesMod = require("./src/bilhetes");
 const travessuras = require("./src/travessuras");
+const admin = require("./src/admin");
 
 if (process.platform === "linux") app.commandLine.appendSwitch("enable-transparent-visuals");
 // No Windows, o Chromium para de PINTAR janelas que ele acha que estão cobertas por outras
@@ -469,20 +470,67 @@ function registrarIpc() {
   on("travessuras:abrirPasta", abrirPastaTravessuras);
 
   // ---------- travessuras ----------
-  // "Pegar o mouse" não é executada aqui (é o pet que corre atrás), mas liga/desliga igual às outras.
-  // Diferente das outras, vem ligada (era o comportamento original do modo bagunça).
-  const PEGAR_MOUSE = { id: "pegar-mouse", nome: "Pegar o mouse", tipo: "mouse" };
-  handle("travessuras:listar", () => [
-    ...(require("./src/cursor").disponivel() ? [{ ...PEGAR_MOUSE, ligada: config.travessuras?.["pegar-mouse"] !== false }] : []),
-    ...listaTravessuras().map((t) => ({ id: t.id, nome: t.nome, tipo: t.tipo, ligada: config.travessuras?.[t.id] === true })),
-  ]);
-  on("travessuras:ligar", (_e, { id, ligada } = {}) => {
-    if (typeof ligada !== "boolean" || (id !== PEGAR_MOUSE.id && !listaTravessuras().some((t) => t.id === id))) return;
-    mudarConfig({ travessuras: { ...config.travessuras, [id]: ligada } });
+  // Travessuras "do pet" (ele mesmo faz, não passam pelo sorteio daqui), mas ligam/desligam igual às outras.
+  // padrao: como vem quando a pessoa nunca mexeu. admin: só pode ligar com o app rodando como administrador.
+  const DO_PET = [
+    { id: "pegar-mouse", nome: "Pegar o mouse", tipo: "mouse", padrao: true, precisa: () => require("./src/cursor").disponivel() },
+    { id: "seguir-mouse", nome: "Seguir o mouse", tipo: "seguir", padrao: false },
+    { id: "admin-janelas", nome: "Também em janelas de administrador", tipo: "admin", padrao: false, admin: true, precisa: () => travessuras.teclasDisponiveis() && admin.disponivel() },
+  ];
+  const ligada = (t) => (t.admin && !admin.ehAdmin() ? false : (config.travessuras?.[t.id] ?? t.padrao) === true);
+  const todasTravessuras = () => [
+    ...DO_PET.filter((t) => !t.precisa || t.precisa()),
+    ...listaTravessuras().map((t) => ({ ...t, padrao: false })),
+  ];
+  handle("travessuras:listar", () =>
+    todasTravessuras().map((t) => ({
+      id: t.id,
+      nome: t.nome,
+      tipo: t.tipo,
+      ligada: ligada(t),
+      precisaAdmin: Boolean(t.admin),
+      bloqueada: Boolean(t.admin) && !admin.ehAdmin(),
+    }))
+  );
+  on("travessuras:ligar", (_e, { id, ligada: valor } = {}) => {
+    const t = todasTravessuras().find((x) => x.id === id);
+    if (typeof valor !== "boolean" || !t) return;
+    if (valor && t.admin && !admin.ehAdmin()) return; // com cadeado: precisa pedir permissão antes
+    mudarConfig({ travessuras: { ...config.travessuras, [id]: valor } });
+  });
+
+  // ---------- permissão de administrador e iniciar com o Windows ----------
+  const itemLogin = () => ({ path: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] });
+  const estadoSistema = () => ({
+    windows: process.platform === "win32",
+    admin: admin.ehAdmin(),
+    iniciarComWindows: process.platform === "win32" && app.getLoginItemSettings(itemLogin()).openAtLogin,
+  });
+  handle("sistema:estado", estadoSistema);
+  handle("sistema:iniciarComWindows", (_e, valor) => {
+    if (process.platform === "win32" && typeof valor === "boolean") app.setLoginItemSettings({ ...itemLogin(), openAtLogin: valor });
+    return estadoSistema();
+  });
+  handle("sistema:pedirAdmin", async () => {
+    if (process.platform !== "win32" || admin.ehAdmin()) return estadoSistema();
+    // solta a trava de "uma instância só" para o app novo (como admin) conseguir abrir
+    app.releaseSingleInstanceLock();
+    const aceitou = await admin.reabrirComoAdmin({ exe: process.execPath, args: process.argv.slice(1), pasta: process.cwd() });
+    if (aceitou) {
+      log("main", "info", "reabrindo como administrador");
+      app.quit();
+    } else {
+      app.requestSingleInstanceLock();
+      log("main", "info", "permissão de administrador cancelada");
+    }
+    return { ...estadoSistema(), cancelado: !aceitou };
   });
   handle("travessura:pedir", () => {
     if (!config.bagunca) return null;
-    const t = travessuras.sortear(listaTravessuras(), config.travessuras || {}, { semIntervalo: process.env.MASCOTE_DEBUG === "travessura" });
+    const t = travessuras.sortear(listaTravessuras(), config.travessuras || {}, {
+      semIntervalo: process.env.MASCOTE_DEBUG === "travessura",
+      admin: admin.ehAdmin(),
+    });
     if (t) log("main", "info", "travessura:", t.nome, "x" + t.vezes);
     return t;
   });
@@ -492,6 +540,13 @@ function registrarIpc() {
       await travessuras.executar(token, {
         abrirLink: (url) => shell.openExternal(url),
         aoTocar: (i) => overlay?.webContents.send("travessura:tecla", i),
+        // janela de administrador na frente: só aperta teclas se o app for admin e a pessoa deixou
+        podeTeclar: () => {
+          if (!admin.janelaDaFrenteEhAdmin()) return true;
+          const ok = admin.ehAdmin() && config.travessuras?.["admin-janelas"] === true;
+          if (!ok) log("main", "info", "travessura pulada: a janela da frente é de administrador");
+          return ok;
+        },
       });
     } catch (e) {
       log("main", "error", "travessura falhou:", e);

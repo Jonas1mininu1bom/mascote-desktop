@@ -97,14 +97,50 @@ async function carregarTravessuras() {
     const c = document.createElement("input");
     c.type = "checkbox";
     c.checked = t.ligada;
+    c.disabled = Boolean(t.bloqueada); // precisa de administrador: fica desligada até a pessoa dar permissão
     c.onchange = () => ponte.enviar("travessuras:ligar", { id: t.id, ligada: c.checked });
     const s = document.createElement("span");
-    s.append(icone({ abrir: "globo", mouse: "mouse" }[t.tipo] || "teclado"), t.nome);
+    s.append(icone({ abrir: "globo", mouse: "mouse", seguir: "pegadas", admin: "escudo" }[t.tipo] || "teclado"), t.nome);
+    if (t.precisaAdmin) {
+      const selo = document.createElement("span");
+      selo.className = "selo";
+      selo.append(icone(t.bloqueada ? "cadeado" : "escudo"), t.bloqueada ? "precisa de administrador" : "admin");
+      s.append(selo);
+    }
+    l.classList.toggle("bloqueada", Boolean(t.bloqueada));
+    if (t.bloqueada) l.title = "Use o botão \"Pedir permissão ao Windows\" aqui embaixo para liberar.";
     l.append(c, s);
     caixa.appendChild(l);
   }
   if (!lista.length) caixa.textContent = "Nenhuma disponível.";
+  carregarSistema(lista.some((t) => t.precisaAdmin));
 }
+
+// "Iniciar com o Windows" e a caixa de permissão de administrador (só no Windows).
+async function carregarSistema(temAdmin) {
+  const e = await ponte.invocar("sistema:estado");
+  mostrarSistema(e, temAdmin);
+}
+function mostrarSistema(e, temAdmin = true) {
+  $("linhaIniciar").hidden = !e.windows;
+  $("iniciarComWindows").checked = e.iniciarComWindows;
+  $("admin").hidden = !e.windows || !temAdmin;
+  $("admin").classList.toggle("ativo", e.admin);
+  $("pedirAdmin").hidden = e.admin;
+  $("pedirAdmin").disabled = false;
+  $("adminTexto").textContent = e.admin
+    ? "Ligado. As opções com escudo já podem ser usadas. Atenção: o chat também roda como administrador agora, então leia bem cada pedido de permissão antes de aceitar."
+    : "Opcional. Sem ela, o Windows não deixa o pet apertar teclas quando uma janela de administrador está na frente (Gerenciador de Tarefas, por exemplo). O app reabre e o Windows pergunta se você permite.";
+}
+$("iniciarComWindows").onchange = async (ev) => mostrarSistema(await ponte.invocar("sistema:iniciarComWindows", ev.target.checked));
+$("pedirAdmin").onclick = async () => {
+  $("pedirAdmin").disabled = true;
+  $("pedirAdmin").lastChild.textContent = "Esperando o Windows…";
+  const e = await ponte.invocar("sistema:pedirAdmin");
+  $("pedirAdmin").lastChild.textContent = "Pedir permissão ao Windows";
+  if (e.cancelado) adicionar("info", "Tudo bem, continuo sem permissão de administrador.");
+  mostrarSistema(e);
+};
 
 $("btnAjustes").onclick = () => {
   $("ajustes").classList.toggle("visivel");

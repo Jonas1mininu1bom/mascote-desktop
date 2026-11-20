@@ -100,6 +100,25 @@ e edite o `travessuras.json`:
   `[mín, máx]`, até 10). Só são aceitas teclas que não apagam, enviam ou fecham nada:
   `alt, tab, shift, win, esquerda, cima, direita, baixo, d, m`. Por enquanto só no Windows.
 - **abrir:** sorteia um dos links (só `http://` ou `https://`).
+- **"admin": true:** a travessura aparece com cadeado e só pode ser ligada com o app rodando como
+  administrador.
+
+Além dessas, há duas que o próprio pet faz: **Seguir o mouse** (vai atrás do cursor sem pegar) e
+**Pegar o mouse**, que imita o Desktop Goose. Ele morde o cursor, corre segurando e solta se você
+puxar com força.
+
+### Permissão de administrador (opcional)
+
+Nada no mascote precisa de administrador. A diferença é que, sem a permissão, o Windows não deixa um
+programa comum apertar teclas quando a janela da frente é de administrador (Gerenciador de Tarefas,
+terminal admin...). Nesses casos ele pula a travessura. Para liberar, use **⚙️ → Pedir permissão ao
+Windows**: o app reabre e o Windows pergunta se você permite. Depois disso, a opção "Também em janelas
+de administrador" pode ser ligada.
+
+Cuidado: como administrador, o chat (Claude Code) também roda com essa permissão. Os pedidos de
+Permitir/Negar continuam aparecendo, então leia bem cada um.
+
+**⚙️ → Iniciar com o Windows** faz o mascote abrir sozinho quando você liga o PC (não precisa de admin).
 
 ## Problemas?
 

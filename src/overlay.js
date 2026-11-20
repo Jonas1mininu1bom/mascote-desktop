@@ -36,10 +36,13 @@ const CHANCE_PEGAR = 0.1; // chance, a cada decisão no modo bagunça, de ir atr
 const VEL_VOLTAR = 450; // px/s voltando para casa
 let ficarAte = 0; // depois de "chamar de volta", fica em casa até este tempo (relógio)
 
-function chamarDeVolta(segundos) {
-  ficarAte = relogio + 45; // fica quietinho em casa por um tempo, mesmo com passeio ligado
+// ficar: true só no botão "Chamar de volta" (fica quietinho em casa um tempo, mesmo com passeio ligado).
+// Quando a casa só muda de lugar (chat aberto, fechado ou arrastado), ele vai junto e continua passeando.
+function chamarDeVolta(segundos, { ficar = true } = {}) {
+  if (ficar) ficarAte = relogio + 45;
   mudar("voltar", segundos, { alvo: { ...tela.casa } });
 }
+const seguirMouseLigado = () => config.bagunca && config.travessuras?.["seguir-mouse"] === true;
 const pegarMouseLigado = () => config.bagunca && mouseNativo && config.travessuras?.["pegar-mouse"] !== false;
 
 // ---------- sprites ----------
@@ -127,7 +130,7 @@ function mudar(estado, tempo, extra = {}) {
   P.estado = estado;
   P.tempo = tempo;
   Object.assign(P, extra);
-  const anim = { andar: "andando", perseguir: "correndo", buscar: "andando", voltar: "andando" }[estado] || estado;
+  const anim = { andar: "andando", perseguir: "correndo", seguir: "andando", buscar: "andando", voltar: "andando" }[estado] || estado;
   if (P.anim !== anim) P.tAnim = 0;
   P.anim = anim;
 }
@@ -189,6 +192,7 @@ function proximoEstado() {
     console.info("[mouse] vou pegar o mouse");
     return mudar("perseguir", 10);
   }
+  if (seguirMouseLigado() && Math.random() < 0.08) return mudar("seguir", rand(6, 10));
   if (config.bagunca && r >= 0.35 && r < 0.4) pedirTravessura(); // raro (e o app ainda limita a 1 a cada 3 min)
   if (config.bagunca && r < 0.35) {
     const { min, max } = limites();
@@ -211,7 +215,7 @@ async function pedirTravessura() {
   if (pedindo || travessura) return;
   pedindo = true;
   const t = await window.api.invocar("travessura:pedir").finally(() => (pedindo = false));
-  if (!t || travessura || segurado || ["perseguir", "segurando", "buscar", "arrastando"].includes(P.estado)) return;
+  if (!t || travessura || segurado || ["perseguir", "seguir", "segurando", "buscar", "arrastando"].includes(P.estado)) return;
   travessura = { ...t, tocadas: 0, apertadaAte: 0 };
   falar(escolha(t.tipo === "abrir" ? ["Olha isso! 😈", "Pesquisei pra você 🌐"] : ["Hehe 😈", "Ops...", "Segura essa!"]), 2.5);
   mudar("travessura", 15);
@@ -393,6 +397,24 @@ function atualizar(dt) {
         const m3 = mao();
         console.info(`[mouse] desisti: mão a ${Math.round(Math.hypot(cursor.x - m3.x, cursor.y - m3.y))}px do mouse (pet ${Math.round(P.x)},${Math.round(P.y)} mouse ${cursor.x},${cursor.y})`);
         falar("Ufa, cansei...", 2);
+        proximoEstado();
+      }
+      return;
+    }
+    case "seguir": {
+      // vai atrás do mouse (sem pegar), parando um pouquinho antes, como um bichinho curioso
+      const m = mao();
+      const d = Math.hypot(cursor.x - m.x, cursor.y - m.y);
+      if (d > 50) {
+        const alvo = {
+          x: Math.max(limites().min, Math.min(limites().max, P.x + (cursor.x - m.x))),
+          y: Math.max(alturaPx() * 0.5, Math.min(tela.altura, P.y + (cursor.y - m.y))),
+        };
+        andarAte(alvo, dt, 1.6);
+      } else P.olhando = cursor.x >= P.x ? 1 : -1;
+      if (P.tempo <= 0) {
+        P.x = limitarX(P.x);
+        P.y = limitarY(P.y);
         proximoEstado();
       }
       return;
@@ -617,7 +639,7 @@ async function trocarPet(novo) {
 window.api.ouvir("cursor", (c) => (cursor = c));
 window.api.ouvir("config", (c) => {
   config = c;
-  if (!config.passear && ["andar", "perseguir", "segurando", "buscar", "arrastando"].includes(P.estado)) {
+  if (!config.passear && ["andar", "perseguir", "seguir", "segurando", "buscar", "arrastando"].includes(P.estado)) {
     P.bilhete = null;
     mudar("voltar", 20, { alvo: P.ancora || tela.casa });
   }
@@ -635,8 +657,8 @@ window.api.ouvir("tela", (t) => {
   if (mudou && emCasa) P.ancora = { ...t.casa };
   const ocupado = segurado || ["perseguir", "segurando", "buscar", "arrastando", "travessura"].includes(P.estado);
   const foraDasTelas = !t.areas.some((a) => dentro(P, a));
-  if (!segurado && foraDasTelas) chamarDeVolta(8); // a tela onde ele estava deixou de ser permitida
-  else if (mudou && !ocupado && (Math.hypot(P.x - antiga.x, P.y - antiga.y) < 140 || !config.passear)) chamarDeVolta(8);
+  if (!segurado && foraDasTelas) chamarDeVolta(8, { ficar: false }); // a tela onde ele estava deixou de ser permitida
+  else if (mudou && !ocupado && (Math.hypot(P.x - antiga.x, P.y - antiga.y) < 140 || !config.passear)) chamarDeVolta(8, { ficar: false });
   else if (!ocupado) {
     P.x = limitarX(P.x);
     P.y = limitarY(P.y);
@@ -661,7 +683,7 @@ window.api.ouvir("pet:humor", (h) => {
     return;
   }
   P.humor = h === "pensando" || h === "trabalhando" ? h : null;
-  if (["perseguir", "segurando", "buscar", "arrastando"].includes(P.estado)) P.bilhete = null;
+  if (["perseguir", "seguir", "segurando", "buscar", "arrastando"].includes(P.estado)) P.bilhete = null;
   if (P.humor) return proximoEstado();
   if (h === "falando") return mudar("acenando", 1.5);
   if (h === "feliz") return mudar("feliz", 1.5);

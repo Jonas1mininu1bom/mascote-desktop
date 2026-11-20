@@ -72,6 +72,7 @@ function linkValido(s) {
 function normalizar(t) {
   if (!t || typeof t !== "object" || typeof t.id !== "string" || !/^[a-z0-9-]{1,40}$/.test(t.id)) return null;
   const nome = typeof t.nome === "string" && t.nome.trim() ? t.nome.trim().slice(0, 60) : t.id;
+  const admin = t.admin === true; // só fica disponível com o app rodando como administrador
   if (t.tipo === "teclas") {
     if (!Array.isArray(t.teclas) || t.teclas.length < 1 || t.teclas.length > 4) return null;
     const teclas = t.teclas.map((k) => String(k).toLowerCase());
@@ -82,12 +83,12 @@ function normalizar(t) {
     const [a, b] = Array.isArray(t.vezes) ? t.vezes : [t.vezes ?? 1, t.vezes ?? 1];
     const min = Math.max(1, Math.min(MAX_VEZES, Math.round(Number(a)) || 1));
     const max = Math.max(min, Math.min(MAX_VEZES, Math.round(Number(b)) || min));
-    return { id: t.id, nome, tipo: "teclas", teclas, vezes: [min, max] };
+    return { id: t.id, nome, tipo: "teclas", teclas, vezes: [min, max], admin };
   }
   if (t.tipo === "abrir") {
     const links = (Array.isArray(t.links) ? t.links : []).filter((l) => typeof l === "string" && linkValido(l));
     if (!links.length) return null;
-    return { id: t.id, nome, tipo: "abrir", links };
+    return { id: t.id, nome, tipo: "abrir", links, admin };
   }
   return null;
 }
@@ -123,6 +124,9 @@ Abrir um link no navegador:
   - Só links http:// ou https://. Ele sorteia um da lista.
 
 "id": letras minúsculas, números e "-". Ele faz no máximo uma travessura a cada 3 minutos.
+
+Precisa de administrador? Coloque "admin": true. Ela aparece com cadeado em ⚙️ e só pode ser
+ligada depois que a pessoa der permissão de administrador ao app (botão em ⚙️).
 `;
 const EXEMPLO = { travessuras: [] };
 
@@ -145,10 +149,10 @@ function listar({ arqPadrao, pastaUsuario }) {
 let ultima = Date.now(); // conta a partir da abertura: nada de travessura logo que o app abre
 let pendente = null; // travessura sorteada esperando o pet chegar na hora de executar
 
-function sortear(lista, ligadas, { semIntervalo = false } = {}) {
+function sortear(lista, ligadas, { semIntervalo = false, admin = false } = {}) {
   if (pendente && Date.now() < pendente.ate) return null; // já tem uma em andamento
   if (!semIntervalo && Date.now() - ultima < INTERVALO_MIN) return null;
-  const ativas = lista.filter((t) => ligadas[t.id] === true);
+  const ativas = lista.filter((t) => ligadas[t.id] === true && (!t.admin || admin));
   if (!ativas.length) return null;
   const t = ativas[Math.floor(Math.random() * ativas.length)];
   const vezes = t.tipo === "teclas" ? t.vezes[0] + Math.floor(Math.random() * (t.vezes[1] - t.vezes[0] + 1)) : 1;
@@ -159,10 +163,12 @@ function sortear(lista, ligadas, { semIntervalo = false } = {}) {
 }
 
 // Executa a travessura sorteada (só uma vez, e só se o token bater).
-async function executar(token, { abrirLink, aoTocar }) {
+// podeTeclar(): false quando a janela da frente não pode receber teclas (ex.: janela de admin sem permissão).
+async function executar(token, { abrirLink, aoTocar, podeTeclar = () => true }) {
   const t = pendente;
   if (!t || t.token !== token || Date.now() > t.ate) return false;
   pendente = null;
+  if (t.tipo === "teclas" && !podeTeclar()) return false;
   if (t.tipo === "teclas") await apertar(t.teclas, t.vezes, aoTocar);
   else {
     aoTocar?.(0);
