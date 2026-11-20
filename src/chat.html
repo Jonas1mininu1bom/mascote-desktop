@@ -65,7 +65,15 @@
   .msg.eu .fotos { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; }
   .msg.eu .fotos img { max-width: 120px; max-height: 120px; border-radius: 8px; display: block; }
   body.soltando #mensagens { outline: 2px dashed var(--destaque); outline-offset: -6px; }
-  #ajustes { display: none; padding: 10px 14px; border-bottom: 1px solid var(--borda); font-size: 13px; }
+  /* As configurações rolam por dentro: antes elas eram mais altas que o painel e empurravam o
+     topo (título, botões) para fora da janela. Cabeçalho, pasta e campo de texto nunca encolhem. */
+  #ajustes { display: none; padding: 10px 14px; border-bottom: 1px solid var(--borda); font-size: 13px;
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  #ajustes::-webkit-scrollbar { width: 8px; }
+  #ajustes::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 4px; }
+  header, #pasta, form, #anexos { flex: none; }
+  /* Com as configurações abertas, elas usam o espaço das mensagens (que voltam ao fechar). */
+  #ajustes.visivel + #mensagens { display: none; }
   #ajustes.visivel { display: block; }
   #ajustes label { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; cursor: pointer; }
   #ajustes small { color: var(--suave); display: block; }
