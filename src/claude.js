@@ -120,4 +120,4 @@ class ChatClaude {
   }
 }
 
-module.exports = { ChatClaude };
+module.exports = { ChatClaude, promptDoPersonagem };
