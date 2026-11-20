@@ -266,7 +266,7 @@ window.Vida = (() => {
         if (P.tempo <= 0) ficarBravo();
         return true;
       case "bravo":
-        P.olhando = cursor.x >= P.x ? 1 : -1; // encara você
+        virarPara(cursor.x); // encara você (com zona morta, para não tremer)
         if (P.tempo <= 0) proximoEstado();
         return true;
       case "comendo":

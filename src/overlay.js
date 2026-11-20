@@ -183,6 +183,7 @@ function proximoEstado() {
 
   const r = Math.random();
   if (debug === "perseguir" && mouseNativo) return mudar("perseguir", 10);
+  if (debug === "seguir") return mudar("seguir", 10);
   if (debug === "travessura" && config.bagunca) pedirTravessura();
   if (!config.passear || relogio < ficarAte) {
     const a = P.ancora || tela.casa;
@@ -306,12 +307,13 @@ function desenharTeclas(topo) {
 }
 
 // Anda em direção ao alvo; devolve true quando chega.
-function andarAte(alvo, dt, mult = 1) {
+// virar = false: quem chama decide para onde ele olha (ex.: seguindo o mouse, com virarPara).
+function andarAte(alvo, dt, mult = 1, virar = true) {
   const dx = alvo.x - P.x;
   const dy = alvo.y - P.y;
   const d = Math.hypot(dx, dy);
   const passo = velocidade() * mult * dt;
-  if (Math.abs(dx) > 1) P.olhando = dx > 0 ? 1 : -1;
+  if (virar && Math.abs(dx) > 1) P.olhando = dx > 0 ? 1 : -1;
   if (d <= passo) {
     P.x = alvo.x;
     P.y = alvo.y;
@@ -320,6 +322,15 @@ function andarAte(alvo, dt, mult = 1) {
   P.x += (dx / d) * passo;
   P.y += (dy / d) * passo;
   return false;
+}
+
+// Olha para o lado de x, com uma "zona morta" no meio: só vira se x estiver claramente de um lado.
+// Sem isso, com o mouse bem em cima/embaixo dele, mirar com a mão fazia ele virar sem parar
+// (virar troca a mão de lado, que muda o alvo, que faz ele virar de volta...).
+function virarPara(x) {
+  const margem = larguraPx() * 0.25;
+  if (x > P.x + margem) P.olhando = 1;
+  else if (x < P.x - margem) P.olhando = -1;
 }
 
 // Ponto da mão do pet na tela (coluna/linha do sprite em pet.mao, ou "maoTras").
@@ -356,7 +367,20 @@ function resgatar(dt) {
   }
 }
 
+// depuração: conta quantas vezes ele vira de lado (para pegar "tremedeira")
+let viradas = 0, olhandoAntes = 0, contagemDesde = 0;
+function contarViradas() {
+  if (P.olhando !== olhandoAntes) viradas++;
+  olhandoAntes = P.olhando;
+  if (relogio - contagemDesde >= 2) {
+    console.warn(`[debug] viradas em 2 s: ${viradas} (estado=${P.estado})`);
+    viradas = 0;
+    contagemDesde = relogio;
+  }
+}
+
 function atualizar(dt) {
+  if (debug === "seguir") contarViradas();
   if (!segurado && P.estado !== "buscar" && P.estado !== "arrastando") resgatar(dt);
   P.tempo -= dt;
   P.tAnim += dt;
@@ -387,6 +411,7 @@ function atualizar(dt) {
       if (andarAte(P.alvo, dt, 1.4)) P.alvo = { x: limitarX(P.x + rand(-40, 40)), y: P.y };
       return;
     case "perseguir": {
+      virarPara(cursor.x);
       const m = mao();
       // perseguindo, ele vai a qualquer lugar da tela (topo, barra de tarefas...), não só no "chão"
       // os pés podem sair da tela (a mão fica acima dos pés; senão o mouse na borda de baixo fica fora de alcance)
@@ -396,7 +421,7 @@ function atualizar(dt) {
       };
       // corre rápido, independente da velocidade do pet (senão um pet lento nunca alcança o mouse)
       const mult = Math.max(2.2, VEL_PERSEGUIR / velocidade());
-      andarAte(alvo, dt, mult);
+      andarAte(alvo, dt, mult, false);
       const m2 = mao();
       if (Math.hypot(cursor.x - m2.x, cursor.y - m2.y) < RAIO_PEGAR || sobreOPet(cursor)) {
         console.info(`[mouse] peguei em ${(10 - P.tempo).toFixed(1)}s`);
@@ -415,6 +440,7 @@ function atualizar(dt) {
     }
     case "seguir": {
       // vai atrás do mouse (sem pegar), parando um pouquinho antes, como um bichinho curioso
+      virarPara(cursor.x);
       const m = mao();
       const d = Math.hypot(cursor.x - m.x, cursor.y - m.y);
       if (d > 50) {
@@ -422,8 +448,8 @@ function atualizar(dt) {
           x: Math.max(limites().min, Math.min(limites().max, P.x + (cursor.x - m.x))),
           y: Math.max(alturaPx() * 0.5, Math.min(tela.altura, P.y + (cursor.y - m.y))),
         };
-        andarAte(alvo, dt, 1.6);
-      } else P.olhando = cursor.x >= P.x ? 1 : -1;
+        andarAte(alvo, dt, 1.6, false);
+      }
       if (P.tempo <= 0) {
         P.x = limitarX(P.x);
         if (window.Vida?.precisaCair()) return Vida.cair();
