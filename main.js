@@ -363,10 +363,15 @@ function iconeBandeja() {
   const pet = petAtual();
   try {
     if (pet.tipo === "pixel") {
-      const { buf, w, h } = quadroParaBitmap(pet, pet.animacoes.parado.quadros[0], 1);
-      return nativeImage.createFromBitmap(buf, { width: w, height: h }).resize({ height: 22 });
+      // A bandeja do Windows espera um ícone quadrado: centraliza o boneco num quadrado transparente.
+      const { buf, w, h } = quadroParaBitmap(pet, pet.animacoes.parado.quadros[0], 2);
+      const lado = Math.max(w, h);
+      const quadrado = Buffer.alloc(lado * lado * 4);
+      const ox = Math.floor((lado - w) / 2), oy = Math.floor((lado - h) / 2);
+      for (let y = 0; y < h; y++) buf.copy(quadrado, ((y + oy) * lado + ox) * 4, y * w * 4, (y + 1) * w * 4);
+      return nativeImage.createFromBitmap(quadrado, { width: lado, height: lado }).resize({ width: 32, height: 32, quality: "best" });
     }
-    return nativeImage.createFromPath(new URL(pet.animacoes.parado.quadros[0]).pathname).resize({ height: 22 });
+    return nativeImage.createFromPath(new URL(pet.animacoes.parado.quadros[0]).pathname).resize({ height: 32 });
   } catch {
     return nativeImage.createEmpty();
   }
