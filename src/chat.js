@@ -298,7 +298,10 @@ ponte.ouvir("chat:ferramenta", (r) => {
   tirarPensando();
   adicionar("info", r).prepend(icone("ferramenta"));
 });
+// Com ⚙️ aberto as mensagens ficam escondidas: algo importante chegando fecha o ⚙️ para aparecer.
+const mostrarMensagens = () => $("ajustes").classList.remove("visivel");
 ponte.ouvir("chat:erro", (m) => {
+  mostrarMensagens();
   tirarPensando();
   adicionar("erro", m);
 });
@@ -307,6 +310,7 @@ ponte.ouvir("chat:fim", () => {
   setOcupado(false);
 });
 ponte.ouvir("chat:permissao", ({ id, nome, resumo }) => {
+  mostrarMensagens(); // senão o pedido fica escondido e o Claude espera para sempre
   tirarPensando();
   const d = document.createElement("div");
   d.className = "permissao";
