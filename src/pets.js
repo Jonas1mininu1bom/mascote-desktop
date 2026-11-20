@@ -20,6 +20,8 @@ function lerPet(pasta) {
   pet.escala = Number(pet.escala) || (pet.tipo === "pixel" ? 3 : 1);
   pet.velocidade = Number(pet.velocidade) || 1.6;
   pet.falas = Array.isArray(pet.falas) ? pet.falas : [];
+  // desenho vetorial "fofinho" (só os modelos que vêm no app; a pixel art continua de reserva)
+  pet.desenho = ["pato", "palito", "tartaruga"].includes(pet.desenho) ? pet.desenho : null;
   // persona do chat (textos curtos; vão para o prompt do Claude)
   const texto = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
   pet.descricao = texto(pet.descricao, 300);
@@ -69,16 +71,43 @@ function lerPet(pasta) {
   return pet;
 }
 
-// Copia os pets que vêm com o app para a pasta da pessoa (só os que ainda não estão lá),
-// para ela ver, editar e usar de modelo. Não sobrescreve nada.
+// Copia os pets que vêm com o app para a pasta da pessoa, para ela ver, editar e usar de modelo.
+// Cópias que a pessoa NÃO editou são atualizadas quando o app muda o pet; as editadas nunca são tocadas.
+// Para saber se foi editada, guardamos o hash do pet.json no momento da cópia (.copia-do-app.json).
+const MARCA = ".copia-do-app.json";
+const hashDe = (arq) => require("node:crypto").createHash("sha256").update(fs.readFileSync(arq)).digest("hex");
+
+function naoFoiEditada(para, deJson) {
+  const json = path.join(para, "pet.json");
+  if (!fs.existsSync(json)) return false;
+  try {
+    const marca = JSON.parse(fs.readFileSync(path.join(para, MARCA), "utf8"));
+    return marca.hash === hashDe(json);
+  } catch {
+    // cópias antigas (sem marca): iguais à versão do app, tirando campos que o app acrescentou depois
+    try {
+      const semNovos = (o) => JSON.stringify({ ...o, desenho: undefined });
+      return semNovos(JSON.parse(fs.readFileSync(json, "utf8"))) === semNovos(JSON.parse(fs.readFileSync(deJson, "utf8")));
+    } catch {
+      return false;
+    }
+  }
+}
+
 function copiarPetsPadrao(origem, destino) {
   fs.mkdirSync(destino, { recursive: true });
   for (const nome of fs.readdirSync(origem)) {
     const de = path.join(origem, nome);
     const para = path.join(destino, nome);
-    if (!fs.existsSync(path.join(de, "pet.json")) || fs.existsSync(para)) continue;
+    const deJson = path.join(de, "pet.json");
+    if (!fs.existsSync(deJson)) continue;
+    const existe = fs.existsSync(para);
+    if (existe && !naoFoiEditada(para, deJson)) continue; // a pessoa mexeu: respeita
+    if (existe && hashDe(path.join(para, "pet.json")) === hashDe(deJson)) continue; // já está igual
     try {
       fs.cpSync(de, para, { recursive: true });
+      fs.writeFileSync(path.join(para, MARCA), JSON.stringify({ hash: hashDe(deJson) }));
+      if (existe) console.info(`[pet ${nome}] cópia atualizada com a versão nova do app`);
     } catch (e) {
       console.warn(`[pet ${nome}] não consegui copiar para a pasta de pets: ${e.message}`);
     }
