@@ -1,7 +1,8 @@
 # 🐾 Mascote Desktop
 
 Um bonequinho que mora no **cantinho da sua tela** e conversa com você usando o
-**Claude Code** por trás. O pet padrão é o **Palito**, um stickman de cachecol.
+**Claude Code** por trás. O pet padrão é o **Palito**, um stickman de cachecol, e
+também vêm junto o **Pato** 🦆 e a **Tartaruga** 🐢 (troque em ⚙️ → Pet).
 
 - 💬 **Chat fixo no canto:** clique no botão redondo para conversar. Ele fica sempre
   no mesmo lugar, então você não precisa caçar o pet pela tela.
@@ -49,6 +50,10 @@ npm start
 Quando o pet segura o seu mouse no modo bagunça, clique nele para ele soltar.
 
 ## Segurança
+
+- As páginas rodam isoladas (`contextIsolation` + `sandbox`, sem Node) e só falam com o
+  processo principal por uma lista fixa de canais, com os dados validados.
+- Nenhuma janela navega para fora do app, abre pop-ups ou recebe permissões do navegador.
 
 O pet usa o Claude Code, que pode ler arquivos e rodar comandos. **Toda ação que mexe
 no computador aparece no chat com os botões Permitir e Negar.** Nada roda sem você

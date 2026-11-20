@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data:; style-src 'unsafe-inline'; script-src 'self'">
 <title>Bilhete</title>
 <style>
   html, body { margin: 0; height: 100%; font: 17px "Comic Sans MS", "Segoe Print", system-ui, sans-serif; overflow: hidden; }
@@ -16,15 +16,6 @@
 <body>
 <header><button id="x" title="Fechar">✕</button></header>
 <main id="conteudo"></main>
-<script>
-  const dados = JSON.parse(new URLSearchParams(location.search).get("dados") || "{}");
-  const el = document.getElementById("conteudo");
-  if (dados.imagem) {
-    const i = document.createElement("img");
-    i.src = dados.imagem;
-    el.appendChild(i);
-  } else el.textContent = dados.texto || "Oi!";
-  document.getElementById("x").onclick = () => window.api.enviar("bilhete:fechar");
-</script>
+<script src="bilhete.js"></script>
 </body>
 </html>

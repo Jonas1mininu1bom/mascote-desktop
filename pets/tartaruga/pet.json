@@ -1,0 +1,414 @@
+{
+ "nome": "Tartaruga",
+ "descricao": "Uma tartaruga sem pressa nenhuma, mas que sempre chega lá.",
+ "autor": "Mascote Desktop",
+ "tipo": "pixel",
+ "escala": 4,
+ "velocidade": 0.8,
+ "personalidade": "Você é uma tartaruga calma e sábia. Fala devagar, com paciência, e lembra que devagar também se chega longe.",
+ "mao": [
+  19,
+  7
+ ],
+ "maoTras": [
+  3,
+  10
+ ],
+ "paleta": {
+  "k": "#2b2d42",
+  "g": "#2a9d8f",
+  "d": "#1f6f66",
+  "c": "#e9c46a",
+  "s": "#a7c957",
+  "e": "#4f772d"
+ },
+ "animacoes": {
+  "parado": {
+   "fps": 1,
+   "quadros": [
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkkssse",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ]
+   ]
+  },
+  "andando": {
+   "fps": 4,
+   "quadros": [
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "...kssk......kssk...",
+     "...kssk......kssk...",
+     "...kkkk......kkkk..."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     ".kssk......kssk.....",
+     ".kssk......kssk.....",
+     ".kkkk......kkkk....."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ]
+   ]
+  },
+  "correndo": {
+   "fps": 8,
+   "quadros": [
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "...kssk......kssk...",
+     "...kssk......kssk...",
+     "...kkkk......kkkk..."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     ".kssk......kssk.....",
+     ".kssk......kssk.....",
+     ".kkkk......kkkk....."
+    ]
+   ]
+  },
+  "feliz": {
+   "fps": 3,
+   "quadros": [
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkkssee",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk...ee.",
+     ".kgdggggdggggdk.esse",
+     ".kgggdggggdgggk.ssee",
+     "kkkkkkkkkkkkkkkkssse",
+     "kcccccccccccccckse..",
+     ".kkkkkkkkkkkkkkk....",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ]
+   ]
+  },
+  "acenando": {
+   "fps": 3,
+   "quadros": [
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk...ee.",
+     ".kgdggggdggggdk.esse",
+     ".kgggdggggdgggk.sske",
+     "kkkkkkkkkkkkkkkkssse",
+     "kcccccccccccccckse..",
+     ".kkkkkkkkkkkkkkk....",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ]
+   ]
+  },
+  "pensando": {
+   "fps": 0.8,
+   "quadros": [
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkkssse",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ]
+   ]
+  },
+  "segurando": {
+   "fps": 5,
+   "quadros": [
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk...ee.",
+     ".kgdggggdggggdk.esse",
+     ".kgggdggggdgggk.sske",
+     "kkkkkkkkkkkkkkkkssse",
+     "kcccccccccccccckse..",
+     ".kkkkkkkkkkkkkkk....",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk...ee.",
+     ".kgdggggdggggdk.esse",
+     ".kgggdggggdgggk.sske",
+     "kkkkkkkkkkkkkkkkssse",
+     "kcccccccccccccckse..",
+     ".kkkkkkkkkkkkkkk....",
+     "...kssk......kssk...",
+     "...kssk......kssk...",
+     "...kkkk......kkkk..."
+    ]
+   ]
+  },
+  "arrastando": {
+   "fps": 3,
+   "quadros": [
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "...kssk......kssk...",
+     "...kssk......kssk...",
+     "...kkkk......kkkk..."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     ".kssk......kssk.....",
+     ".kssk......kssk.....",
+     ".kkkk......kkkk....."
+    ]
+   ]
+  },
+  "carregado": {
+   "fps": 2,
+   "quadros": [
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     ".kssk........kssk...",
+     ".kssk........kssk...",
+     ".kkkk........kkkk..."
+    ],
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk..ee.",
+     ".kgggdggggdgggk.esse",
+     "kkkkkkkkkkkkkkkksske",
+     "kcccccccccccccckssse",
+     ".kkkkkkkkkkkkkkkeee.",
+     "...kssk....kssk.....",
+     "...kssk....kssk.....",
+     "...kkkk....kkkk....."
+    ]
+   ]
+  },
+  "dormindo": {
+   "fps": 1,
+   "quadros": [
+    [
+     "....................",
+     ".....kkkkkk.........",
+     "...kkgggdggkk.......",
+     "..kggdgggggdgk......",
+     ".kgdggggdggggdk.....",
+     ".kgggdggggdgggk.....",
+     "kkkkkkkkkkkkkkkk....",
+     "kcccccccccccccck....",
+     ".kkkkkkkkkkkkkkk....",
+     "..kssk......kssk....",
+     "..kssk......kssk....",
+     "..kkkk......kkkk...."
+    ]
+   ]
+  }
+ },
+ "falas": [
+  "Devagar e sempre 🐢",
+  "Sem pressa… o bug não vai fugir.",
+  "Respira. Uma coisa de cada vez.",
+  "Já são 100 anos programando, sabia?",
+  "Que tal uma pausa?",
+  "Salvou o arquivo? Com calma, mas salva."
+ ],
+ "bilhetes": [
+  "Devagar e sempre 🐢",
+  "Respira fundo 🌿",
+  "Bebeu água hoje? 💧",
+  "Uma tarefa de cada vez ✨",
+  "Cheguei! (demorei, né?)"
+ ]
+}

@@ -1,8 +1,9 @@
 // Mascote Desktop: processo principal do Electron.
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, dialog, globalShortcut } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, dialog, globalShortcut, session } = require("electron");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 const { listarPets, quadroParaBitmap } = require("./src/pets");
 const { ChatClaude } = require("./src/claude");
 
@@ -71,6 +72,28 @@ function infoTela() {
   };
 }
 
+// Todas as janelas: sem Node na página, isoladas e em sandbox.
+function prefsSeguras() {
+  return {
+    preload: path.join(__dirname, "src/preload.js"),
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: true,
+    webSecurity: true,
+    spellcheck: false,
+  };
+}
+
+// Só aceita mensagens vindas das páginas do próprio app.
+const PASTA_SRC = pathToFileURL(path.join(__dirname, "src")).href + "/";
+function origemConfiavel(e) {
+  const url = e.senderFrame?.url || "";
+  if (url.startsWith(PASTA_SRC)) return true;
+  console.warn("[ipc] mensagem recusada de", url || "(desconhecido)");
+  return false;
+}
+const num = (v) => typeof v === "number" && Number.isFinite(v);
+
 const naoFocavel = { focusable: false, skipTaskbar: true, hasShadow: false };
 
 function criarOverlay() {
@@ -84,7 +107,7 @@ function criarOverlay() {
     movable: false,
     alwaysOnTop: true,
     backgroundColor: "#00000000",
-    webPreferences: { preload: path.join(__dirname, "src/preload.js") },
+    webPreferences: prefsSeguras(),
   });
   overlay.setAlwaysOnTop(true, "screen-saver");
   overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -102,7 +125,7 @@ function criarChat() {
     hasShadow: false,
     alwaysOnTop: true,
     backgroundColor: "#00000000",
-    webPreferences: { preload: path.join(__dirname, "src/preload.js") },
+    webPreferences: prefsSeguras(),
   });
   chat.setAlwaysOnTop(true, "screen-saver");
   chat.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -203,7 +226,7 @@ function criarBilhete({ x, y, conteudo }) {
     skipTaskbar: true,
     alwaysOnTop: true,
     show: false,
-    webPreferences: { preload: path.join(__dirname, "src/preload.js") },
+    webPreferences: prefsSeguras(),
   });
   w.setAlwaysOnTop(true, "floating");
   w.loadFile(path.join(__dirname, "src/bilhete.html"), { query: { dados: JSON.stringify(conteudo || {}) } });
@@ -222,30 +245,38 @@ const pedidosPermissao = new Map();
 let proxPermissao = 1;
 
 function registrarIpc() {
-  ipcMain.handle("inicio", () => ({ pet: petAtual(), config, tela: infoTela(), mouseNativo: require("./src/cursor").disponivel() }));
-  ipcMain.on("pet:ignorar", (_e, ignorar) => overlay?.setIgnoreMouseEvents(ignorar, { forward: true }));
-  ipcMain.on("pet:moverCursor", (_e, { x, y }) => {
-    if (!config.bagunca) return;
+  const on = (canal, fn) => ipcMain.on(canal, (e, ...a) => origemConfiavel(e) && fn(e, ...a));
+  const handle = (canal, fn) => ipcMain.handle(canal, (e, ...a) => (origemConfiavel(e) ? fn(e, ...a) : null));
+  handle("inicio", () => ({ pet: petAtual(), config, tela: infoTela(), mouseNativo: require("./src/cursor").disponivel() }));
+  on("pet:ignorar", (_e, ignorar) => overlay?.setIgnoreMouseEvents(ignorar === true, { forward: true }));
+  on("pet:moverCursor", (_e, { x, y } = {}) => {
+    if (!config.bagunca || !num(x) || !num(y)) return;
     const o = tela().bounds;
     require("./src/cursor").moverCursor(o.x + x, o.y + y);
   });
-  ipcMain.handle("bilhete:criar", (_e, dados) => (config.bagunca && bilhetes.size < 5 ? criarBilhete(dados) : null));
-  ipcMain.on("bilhete:mover", (_e, { id, x, y }) => {
+  handle("bilhete:criar", (_e, dados) =>
+    config.bagunca && bilhetes.size < 5 && dados && num(dados.x) && num(dados.y) ? criarBilhete(dados) : null
+  );
+  on("bilhete:mover", (_e, { id, x, y } = {}) => {
+    if (!num(x) || !num(y)) return;
     const w = bilhetes.get(id);
     const o = tela().bounds;
     if (w && !w.isDestroyed()) w.setPosition(Math.round(o.x + x), Math.round(o.y + y));
   });
-  ipcMain.on("bilhete:fechar", (e) => BrowserWindow.fromWebContents(e.sender)?.close());
+  on("bilhete:fechar", (e) => BrowserWindow.fromWebContents(e.sender)?.close());
 
-  ipcMain.on("config:mudar", (_e, parcial) => mudarConfig(parcial));
-  ipcMain.handle("pets:listar", () => pets.map((p) => ({ id: p.id, nome: p.nome })));
-  ipcMain.on("pets:escolher", (_e, id) => escolherPet(id));
-  ipcMain.on("pets:abrirPasta", () => shell.openPath(pastaPetsUsuario()));
-  ipcMain.on("pet:voltar", () => overlay?.webContents.send("pet:voltar"));
-  ipcMain.on("app:sair", () => app.quit());
+  on("config:mudar", (_e, parcial) => {
+    const limpo = filtrarConfigDaPagina(parcial);
+    if (Object.keys(limpo).length) mudarConfig(limpo);
+  });
+  handle("pets:listar", () => pets.map((p) => ({ id: p.id, nome: p.nome })));
+  on("pets:escolher", (_e, id) => typeof id === "string" && pets.some((p) => p.id === id) && escolherPet(id));
+  on("pets:abrirPasta", () => shell.openPath(pastaPetsUsuario()));
+  on("pet:voltar", () => overlay?.webContents.send("pet:voltar"));
+  on("app:sair", () => app.quit());
 
-  ipcMain.on("chat:abrir", (_e, aberto) => abrirChat(aberto));
-  ipcMain.handle("chat:escolherPasta", async () => {
+  on("chat:abrir", (_e, aberto) => abrirChat(aberto === true));
+  handle("chat:escolherPasta", async () => {
     const r = await dialog.showOpenDialog(chat, { properties: ["openDirectory"], defaultPath: config.pasta });
     if (!r.canceled && r.filePaths[0]) {
       mudarConfig({ pasta: r.filePaths[0] });
@@ -253,13 +284,14 @@ function registrarIpc() {
     }
     return config.pasta;
   });
-  ipcMain.on("chat:nova", () => conversa.novaConversa());
-  ipcMain.on("chat:parar", () => conversa.parar());
-  ipcMain.on("chat:responderPermissao", (_e, { id, ok }) => {
-    pedidosPermissao.get(id)?.(ok);
+  on("chat:nova", () => conversa.novaConversa());
+  on("chat:parar", () => conversa.parar());
+  on("chat:responderPermissao", (_e, { id, ok } = {}) => {
+    pedidosPermissao.get(id)?.(ok === true);
     pedidosPermissao.delete(id);
   });
-  ipcMain.on("chat:enviar", (_e, texto) => {
+  on("chat:enviar", (_e, texto) => {
+    if (typeof texto !== "string" || !texto.trim() || texto.length > 20000) return;
     const pet = petAtual();
     const humor = (h) => overlay?.webContents.send("pet:humor", h);
     humor("pensando");
@@ -293,8 +325,31 @@ function registrarIpc() {
   });
 }
 
+// ---------- blindagem ----------
+// Nenhuma janela navega para outro lugar, abre pop-ups, pede permissões ou ganha <webview>.
+app.on("web-contents-created", (_e, wc) => {
+  wc.on("will-navigate", (ev) => ev.preventDefault());
+  wc.on("will-redirect", (ev) => ev.preventDefault());
+  wc.on("will-attach-webview", (ev) => ev.preventDefault());
+  wc.setWindowOpenHandler(() => ({ action: "deny" }));
+});
+
+// O que a página do chat pode mudar na configuração.
+// (a pasta de trabalho e o pet têm canais próprios, com diálogo/validação no processo principal)
+const CONFIG_DA_PAGINA = ["passear", "bagunca"]; // allowlist: chave nova fica bloqueada por padrão
+function filtrarConfigDaPagina(parcial) {
+  if (!parcial || typeof parcial !== "object" || Array.isArray(parcial)) return {};
+  const limpo = {};
+  for (const chave of CONFIG_DA_PAGINA) {
+    if (typeof parcial[chave] === "boolean") limpo[chave] = parcial[chave];
+  }
+  return limpo;
+}
+
 // ---------- início ----------
 app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler((_wc, _perm, ok) => ok(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
   carregarConfig();
   recarregarPets();
   if (pets.length === 0) {
