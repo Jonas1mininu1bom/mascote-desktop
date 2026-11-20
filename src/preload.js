@@ -2,12 +2,12 @@
 // Só os canais listados aqui podem ser usados pelas páginas.
 const { contextBridge, ipcRenderer } = require("electron");
 
-const INVOCAR = new Set(["inicio", "bilhete:criar", "pets:listar", "chat:escolherPasta", "travessuras:listar", "travessura:pedir"]);
+const INVOCAR = new Set(["inicio", "bilhete:criar", "pets:listar", "chat:escolherPasta", "travessuras:listar", "travessura:pedir", "chat:arrastar", "telas:listar"]);
 const ENVIAR = new Set([
   "app:sair", "chat:abrir", "chat:enviar", "chat:nova", "chat:parar", "chat:responderPermissao",
   "config:mudar", "pet:voltar", "pets:abrirPasta", "bilhetes:abrirPasta", "pets:escolher",
   "bilhete:fechar", "bilhete:mover", "pet:ignorar", "pet:moverCursor",
-  "travessuras:ligar", "travessuras:abrirPasta", "travessura:executar",
+  "travessuras:ligar", "travessuras:abrirPasta", "travessura:executar", "chat:posicaoPadrao",
 ]);
 const OUVIR = new Set([
   "chat:erro", "chat:estado", "chat:ferramenta", "chat:fim", "chat:permissao", "chat:texto",

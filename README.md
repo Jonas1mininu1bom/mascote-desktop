@@ -43,13 +43,15 @@ npm start
 | Ação | Como |
 |---|---|
 | Conversar | Clique no botão laranja no canto inferior direito |
+| Mudar o chat de lugar | Arraste o botão (ou o topo do painel aberto). ⚙️ → Chat no canto desfaz |
+| Escolher em que tela o pet fica | ⚙️ → Telas (todas, ou uma específica) |
 | Escolher em que pasta ele trabalha | Clique na linha 📁 no topo do chat |
 | Carinho | Clique no pet |
 | Mudar o pet de lugar | Arraste o pet com o mouse |
 | Ligar passeio / modo bagunça | ⚙️ no chat, ou o ícone na bandeja do sistema |
 | Trocar de pet / abrir a pasta de pets | ⚙️ no chat |
 | Escolher os bilhetes que ele traz | ⚙️ → Pasta de bilhetes |
-| Ligar travessuras / criar novas | ⚙️ → Travessuras / Pasta de travessuras |
+| Ligar travessuras (pegar o mouse, Alt+Tab, navegador) / criar novas | ⚙️ → Travessuras / Pasta de travessuras |
 | Fazer o pet voltar para o canto | ⚙️ → Chamar de volta |
 | Fechar | ⚙️ → Fechar o app, a bandeja, ou **Ctrl+Alt+Shift+Q** |
 
@@ -79,8 +81,9 @@ abra **⚙️ → Pasta de bilhetes** e edite o `bilhetes.json`:
 
 ## Travessuras
 
-Com o modo bagunça ligado, ative em **⚙️ → Travessuras** as que quiser (todas começam desligadas).
-Ele faz no máximo uma a cada 3 minutos. Para criar as suas, abra **⚙️ → Pasta de travessuras**
+Com o modo bagunça ligado, ative em **⚙️ → Travessuras** as que quiser. "Pegar o mouse" vem ligada;
+as outras começam desligadas.
+Ele faz no máximo uma a cada 3 minutos (e nenhuma nos 3 primeiros minutos depois de abrir o app). Para criar as suas, abra **⚙️ → Pasta de travessuras**
 e edite o `travessuras.json`:
 
 ```json
@@ -105,7 +108,8 @@ O app grava um log em `%APPDATA%mascote-desktoplogsmascote.log` (Windows),
 incluindo erros das páginas. Se o pet sumir da tela, ele volta sozinho para o canto em ~3 s.
 
 Para depurar: `MASCOTE_DEBUG=perseguir npm start` (persegue o mouse sem parar) ou
-`MASCOTE_DEBUG=travessura npm start` (faz as travessuras ligadas sem intervalo).
+`MASCOTE_DEBUG=travessura npm start` (faz as travessuras ligadas sem intervalo) ou
+`MASCOTE_DEBUG=voltar npm start` (leva o pet para longe e chama de volta).
 
 ## Segurança
 
@@ -119,7 +123,6 @@ aprovar.
 
 ## Limitações conhecidas (protótipo)
 
-- Passeando, ele fica no monitor principal; só no modo bagunça ele visita os outros.
 - Com monitores de escalas (DPI) diferentes, o desenho pode ficar maior num deles.
 - No Linux com Wayland, o pet não consegue pegar o mouse (o resto funciona).
 - No Linux, a transparência precisa de um compositor (o padrão no GNOME e KDE).

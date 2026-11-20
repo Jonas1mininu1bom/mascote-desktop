@@ -44,7 +44,7 @@ function vigiar(nome, w) {
 }
 
 // ---------- configuração ----------
-const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir(), travessuras: {} };
+const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir(), travessuras: {}, telas: "todas" };
 let config = { ...PADRAO };
 const arqConfig = () => path.join(app.getPath("userData"), "config.json");
 const pastaPetsUsuario = () => path.join(app.getPath("userData"), "pets");
@@ -110,26 +110,82 @@ function areaTotal() {
   };
 }
 
-function boundsChat(aberto) {
+const limitar = (v, min, max) => Math.max(min, Math.min(max, v));
+const centroBotao = (b) => ({ x: b.x + BOTAO / 2, y: b.y + BOTAO / 2 });
+
+// Posição do botão do chat (pode ser arrastado; fica salvo em config.chatPos). Sem posição salva: canto inferior direito.
+function posBotao() {
+  const p = config.chatPos;
+  if (p && num(p.x) && num(p.y)) {
+    const wa = screen.getDisplayNearestPoint(centroBotao(p)).workArea; // se o monitor sumiu, cai no mais próximo
+    return {
+      x: Math.round(limitar(p.x, wa.x, wa.x + wa.width - BOTAO)),
+      y: Math.round(limitar(p.y, wa.y, wa.y + wa.height - BOTAO)),
+    };
+  }
   const wa = tela().workArea;
-  const w = aberto ? PAINEL.w : BOTAO;
-  const h = aberto ? PAINEL.h : BOTAO;
-  return { x: wa.x + wa.width - w - MARGEM, y: wa.y + wa.height - h - MARGEM, width: w, height: h };
+  return { x: wa.x + wa.width - BOTAO - MARGEM, y: wa.y + wa.height - BOTAO - MARGEM };
+}
+const telaDoChat = () => screen.getDisplayNearestPoint(centroBotao(posBotao()));
+
+// O painel abre a partir do botão, crescendo para o lado em que há mais espaço.
+function boundsChat(aberto) {
+  const b = posBotao();
+  if (!aberto) return { ...b, width: BOTAO, height: BOTAO };
+  const wa = telaDoChat().workArea;
+  const c = centroBotao(b);
+  const x = c.x < wa.x + wa.width / 2 ? b.x : b.x + BOTAO - PAINEL.w;
+  const y = c.y < wa.y + wa.height / 2 ? b.y : b.y + BOTAO - PAINEL.h;
+  return {
+    x: Math.round(limitar(x, wa.x, wa.x + wa.width - PAINEL.w)),
+    y: Math.round(limitar(y, wa.y, wa.y + wa.height - PAINEL.h)),
+    width: PAINEL.w,
+    height: PAINEL.h,
+  };
+}
+
+// Onde o pet fica: ao lado do chat (à esquerda; se não couber, à direita), com os pés na base dele.
+function casaPara(r) {
+  const o = areaTotal();
+  const wa = telaDoChat().workArea;
+  const esquerda = r.x - 44 > wa.x + 40;
+  return { x: (esquerda ? r.x - 44 : r.x + r.width + 44) - o.x, y: Math.min(r.y + r.height, wa.y + wa.height) - o.y - 2 };
+}
+
+// Telas em que o pet pode ficar: todas, ou só a escolhida em ⚙️ (config.telas = id do monitor).
+function telasPermitidas() {
+  const ds = screen.getAllDisplays();
+  const escolhida = config.telas !== "todas" && ds.find((d) => String(d.id) === String(config.telas));
+  return escolhida ? [escolhida] : ds; // se a tela escolhida foi desconectada, volta para todas
+}
+function listarTelas() {
+  const prim = screen.getPrimaryDisplay().id;
+  return screen
+    .getAllDisplays()
+    .sort((a, b) => a.bounds.x - b.bounds.x || a.bounds.y - b.bounds.y)
+    .map((d, i) => ({ id: String(d.id), nome: `Tela ${i + 1} (${d.size.width}x${d.size.height}${d.id === prim ? ", principal" : ""})` }));
 }
 
 // Informações da tela no sistema de coordenadas do overlay.
 function infoTela() {
   const o = areaTotal();
-  const wa = tela().workArea;
-  const b = boundsChat(false);
   const rel = (r) => ({ x: r.x - o.x, y: r.y - o.y, w: r.width, h: r.height });
+  const permitidas = telasPermitidas();
+  const chatD = telaDoChat();
+  // a casa é ao lado do chat; se o chat estiver numa tela onde o pet não pode ficar, é no canto da tela dele
+  const casaD = permitidas.find((d) => d.id === chatD.id) || permitidas[0];
+  const wa = casaD.workArea;
+  const casa =
+    casaD.id === chatD.id
+      ? casaPara(boundsChat(chatAberto))
+      : { x: wa.x + wa.width - 60 - o.x, y: wa.y + wa.height - 2 - o.y };
   return {
     largura: o.width,
     altura: o.height,
-    area: rel(wa), // monitor principal
-    areas: screen.getAllDisplays().map((d) => rel(d.workArea)), // todos (modo bagunça)
-    // o pet nasce (e mora) ao lado do botão de chat
-    casa: { x: b.x - o.x - 40, y: wa.y - o.y + wa.height - 6 },
+    area: rel(wa), // tela da casa
+    areas: permitidas.map((d) => rel(d.workArea)), // onde ele pode andar
+    casa,
+    painel: chatAberto ? rel(boundsChat(true)) : null,
   };
 }
 
@@ -207,11 +263,52 @@ function criarChat() {
 
 function abrirChat(aberto) {
   chatAberto = aberto;
-  chat.setBounds(boundsChat(aberto));
+  posicionarChat();
   chat.webContents.send("chat:estado", aberto);
-  // o pet anda para o lado do chat, para não ficar escondido atrás dele
-  overlay?.webContents.send("chat:estado", { aberto, esquerda: boundsChat(aberto).x - areaTotal().x });
   if (aberto) chat.focus();
+}
+
+let posicionando = false;
+function posicionarChat() {
+  posicionando = true;
+  chat.setBounds(boundsChat(chatAberto));
+  setTimeout(() => (posicionando = false), 100);
+  // o pet acompanha o chat (e não fica escondido atrás do painel)
+  overlay?.webContents.send("tela", infoTela());
+}
+
+// Arrastar o botão: a página avisa início/fim; o processo principal segue o mouse.
+let arrasto = null;
+function arrastarChat(ativo) {
+  if (process.env.MASCOTE_DEBUG) log("main", "info", "[debug] arrastarChat", ativo, Boolean(arrasto));
+  if (ativo && !arrasto) {
+    const c = screen.getCursorScreenPoint();
+    const [x, y] = chat.getPosition();
+    arrasto = { dx: c.x - x, dy: c.y - y, inicio: c, moveu: false };
+    arrasto.timer = setInterval(() => {
+      const p = screen.getCursorScreenPoint();
+      if (!arrasto.moveu && Math.hypot(p.x - arrasto.inicio.x, p.y - arrasto.inicio.y) < 5) return;
+      arrasto.moveu = true;
+      chat.setPosition(p.x - arrasto.dx, p.y - arrasto.dy);
+    }, 16);
+  } else if (!ativo && arrasto) {
+    clearInterval(arrasto.timer);
+    const moveu = arrasto.moveu;
+    arrasto = null;
+    if (!moveu) return false;
+    const [x, y] = chat.getPosition();
+    if (chatAberto) {
+      // arrastou o painel aberto: o botão fica no canto do painel que corresponde ao lado em que ele abre
+      const wa = screen.getDisplayNearestPoint({ x: x + PAINEL.w / 2, y: y + PAINEL.h / 2 }).workArea;
+      const bx = x + PAINEL.w / 2 < wa.x + wa.width / 2 ? x : x + PAINEL.w - BOTAO;
+      const by = y + PAINEL.h / 2 < wa.y + wa.height / 2 ? y : y + PAINEL.h - BOTAO;
+      config.chatPos = { x: bx, y: by };
+    } else config.chatPos = { x, y };
+    salvarConfig();
+    posicionarChat();
+    return true;
+  }
+  return false;
 }
 
 function enviarParaTodos(canal, dados) {
@@ -247,6 +344,7 @@ function montarBandeja() {
     { label: petAtual().nome, enabled: false },
     { label: "Abrir o chat", click: () => abrirChat(true) },
     { label: "Chamar o pet de volta", click: () => overlay.webContents.send("pet:voltar") },
+    { label: "Chat de volta para o canto", click: () => ((config.chatPos = undefined), salvarConfig(), posicionarChat()) },
     { type: "separator" },
     { label: "Passear pela tela", type: "checkbox", checked: config.passear, click: (i) => mudarConfig({ passear: i.checked }) },
     { label: "Modo bagunça (pega o mouse, traz bilhetes)", type: "checkbox", checked: config.bagunca, click: (i) => mudarConfig({ bagunca: i.checked }) },
@@ -278,11 +376,14 @@ function mudarConfig(parcial) {
   if (parcial.bagunca) config.passear = true;
   salvarConfig();
   enviarParaTodos("config", config);
+  if ("telas" in parcial) overlay?.webContents.send("tela", infoTela());
   montarBandeja();
 }
 
 function escolherPet(id) {
+  const trocou = id !== config.pet;
   recarregarPets();
+  if (trocou) conversa.novaConversa(); // cada personagem começa a própria conversa
   mudarConfig({ pet: id });
   enviarParaTodos("pet:trocar", petAtual());
 }
@@ -330,7 +431,7 @@ function registrarIpc() {
   handle("inicio", () => ({ pet: petAtual(), config, tela: infoTela(), mouseNativo: require("./src/cursor").disponivel(), debug: process.env.MASCOTE_DEBUG || null }));
   on("pet:ignorar", (_e, ignorar) => overlay?.setIgnoreMouseEvents(ignorar === true, { forward: true }));
   on("pet:moverCursor", (_e, { x, y } = {}) => {
-    if (!config.bagunca || !num(x) || !num(y)) return;
+    if (!config.bagunca || config.travessuras?.["pegar-mouse"] === false || !num(x) || !num(y)) return;
     const o = areaTotal();
     require("./src/cursor").moverCursor(o.x + x, o.y + y);
   });
@@ -350,17 +451,22 @@ function registrarIpc() {
     if (Object.keys(limpo).length) mudarConfig(limpo);
   });
   handle("pets:listar", () => pets.map((p) => ({ id: p.id, nome: p.nome })));
+  handle("telas:listar", () => listarTelas());
   on("pets:escolher", (_e, id) => typeof id === "string" && pets.some((p) => p.id === id) && escolherPet(id));
   on("pets:abrirPasta", () => shell.openPath(pastaPetsUsuario()));
   on("bilhetes:abrirPasta", abrirPastaBilhetes);
   on("travessuras:abrirPasta", abrirPastaTravessuras);
 
   // ---------- travessuras ----------
-  handle("travessuras:listar", () =>
-    listaTravessuras().map((t) => ({ id: t.id, nome: t.nome, tipo: t.tipo, ligada: config.travessuras?.[t.id] === true }))
-  );
+  // "Pegar o mouse" não é executada aqui (é o pet que corre atrás), mas liga/desliga igual às outras.
+  // Diferente das outras, vem ligada (era o comportamento original do modo bagunça).
+  const PEGAR_MOUSE = { id: "pegar-mouse", nome: "Pegar o mouse", tipo: "mouse" };
+  handle("travessuras:listar", () => [
+    ...(require("./src/cursor").disponivel() ? [{ ...PEGAR_MOUSE, ligada: config.travessuras?.["pegar-mouse"] !== false }] : []),
+    ...listaTravessuras().map((t) => ({ id: t.id, nome: t.nome, tipo: t.tipo, ligada: config.travessuras?.[t.id] === true })),
+  ]);
   on("travessuras:ligar", (_e, { id, ligada } = {}) => {
-    if (typeof ligada !== "boolean" || !listaTravessuras().some((t) => t.id === id)) return;
+    if (typeof ligada !== "boolean" || (id !== PEGAR_MOUSE.id && !listaTravessuras().some((t) => t.id === id))) return;
     mudarConfig({ travessuras: { ...config.travessuras, [id]: ligada } });
   });
   handle("travessura:pedir", () => {
@@ -384,7 +490,13 @@ function registrarIpc() {
   on("pet:voltar", () => overlay?.webContents.send("pet:voltar"));
   on("app:sair", () => app.quit());
 
-  on("chat:abrir", (_e, aberto) => abrirChat(aberto === true));
+  on("chat:abrir", (_e, aberto) => (process.env.MASCOTE_DEBUG && log("main", "info", "[debug] chat:abrir", aberto), abrirChat(aberto === true)));
+  handle("chat:arrastar", (_e, ativo) => arrastarChat(ativo === true));
+  on("chat:posicaoPadrao", () => {
+    delete config.chatPos;
+    salvarConfig();
+    posicionarChat();
+  });
   handle("chat:escolherPasta", async () => {
     const r = await dialog.showOpenDialog(chat, { properties: ["openDirectory"], defaultPath: config.pasta });
     if (!r.canceled && r.filePaths[0]) {
@@ -406,7 +518,7 @@ function registrarIpc() {
     humor("pensando");
     conversa.enviar(
       texto,
-      { pasta: config.pasta, nomePet: pet.nome, personalidade: pet.personalidade },
+      { pasta: config.pasta, pet },
       {
         texto: (t) => {
           chat.webContents.send("chat:texto", t);
@@ -452,6 +564,10 @@ function filtrarConfigDaPagina(parcial) {
   for (const chave of CONFIG_DA_PAGINA) {
     if (typeof parcial[chave] === "boolean") limpo[chave] = parcial[chave];
   }
+  // telas: "todas" ou o id de um monitor conectado
+  if (parcial.telas === "todas" || (typeof parcial.telas === "string" && listarTelas().some((t) => t.id === parcial.telas))) {
+    limpo.telas = parcial.telas;
+  }
   return limpo;
 }
 
@@ -469,6 +585,8 @@ app.whenReady().then(() => {
     return app.quit();
   }
   registrarIpc();
+  // teste do "chamar de volta": o overlay põe o pet longe e aqui chamamos pelo mesmo canal do botão
+  if (process.env.MASCOTE_DEBUG === "voltar") setTimeout(() => overlay?.webContents.send("pet:voltar"), 4000);
   criarOverlay();
   criarChat();
   montarBandeja();
@@ -477,8 +595,8 @@ app.whenReady().then(() => {
   const telasMudaram = () => {
     log("main", "info", "telas mudaram:", screen.getAllDisplays().map((d) => d.bounds));
     overlay?.setBounds(areaTotal());
-    chat?.setBounds(boundsChat(chatAberto));
-    overlay?.webContents.send("tela", infoTela());
+    if (chat) posicionarChat();
+    else overlay?.webContents.send("tela", infoTela());
   };
   for (const ev of ["display-metrics-changed", "display-added", "display-removed"]) screen.on(ev, telasMudaram);
 });

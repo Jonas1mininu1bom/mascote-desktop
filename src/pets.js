@@ -20,6 +20,13 @@ function lerPet(pasta) {
   pet.escala = Number(pet.escala) || (pet.tipo === "pixel" ? 3 : 1);
   pet.velocidade = Number(pet.velocidade) || 1.6;
   pet.falas = Array.isArray(pet.falas) ? pet.falas : [];
+  // persona do chat (textos curtos; vão para o prompt do Claude)
+  const texto = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
+  pet.descricao = texto(pet.descricao, 300);
+  pet.personalidade = texto(pet.personalidade, 600);
+  pet.jeitoDeFalar = texto(pet.jeitoDeFalar, 600);
+  pet.saudacao = texto(pet.saudacao, 300);
+  pet.exemplos = (Array.isArray(pet.exemplos) ? pet.exemplos : []).map((e) => texto(e, 160)).filter(Boolean).slice(0, 6);
   pet.bilhetes = Array.isArray(pet.bilhetes) ? pet.bilhetes : [];
   if (!pet.animacoes || typeof pet.animacoes !== "object") throw new Error("falta o campo \"animacoes\"");
   for (const nome of OBRIGATORIAS) {

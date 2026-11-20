@@ -75,7 +75,10 @@ deixa a ampliação nítida (bom para pixel art).
 | `tipo` | `"pixel"` ou `"imagens"`. |
 | `escala` | Quanto ampliar o desenho (pixel art pequena fica boa com 3 ou 4). |
 | `velocidade` | Velocidade de caminhada (1 a 3 é um bom intervalo). |
-| `personalidade` | Uma frase que muda o jeito do pet responder no chat. |
+| `personalidade` | Quem o personagem é (até 600 caracteres). Vai para o chat: ele responde como esse personagem. |
+| `jeitoDeFalar` | Como ele fala: expressões, ritmo, manias (até 600 caracteres). |
+| `exemplos` | Até 6 falas de exemplo, para o chat pegar o tom (não são copiadas). |
+| `saudacao` | A primeira mensagem do chat quando esse pet é escolhido. |
 | `mao` | `[coluna, linha]` da mão da frente, no desenho virado para a direita. É onde ele segura o mouse. |
 | `maoTras` | `[coluna, linha]` da mão de trás. É onde ele segura os bilhetes. |
 | `falas` | Frases que ele diz de vez em quando num balãozinho. |
@@ -114,6 +117,9 @@ Foi assim que o Palito nasceu. Abra o terminal na pasta de pets e peça algo com
 > Inclua `mao`, `maoTras`, 5 falas e 5 bilhetes em português.
 
 Depois rode `npm run validar-pet -- sapinho` e escolha o pet no app.
+
+> A persona só muda o jeito de falar: o chat continua pedindo permissão antes de qualquer ação.
+> Mesmo assim, só instale pets de quem você confia.
 
 > ⚠️ Use personagens seus ou que você tenha permissão de usar. Não distribua pets com
 > personagens, logos ou marcas de outras pessoas ou empresas.

@@ -142,7 +142,7 @@ function listar({ arqPadrao, pastaUsuario }) {
 }
 
 // ---------- sorteio com intervalo mínimo ----------
-let ultima = 0;
+let ultima = Date.now(); // conta a partir da abertura: nada de travessura logo que o app abre
 let pendente = null; // travessura sorteada esperando o pet chegar na hora de executar
 
 function sortear(lista, ligadas, { semIntervalo = false } = {}) {

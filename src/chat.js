@@ -54,8 +54,40 @@ async function carregarPets() {
   $("pets").value = config.pet;
 }
 
-$("botao").onclick = () => ponte.enviar("chat:abrir", true);
+// Botão: clique abre o chat; segurar e arrastar muda o lugar dele (quem move a janela é o processo principal).
+$("botao").addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  $("botao").setPointerCapture(e.pointerId);
+  $("botao").classList.add("arrastando");
+  ponte.invocar("chat:arrastar", true);
+});
+$("botao").addEventListener("pointerup", async () => {
+  $("botao").classList.remove("arrastando");
+  const arrastou = await ponte.invocar("chat:arrastar", false);
+  if (!arrastou) ponte.enviar("chat:abrir", true);
+});
+$("botao").addEventListener("lostpointercapture", () => {
+  if ($("botao").classList.contains("arrastando")) {
+    $("botao").classList.remove("arrastando");
+    ponte.invocar("chat:arrastar", false);
+  }
+});
+// o cabeçalho do painel aberto também arrasta (sem atrapalhar os botões dele)
+document.querySelector("header").addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || e.target.closest("button")) return;
+  e.currentTarget.setPointerCapture(e.pointerId);
+  ponte.invocar("chat:arrastar", true);
+});
+document.querySelector("header").addEventListener("pointerup", () => ponte.invocar("chat:arrastar", false));
 $("fechar").onclick = () => ponte.enviar("chat:abrir", false);
+async function carregarTelas() {
+  const lista = await ponte.invocar("telas:listar");
+  const opcoes = [{ id: "todas", nome: "Todas as telas" }, ...lista];
+  $("telas").replaceChildren(...opcoes.map((t) => Object.assign(document.createElement("option"), { value: t.id, textContent: t.nome })));
+  $("telas").value = opcoes.some((t) => t.id === String(config.telas)) ? String(config.telas) : "todas";
+}
+$("telas").onchange = (e) => ponte.enviar("config:mudar", { telas: e.target.value });
+
 async function carregarTravessuras() {
   const lista = await ponte.invocar("travessuras:listar");
   const caixa = $("listaTravessuras");
@@ -67,7 +99,7 @@ async function carregarTravessuras() {
     c.checked = t.ligada;
     c.onchange = () => ponte.enviar("travessuras:ligar", { id: t.id, ligada: c.checked });
     const s = document.createElement("span");
-    s.append(icone(t.tipo === "abrir" ? "globo" : "teclado"), t.nome);
+    s.append(icone({ abrir: "globo", mouse: "mouse" }[t.tipo] || "teclado"), t.nome);
     l.append(c, s);
     caixa.appendChild(l);
   }
@@ -77,6 +109,7 @@ async function carregarTravessuras() {
 $("btnAjustes").onclick = () => {
   $("ajustes").classList.toggle("visivel");
   carregarPets();
+  carregarTelas();
   carregarTravessuras();
 };
 $("nova").onclick = () => {
@@ -93,6 +126,7 @@ $("passear").onchange = (e) => ponte.enviar("config:mudar", { passear: e.target.
 $("bagunca").onchange = (e) => ponte.enviar("config:mudar", { bagunca: e.target.checked });
 $("pets").onchange = (e) => ponte.enviar("pets:escolher", e.target.value);
 $("voltar").onclick = () => ponte.enviar("pet:voltar");
+$("chatCanto").onclick = () => ponte.enviar("chat:posicaoPadrao");
 $("abrirPets").onclick = () => ponte.enviar("pets:abrirPasta");
 $("abrirBilhetes").onclick = () => ponte.enviar("bilhetes:abrirPasta");
 $("abrirTravessuras").onclick = () => ponte.enviar("travessuras:abrirPasta");
@@ -166,11 +200,21 @@ ponte.ouvir("chat:permissao", ({ id, nome, resumo }) => {
   $("mensagens").scrollTop = $("mensagens").scrollHeight;
 });
 ponte.ouvir("config", mostrarConfig);
-ponte.ouvir("pet:trocar", (p) => ($("titulo").textContent = p.nome));
+const saudacao = (p) =>
+  p.saudacao || `Oi! Eu sou ${p.nome}. Posso conversar, ler arquivos e ajudar com código na pasta aí em cima. Antes de mexer em algo, eu peço permissão.`;
+let petAtualId = null;
+ponte.ouvir("pet:trocar", (p) => {
+  $("titulo").textContent = p.nome;
+  if (p.id === petAtualId) return;
+  petAtualId = p.id;
+  $("mensagens").replaceChildren();
+  adicionar("pet", saudacao(p));
+});
 
 (async () => {
   const d = await ponte.invocar("inicio");
   mostrarConfig(d.config);
   $("titulo").textContent = d.pet.nome;
-  adicionar("pet", `Oi! Eu sou ${d.pet.nome}. Posso conversar, ler arquivos e ajudar com código na pasta aí em cima. Antes de mexer em algo, eu peço permissão.`);
+  petAtualId = d.pet.id;
+  adicionar("pet", saudacao(d.pet));
 })();

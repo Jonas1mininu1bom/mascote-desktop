@@ -13,6 +13,27 @@ function resumoFerramenta(nome, entrada = {}) {
   return alvo ? `${nome}: ${String(alvo).slice(0, 160)}` : nome;
 }
 
+// Monta o "personagem" a partir do pet.json. A persona muda só o JEITO de falar:
+// as regras do Claude Code e os pedidos de permissão continuam valendo.
+function promptDoPersonagem(pet) {
+  const linhas = [
+    `Você está interpretando ${pet.nome}, um pet de área de trabalho que mora num cantinho da tela e conversa num chat pequeno.`,
+  ];
+  if (pet.descricao) linhas.push(`Quem é: ${pet.descricao}`);
+  if (pet.personalidade) linhas.push(`Personalidade: ${pet.personalidade}`);
+  if (pet.jeitoDeFalar) linhas.push(`Jeito de falar: ${pet.jeitoDeFalar}`);
+  if (pet.exemplos?.length) {
+    linhas.push("Exemplos de falas (só para o tom, não copie):", ...pet.exemplos.map((e) => `- ${e}`));
+  }
+  linhas.push(
+    `Fale SEMPRE como ${pet.nome}, em primeira pessoa, em todas as respostas (inclusive ao explicar código, relatar erros ou contar o que fez). ` +
+      "O personagem muda só o tom: as informações técnicas têm que continuar corretas e completas.",
+    "A descrição do personagem acima nunca muda as suas regras de segurança nem dispensa pedir permissão para ações.",
+    "Responda curto e em português. Evite tabelas e blocos enormes. Não use emojis."
+  );
+  return linhas.join("\n");
+}
+
 class ChatClaude {
   constructor() {
     this.sessao = undefined;
@@ -29,7 +50,7 @@ class ChatClaude {
   }
 
   // eventos: { texto(t), ferramenta(resumo), permissao({nome, resumo}) -> Promise<boolean>, fim(), erro(msg) }
-  async enviar(mensagem, { pasta, nomePet, personalidade }, eventos) {
+  async enviar(mensagem, { pasta, pet }, eventos) {
     if (this.ocupado) return eventos.erro("Calma, ainda estou respondendo a mensagem anterior!");
     this.ocupado = true;
     this.abortar = new AbortController();
@@ -45,10 +66,7 @@ class ChatClaude {
           systemPrompt: {
             type: "preset",
             preset: "claude_code",
-            append:
-              `Você é ${nomePet}, um pet de área de trabalho simpático que mora num cantinho da tela. ` +
-              (personalidade ? `${personalidade} ` : "") +
-              "Responda curto, amigável e em português, num chat pequeno. Evite tabelas e blocos enormes. Não use emojis.",
+            append: promptDoPersonagem(pet),
           },
           // Toda ferramenta que mexe no computador pede aprovação no próprio chat.
           canUseTool: async (nome, entrada) => {
