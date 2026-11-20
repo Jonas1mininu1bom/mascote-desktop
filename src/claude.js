@@ -50,14 +50,28 @@ class ChatClaude {
   }
 
   // eventos: { texto(t), ferramenta(resumo), permissao({nome, resumo}) -> Promise<boolean>, fim(), erro(msg) }
-  async enviar(mensagem, { pasta, pet }, eventos) {
+  // mensagem: { texto, imagens } (imagens já validadas: blocos "image" da API).
+  async enviar({ texto, imagens = [] }, { pasta, pet }, eventos) {
     if (this.ocupado) return eventos.erro("Calma, ainda estou respondendo a mensagem anterior!");
     this.ocupado = true;
     this.abortar = new AbortController();
     try {
       const { query } = await carregarSdk();
+      // Com imagem, a mensagem vai como blocos (imagens + texto); sem imagem, como texto simples.
+      const prompt = imagens.length
+        ? (async function* () {
+            yield {
+              type: "user",
+              parent_tool_use_id: null,
+              message: {
+                role: "user",
+                content: [...imagens, { type: "text", text: texto.trim() || "O que você vê nesta imagem?" }],
+              },
+            };
+          })()
+        : texto;
       const resposta = query({
-        prompt: mensagem,
+        prompt,
         options: {
           resume: this.sessao,
           cwd: pasta,

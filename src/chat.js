@@ -168,16 +168,106 @@ $("abrirBilhetes").onclick = () => ponte.enviar("bilhetes:abrirPasta");
 $("abrirTravessuras").onclick = () => ponte.enviar("travessuras:abrirPasta");
 $("sair").onclick = () => ponte.enviar("app:sair");
 
-$("form").onsubmit = (e) => {
+// ---------- imagens coladas ou arrastadas ----------
+const MAX_IMAGENS = 4;
+const MAX_BYTES = 5 * 1024 * 1024;
+const TIPOS = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+let anexos = []; // { arquivo, url }
+
+function mostrarAnexos() {
+  const caixa = $("anexos");
+  caixa.replaceChildren(
+    ...anexos.map((a, i) => {
+      const d = document.createElement("div");
+      d.className = "anexo";
+      const img = document.createElement("img");
+      img.src = a.url;
+      img.alt = "imagem anexada";
+      const x = document.createElement("button");
+      x.type = "button";
+      x.title = "Tirar imagem";
+      x.textContent = "×";
+      x.onclick = () => {
+        URL.revokeObjectURL(anexos[i].url);
+        anexos.splice(i, 1);
+        mostrarAnexos();
+      };
+      d.append(img, x);
+      return d;
+    })
+  );
+  caixa.classList.toggle("tem", anexos.length > 0);
+}
+
+function anexar(arquivos) {
+  for (const arq of arquivos) {
+    if (!TIPOS.includes(arq.type)) continue;
+    if (anexos.length >= MAX_IMAGENS) return adicionar("erro", `No máximo ${MAX_IMAGENS} imagens por mensagem.`);
+    if (arq.size > MAX_BYTES) {
+      adicionar("erro", "Essa imagem passa de 5 MB.");
+      continue;
+    }
+    anexos.push({ arquivo: arq, url: URL.createObjectURL(arq) });
+  }
+  mostrarAnexos();
+}
+
+// base64 sem o prefixo "data:...;base64,"
+const paraBase64 = (arq) =>
+  new Promise((ok, falha) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(",")[1]);
+    r.onerror = () => falha(r.error);
+    r.readAsDataURL(arq);
+  });
+
+$("entrada").addEventListener("paste", (e) => {
+  const imgs = [...(e.clipboardData?.files || [])].filter((f) => TIPOS.includes(f.type));
+  if (!imgs.length) return; // texto normal: deixa colar
+  e.preventDefault();
+  anexar(imgs);
+});
+document.addEventListener("dragover", (e) => {
+  if ([...(e.dataTransfer?.items || [])].some((i) => i.kind === "file")) {
+    e.preventDefault();
+    document.body.classList.add("soltando");
+  }
+});
+document.addEventListener("dragleave", (e) => {
+  if (!e.relatedTarget) document.body.classList.remove("soltando");
+});
+document.addEventListener("drop", (e) => {
+  e.preventDefault(); // nunca deixa o arquivo "abrir" na janela
+  document.body.classList.remove("soltando");
+  anexar([...(e.dataTransfer?.files || [])]);
+});
+
+$("form").onsubmit = async (e) => {
   e.preventDefault();
   if (ocupado) return ponte.enviar("chat:parar");
   const texto = $("entrada").value.trim();
-  if (!texto) return;
+  if (!texto && !anexos.length) return;
+  const enviando = anexos;
+  anexos = [];
+  mostrarAnexos();
   $("entrada").value = "";
-  adicionar("eu", texto);
+  const bolha = adicionar("eu", texto);
+  if (enviando.length) {
+    const fotos = document.createElement("div");
+    fotos.className = "fotos";
+    for (const a of enviando) fotos.append(Object.assign(document.createElement("img"), { src: a.url, alt: "imagem enviada" }));
+    bolha.prepend(fotos);
+  }
   bolhaAtual = adicionar("info", "pensando…");
   setOcupado(true);
-  ponte.enviar("chat:enviar", texto);
+  try {
+    const imagens = await Promise.all(enviando.map(async (a) => ({ dados: await paraBase64(a.arquivo) })));
+    ponte.enviar("chat:enviar", { texto, imagens });
+  } catch {
+    tirarPensando();
+    adicionar("erro", "Não consegui ler a imagem.");
+    setOcupado(false);
+  }
 };
 $("entrada").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {

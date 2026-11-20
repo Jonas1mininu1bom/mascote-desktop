@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:">
 <title>Chat do pet</title>
 <style>
   /* tons quentes: laranja terracota + creme */
@@ -57,6 +57,14 @@
   #pedirAdmin { font: inherit; background: var(--destaque); color: #fff; border: 0; border-radius: 8px; padding: 5px 10px; cursor: pointer; }
   #pedirAdmin:hover { background: var(--destaque-forte); }
   #pedirAdmin:disabled { opacity: 0.6; cursor: default; }
+  #anexos { display: none; gap: 6px; padding: 6px 12px 0; flex-wrap: wrap; }
+  #anexos.tem { display: flex; }
+  #anexos .anexo { position: relative; }
+  #anexos img { width: 54px; height: 54px; object-fit: cover; border-radius: 8px; border: 1px solid var(--borda); display: block; }
+  #anexos button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; border: 0; background: var(--destaque-forte); color: #fff; font: bold 12px/18px system-ui, sans-serif; cursor: pointer; padding: 0; }
+  .msg.eu .fotos { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; }
+  .msg.eu .fotos img { max-width: 120px; max-height: 120px; border-radius: 8px; display: block; }
+  body.soltando #mensagens { outline: 2px dashed var(--destaque); outline-offset: -6px; }
   #ajustes { display: none; padding: 10px 14px; border-bottom: 1px solid var(--borda); font-size: 13px; }
   #ajustes.visivel { display: block; }
   #ajustes label { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; cursor: pointer; }
@@ -119,8 +127,9 @@
     </div>
   </div>
   <div id="mensagens"></div>
+  <div id="anexos"></div>
   <form id="form">
-    <textarea id="entrada" placeholder="Fale com o pet…" rows="1"></textarea>
+    <textarea id="entrada" placeholder="Fale com o pet… (Ctrl+V cola imagens)" rows="1"></textarea>
     <button id="enviar" type="submit" title="Enviar"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z" /><path d="M6 12h16" /></svg></button>
   </form>
 </section>

@@ -57,6 +57,11 @@ npm start
 
 Quando o pet segura o seu mouse no modo bagunça, clique nele para ele soltar.
 
+### Imagens no chat
+
+Cole uma imagem com **Ctrl+V** no campo de mensagem (ou arraste o arquivo para o chat). Vão até 4 por
+mensagem (PNG, JPG, GIF ou WEBP, até 5 MB cada), e o Claude Code vê a imagem junto com o seu texto.
+
 ## Bilhetes da comunidade
 
 No modo bagunça o pet traz bilhetes. Ele já vem com 40 mensagens, e você pode colocar as suas:

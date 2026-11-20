@@ -9,6 +9,7 @@ const { ChatClaude } = require("./src/claude");
 const bilhetesMod = require("./src/bilhetes");
 const travessuras = require("./src/travessuras");
 const admin = require("./src/admin");
+const { validarImagens } = require("./src/imagens");
 
 if (process.platform === "linux") app.commandLine.appendSwitch("enable-transparent-visuals");
 // No Windows, o Chromium para de PINTAR janelas que ele acha que estão cobertas por outras
@@ -577,13 +578,23 @@ function registrarIpc() {
     pedidosPermissao.get(id)?.(ok === true);
     pedidosPermissao.delete(id);
   });
-  on("chat:enviar", (_e, texto) => {
-    if (typeof texto !== "string" || !texto.trim() || texto.length > 20000) return;
+  // A página manda { texto, imagens: [{ dados: base64 }] } (ou só o texto, como antes).
+  on("chat:enviar", (_e, pedido) => {
+    const texto = typeof pedido === "string" ? pedido : typeof pedido?.texto === "string" ? pedido.texto : "";
+    if (texto.length > 20000) return;
+    let imagens;
+    try {
+      imagens = validarImagens(typeof pedido === "object" ? pedido.imagens : null);
+    } catch (e) {
+      chat.webContents.send("chat:erro", e.message);
+      return chat.webContents.send("chat:fim");
+    }
+    if (!texto.trim() && !imagens.length) return chat.webContents.send("chat:fim");
     const pet = petAtual();
     const humor = (h) => overlay?.webContents.send("pet:humor", h);
     humor("pensando");
     conversa.enviar(
-      texto,
+      { texto, imagens },
       { pasta: config.pasta, pet },
       {
         texto: (t) => {
