@@ -18,6 +18,13 @@ if (process.platform === "linux") app.commandLine.appendSwitch("enable-transpare
 app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
 app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 if (!app.requestSingleInstanceLock()) app.quit();
+// Abriram o app de novo (atalho, Menu Iniciar) com ele já rodando: em vez de não fazer nada,
+// traz o mascote de volta (se estava minimizado) e abre o chat.
+app.on("second-instance", () => {
+  if (!chat || chat.isDestroyed()) return;
+  if (escondido) esconderMascote(false);
+  abrirChat(true);
+});
 
 // ---------- log ----------
 // Grava em <userData>/logs/mascote.log tudo do processo principal e das páginas (overlay, chat).
@@ -664,6 +671,8 @@ function registrarIpc() {
           new Promise((resolve) => {
             const id = proxPermissao++;
             pedidosPermissao.set(id, resolve);
+            // minimizado na bandeja: volta para a tela, senão o pedido fica invisível e o Claude espera para sempre
+            if (escondido) esconderMascote(false);
             if (!chatAberto) abrirChat(true);
             chat.webContents.send("chat:permissao", { id, ...dados });
             humor("pensando");
