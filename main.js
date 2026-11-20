@@ -553,6 +553,7 @@ const pedidosPermissao = new Map();
 let proxPermissao = 1;
 
 let falhasCursor = 0;
+let ultimoCursor = null;
 
 function registrarIpc() {
   const on = (canal, fn) => ipcMain.on(canal, (e, ...a) => origemConfiavel(e) && fn(e, ...a));
@@ -565,10 +566,14 @@ function registrarIpc() {
     const alvo = { x: Math.round(o.x + x), y: Math.round(o.y + y) };
     require("./src/cursor").moverCursor(alvo.x, alvo.y);
     // O Windows ignora o pedido, sem dar erro, quando a janela da frente é de administrador e o app não é.
-    // Se o cursor não for para onde mandamos várias vezes seguidas, o pet solta e explica o porquê.
+    // Bloqueado = o cursor fica PARADO no mesmo ponto enquanto mandamos ele ir para outro lugar.
+    // (Se ele está se mexendo, é a mão da pessoa: aí quem decide é a regra de "puxou com força" do pet.)
     const p = screen.getCursorScreenPoint();
-    falhasCursor = Math.hypot(p.x - alvo.x, p.y - alvo.y) > 4 ? falhasCursor + 1 : 0;
-    if (falhasCursor >= 5) {
+    const longeDoAlvo = Math.hypot(p.x - alvo.x, p.y - alvo.y) > 4;
+    const parado = ultimoCursor && Math.hypot(p.x - ultimoCursor.x, p.y - ultimoCursor.y) <= 1;
+    ultimoCursor = p;
+    falhasCursor = longeDoAlvo && parado ? falhasCursor + 1 : 0;
+    if (falhasCursor >= 8) {
       falhasCursor = 0;
       const janelaAdmin = process.platform === "win32" && !admin.ehAdmin() && admin.janelaDaFrenteEhAdmin();
       log("main", "info", "[mouse] o cursor não obedeceu", janelaAdmin ? "(janela de administrador na frente)" : "");
