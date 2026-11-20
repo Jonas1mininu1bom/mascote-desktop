@@ -26,8 +26,8 @@ const escolha = (lista) => lista[Math.floor(Math.random() * lista.length)];
 const larguraPx = () => tamGrade.w * pet.escala;
 const alturaPx = () => tamGrade.h * pet.escala;
 const velocidade = () => pet.velocidade * 60; // pixels por segundo
-const VEL_PERSEGUIR = 520; // px/s correndo atrás do mouse
-const RAIO_PEGAR = 18; // distância da mão até o mouse para "pegar"
+const VEL_PERSEGUIR = 900; // px/s correndo atrás do mouse
+const RAIO_PEGAR = 26; // distância da mão até o mouse para "pegar"
 const VEL_ARRASTAR = 260; // px/s arrastando o mouse roubado
 
 // ---------- sprites ----------
@@ -172,7 +172,10 @@ function proximoEstado() {
     return mudar("parado", 3.5);
   }
 
-  if (config.bagunca && mouseNativo && r < 0.25) return mudar("perseguir", 10);
+  if (config.bagunca && mouseNativo && r < 0.25) {
+    console.info("[mouse] vou pegar o mouse");
+    return mudar("perseguir", 10);
+  }
   if (config.bagunca && r >= 0.35 && r < 0.4) pedirTravessura(); // raro (e o app ainda limita a 1 a cada 3 min)
   if (config.bagunca && r < 0.35) {
     const { min, max } = limites();
@@ -350,18 +353,23 @@ function atualizar(dt) {
       return;
     case "perseguir": {
       const m = mao();
-      // mouse fora da área onde ele pode andar (ex.: em cima da barra de tarefas): espera na beirada
-      const xAlvo = limitarX(P.x + (cursor.x - m.x));
-      const alvo = { x: xAlvo, y: limitarY(P.y + (cursor.y - m.y), xAlvo) };
+      // perseguindo, ele vai a qualquer lugar da tela (topo, barra de tarefas...), não só no "chão"
+      const alvo = {
+        x: Math.max(0, Math.min(tela.largura, P.x + (cursor.x - m.x))),
+        y: Math.max(alturaPx() * 0.5, Math.min(tela.altura, P.y + (cursor.y - m.y))),
+      };
       // corre rápido, independente da velocidade do pet (senão um pet lento nunca alcança o mouse)
       const mult = Math.max(2.2, VEL_PERSEGUIR / velocidade());
       andarAte(alvo, dt, mult);
       const m2 = mao();
       if (Math.hypot(cursor.x - m2.x, cursor.y - m2.y) < RAIO_PEGAR) {
+        console.info(`[mouse] peguei em ${(10 - P.tempo).toFixed(1)}s`);
         falar(escolha(["Peguei! 😈", "É meu agora!", "Hehe"]), 2);
         return mudar("segurando", rand(3, 6), { alvo: pontoAleatorio() });
       }
       if (P.tempo <= 0) {
+        const m3 = mao();
+        console.info(`[mouse] desisti: mão a ${Math.round(Math.hypot(cursor.x - m3.x, cursor.y - m3.y))}px do mouse (pet ${Math.round(P.x)},${Math.round(P.y)} mouse ${cursor.x},${cursor.y})`);
         falar("Ufa, cansei...", 2);
         proximoEstado();
       }
@@ -372,7 +380,10 @@ function atualizar(dt) {
       if (andarAte(P.alvo, dt, Math.max(1, VEL_ARRASTAR / velocidade()))) P.alvo = pontoAleatorio();
       const m = mao();
       window.api.enviar("pet:moverCursor", { x: m.x, y: m.y });
-      if (P.tempo <= 0) mudar("feliz", 1.2);
+      if (P.tempo <= 0) {
+        mudar("feliz", 1.2);
+        P.y = limitarY(P.y); // se estava no topo/barra de tarefas, volta para o chão
+      }
       return;
     }
     case "buscar":

@@ -5,20 +5,25 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
 <title>Chat do pet</title>
 <style>
+  /* tons quentes: laranja terracota + creme */
   :root {
-    --fundo: #ffffff; --texto: #2b2d42; --suave: #6b7280; --borda: #e5e7eb;
-    --destaque: #ef476f; --bolha-eu: #2b2d42; --bolha-eu-texto: #ffffff; --bolha-pet: #f3f4f6;
+    --fundo: #faf9f5; --texto: #1f1e1d; --suave: #73726c; --borda: #e8e6dc;
+    --destaque: #d97757; --destaque-forte: #c6613f; --bolha-eu: #d97757; --bolha-eu-texto: #ffffff; --bolha-pet: #f0eee6;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --fundo: #1f2130; --texto: #f1f2f6; --suave: #9ca3af; --borda: #34374a;
-      --bolha-eu: #ef476f; --bolha-pet: #2b2e40; }
+    :root { --fundo: #262624; --texto: #f5f4ef; --suave: #a6a39a; --borda: #3d3d3a;
+      --bolha-pet: #30302e; }
   }
+  .ic { width: 18px; height: 18px; display: block; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: transparent; font: 14px system-ui, sans-serif; color: var(--texto); overflow: hidden; }
 
-  #botao { position: absolute; inset: 4px; border-radius: 50%; border: none; cursor: pointer;
-    background: var(--destaque); color: #fff; font-size: 26px; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
-  #botao:hover { transform: scale(1.06); }
+  #botao { position: absolute; inset: 4px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); cursor: pointer;
+    background: radial-gradient(circle at 30% 25%, #e4906f, var(--destaque) 55%, var(--destaque-forte));
+    color: #fff; display: grid; place-items: center; box-shadow: 0 4px 14px rgba(140,60,30,.35);
+    transition: transform .15s ease, box-shadow .15s ease; }
+  #botao .ic { width: 28px; height: 28px; }
+  #botao:hover { transform: scale(1.07); box-shadow: 0 6px 18px rgba(140,60,30,.45); }
   #painel { display: none; position: absolute; inset: 4px; background: var(--fundo); border-radius: 16px;
     box-shadow: 0 6px 24px rgba(0,0,0,.25); flex-direction: column; overflow: hidden; border: 1px solid var(--borda); }
   body.aberto #botao { display: none; }
@@ -27,10 +32,18 @@
   header { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px 14px; border-bottom: 1px solid var(--borda); -webkit-app-region: drag; }
   header h1 { font-size: 15px; margin: 0; flex: 1; }
   header button, .icone { -webkit-app-region: no-drag; background: none; border: none; color: var(--texto);
-    font-size: 16px; cursor: pointer; border-radius: 8px; padding: 4px 7px; }
+    cursor: pointer; border-radius: 8px; padding: 5px; display: grid; place-items: center; }
   header button:hover { background: var(--bolha-pet); }
   #pasta { -webkit-app-region: no-drag; font-size: 12px; color: var(--suave); padding: 6px 14px; border-bottom: 1px solid var(--borda);
-    cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 6px; align-items: center; }
+  #pasta .ic { width: 14px; height: 14px; flex: none; }
+  #pasta span { overflow: hidden; text-overflow: ellipsis; }
+  #listaTravessuras .ic { width: 15px; height: 15px; display: inline-block; vertical-align: -3px; margin-right: 4px; color: var(--suave); }
+  .info .ic { width: 13px; height: 13px; display: inline-block; vertical-align: -2px; margin-right: 4px; }
+  input[type=checkbox] { accent-color: var(--destaque); }
+  #ajustes select { background: var(--bolha-pet); color: var(--texto); border: 1px solid var(--borda); border-radius: 6px; padding: 2px 4px; }
+  #mensagens::-webkit-scrollbar { width: 8px; }
+  #mensagens::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 4px; }
   #pasta:hover { color: var(--texto); }
 
   #ajustes { display: none; padding: 10px 14px; border-bottom: 1px solid var(--borda); font-size: 13px; }
@@ -57,26 +70,27 @@
   form { display: flex; gap: 6px; padding: 10px; border-top: 1px solid var(--borda); }
   textarea { flex: 1; resize: none; font: inherit; color: var(--texto); background: var(--bolha-pet); border: 1px solid var(--borda);
     border-radius: 12px; padding: 8px 10px; height: 40px; max-height: 120px; outline: none; }
-  form button { border: none; border-radius: 12px; background: var(--destaque); color: #fff; font-size: 16px; width: 44px; cursor: pointer; }
+  form button { border: none; border-radius: 12px; background: var(--destaque); color: #fff; width: 44px; cursor: pointer; display: grid; place-items: center; }
+  form button:hover { background: var(--destaque-forte); }
   form button.parar { background: var(--suave); }
 </style>
 </head>
 <body>
-<button id="botao" title="Conversar com o pet">💬</button>
+<button id="botao" title="Conversar com o pet"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /><path d="M8 12h.01" /><path d="M12 12h.01" /><path d="M16 12h.01" /></svg></button>
 
 <section id="painel">
   <header>
     <h1 id="titulo">Pet</h1>
-    <button id="nova" title="Nova conversa">✚</button>
-    <button id="btnAjustes" title="Ajustes">⚙️</button>
-    <button id="fechar" title="Minimizar">▾</button>
+    <button id="nova" title="Nova conversa"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" /></svg></button>
+    <button id="btnAjustes" title="Ajustes"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /><circle cx="12" cy="12" r="3" /></svg></button>
+    <button id="fechar" title="Minimizar"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="m6 9 6 6 6-6" /></svg></button>
   </header>
-  <div id="pasta" title="Pasta em que o pet trabalha (clique para trocar)">📁 …</div>
+  <div id="pasta" title="Pasta em que o pet trabalha (clique para trocar)"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" /></svg><span id="pastaNome">…</span></div>
   <div id="ajustes">
     <label><input type="checkbox" id="passear"><span>Deixar passear pela tela<small>Por padrão ele fica quietinho aqui no canto.</small></span></label>
-    <label><input type="checkbox" id="bagunca"><span>Modo bagunça 😈<small>Pega o seu mouse e traz bilhetes para a tela.</small></span></label>
+    <label><input type="checkbox" id="bagunca"><span>Modo bagunça<small>Pega o seu mouse e traz bilhetes para a tela.</small></span></label>
     <label style="display:block">Pet: <select id="pets"></select></label>
-    <div id="travessuras"><b>Travessuras 😈</b><small>De vez em quando, só no modo bagunça.</small><div id="listaTravessuras"></div></div>
+    <div id="travessuras"><b>Travessuras</b><small>De vez em quando, só no modo bagunça.</small><div id="listaTravessuras"></div></div>
     <div class="acoes">
       <button id="voltar">Chamar de volta</button>
       <button id="abrirPets">Pasta de pets</button>
@@ -88,9 +102,17 @@
   <div id="mensagens"></div>
   <form id="form">
     <textarea id="entrada" placeholder="Fale com o pet…" rows="1"></textarea>
-    <button id="enviar" type="submit" title="Enviar">➤</button>
+    <button id="enviar" type="submit" title="Enviar"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z" /><path d="M6 12h16" /></svg></button>
   </form>
 </section>
+<!-- ícones Lucide (ISC, veja icones/LICENSE-lucide.txt) usados pelo chat.js -->
+<template id="icones">
+  <span data-icone="enviar"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z" /><path d="M6 12h16" /></svg></span>
+  <span data-icone="parar"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><rect width="18" height="18" x="3" y="3" rx="2" /></svg></span>
+  <span data-icone="globo"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" /></svg></span>
+  <span data-icone="teclado"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M10 8h.01" /><path d="M12 12h.01" /><path d="M14 8h.01" /><path d="M16 12h.01" /><path d="M18 8h.01" /><path d="M6 8h.01" /><path d="M7 16h10" /><path d="M8 12h.01" /><rect width="20" height="16" x="2" y="4" rx="2" /></svg></span>
+  <span data-icone="ferramenta"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></svg></span>
+</template>
 <script src="chat.js"></script>
 </body>
 </html>

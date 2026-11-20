@@ -42,7 +42,7 @@ npm start
 
 | Ação | Como |
 |---|---|
-| Conversar | Clique no botão 💬 no canto inferior direito |
+| Conversar | Clique no botão laranja no canto inferior direito |
 | Escolher em que pasta ele trabalha | Clique na linha 📁 no topo do chat |
 | Carinho | Clique no pet |
 | Mudar o pet de lugar | Arraste o pet com o mouse |
@@ -124,6 +124,10 @@ aprovar.
 - No Linux com Wayland, o pet não consegue pegar o mouse (o resto funciona).
 - No Linux, a transparência precisa de um compositor (o padrão no GNOME e KDE).
 - No macOS, pegar o mouse pode pedir permissão de Acessibilidade.
+
+## Créditos
+
+- Ícones do chat: [Lucide](https://lucide.dev) (licença ISC, em `src/icones/LICENSE-lucide.txt`).
 
 ## Observações
 

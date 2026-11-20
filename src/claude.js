@@ -48,7 +48,7 @@ class ChatClaude {
             append:
               `Você é ${nomePet}, um pet de área de trabalho simpático que mora num cantinho da tela. ` +
               (personalidade ? `${personalidade} ` : "") +
-              "Responda curto, amigável e em português, num chat pequeno. Evite tabelas e blocos enormes.",
+              "Responda curto, amigável e em português, num chat pequeno. Evite tabelas e blocos enormes. Não use emojis.",
           },
           // Toda ferramenta que mexe no computador pede aprovação no próprio chat.
           canUseTool: async (nome, entrada) => {
@@ -73,7 +73,7 @@ class ChatClaude {
         }
       }
     } catch (e) {
-      if (this.abortar.signal.aborted) eventos.erro("Parei! 🛑");
+      if (this.abortar.signal.aborted) eventos.erro("Parei.");
       else
         eventos.erro(
           `Não consegui falar com o Claude Code: ${e.message}\n` +

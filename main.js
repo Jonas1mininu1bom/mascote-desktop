@@ -35,7 +35,7 @@ process.on("unhandledRejection", (e) => log("main", "error", e));
 function vigiar(nome, w) {
   const wc = w.webContents;
   wc.on("console-message", (e) => {
-    if (e.level === "debug" || e.level === "info") return;
+    if (e.level === "debug" || (e.level === "info" && !String(e.message).startsWith("[mouse]"))) return;
     log(nome, e.level, e.message, `(${path.basename(e.sourceId || "")}:${e.lineNumber})`);
   });
   wc.on("render-process-gone", (_e, d) => log(nome, "error", "a página caiu:", d.reason, "código", d.exitCode));
@@ -244,7 +244,7 @@ function iconeBandeja() {
 
 function montarBandeja() {
   const menu = Menu.buildFromTemplate([
-    { label: `${petAtual().nome} 🐾`, enabled: false },
+    { label: petAtual().nome, enabled: false },
     { label: "Abrir o chat", click: () => abrirChat(true) },
     { label: "Chamar o pet de volta", click: () => overlay.webContents.send("pet:voltar") },
     { type: "separator" },

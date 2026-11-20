@@ -1,5 +1,7 @@
 // Chat fixo no canto da tela.
 const $ = (id) => document.getElementById(id);
+// cópia de um ícone do <template id="icones">
+const icone = (nome) => $("icones").content.querySelector(`[data-icone="${nome}"] svg`).cloneNode(true);
 const ponte = window.api;
 let config = {};
 let ocupado = false;
@@ -27,7 +29,7 @@ function adicionar(classe, texto) {
 
 function setOcupado(v) {
   ocupado = v;
-  $("enviar").textContent = v ? "■" : "➤";
+  $("enviar").replaceChildren(icone(v ? "parar" : "enviar"));
   $("enviar").title = v ? "Parar" : "Enviar";
   $("enviar").classList.toggle("parar", v);
 }
@@ -36,7 +38,7 @@ function mostrarConfig(c) {
   config = c;
   $("passear").checked = c.passear;
   $("bagunca").checked = c.bagunca;
-  $("pasta").textContent = "📁 " + c.pasta;
+  $("pastaNome").textContent = c.pasta;
   $("pets").value = c.pet;
 }
 
@@ -65,7 +67,7 @@ async function carregarTravessuras() {
     c.checked = t.ligada;
     c.onchange = () => ponte.enviar("travessuras:ligar", { id: t.id, ligada: c.checked });
     const s = document.createElement("span");
-    s.textContent = (t.tipo === "abrir" ? "🌐 " : "⌨️ ") + t.nome;
+    s.append(icone(t.tipo === "abrir" ? "globo" : "teclado"), t.nome);
     l.append(c, s);
     caixa.appendChild(l);
   }
@@ -80,7 +82,7 @@ $("btnAjustes").onclick = () => {
 $("nova").onclick = () => {
   ponte.enviar("chat:nova");
   $("mensagens").innerHTML = "";
-  adicionar("info", "Conversa nova! 🌱");
+  adicionar("info", "Conversa nova.");
 };
 $("pasta").onclick = async () => {
   const antes = config.pasta;
@@ -132,7 +134,7 @@ ponte.ouvir("chat:texto", (t) => {
 });
 ponte.ouvir("chat:ferramenta", (r) => {
   tirarPensando();
-  adicionar("info", "🔧 " + r);
+  adicionar("info", r).prepend(icone("ferramenta"));
 });
 ponte.ouvir("chat:erro", (m) => {
   tirarPensando();
@@ -156,7 +158,7 @@ ponte.ouvir("chat:permissao", ({ id, nome, resumo }) => {
     b.onclick = () => {
       ponte.enviar("chat:responderPermissao", { id, ok });
       d.querySelectorAll("button").forEach((x) => x.remove());
-      d.append(ok ? "✅ Permitido" : "🚫 Negado");
+      d.append(ok ? "Permitido." : "Negado.");
     };
     d.appendChild(b);
   }
@@ -170,5 +172,5 @@ ponte.ouvir("pet:trocar", (p) => ($("titulo").textContent = p.nome));
   const d = await ponte.invocar("inicio");
   mostrarConfig(d.config);
   $("titulo").textContent = d.pet.nome;
-  adicionar("pet", `Oi! Eu sou ${d.pet.nome}. Posso conversar, ler arquivos e ajudar com código na pasta aí em cima. Antes de mexer em algo, eu peço permissão. 🙂`);
+  adicionar("pet", `Oi! Eu sou ${d.pet.nome}. Posso conversar, ler arquivos e ajudar com código na pasta aí em cima. Antes de mexer em algo, eu peço permissão.`);
 })();
