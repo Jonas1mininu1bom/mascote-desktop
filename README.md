@@ -94,7 +94,9 @@ mensagem (PNG, JPG, GIF ou WEBP, até 5 MB cada), e o Claude Code vê a imagem j
 - **Brinquedos** (botão pequeno ao lado do chat, ou botão direito no pet): **Comida** (ele vai até a
   comida e come) e **Bola de futebol**. Clique na bola para chutar: ela vai para o lado oposto de onde
   você clicou, e o pet corre atrás e chuta de volta na direção do seu mouse. Se você parar de jogar,
-  depois de uns 15 s ele cansa. Pelo botão direito também tem **Carinho**. Se ficar muito tempo sem
+  depois de uns 15 s ele cansa. A bola segue o **Chão** escolhido: no modo barra de tarefas ela
+  tem gravidade e quica em cima da barra; no modo tela inteira ela rola pela tela toda, vista de cima,
+  como o pet anda. Pelo botão direito também tem **Carinho**. Se ficar muito tempo sem
   comer, ele avisa que está com fome.
 
 ## Bilhetes da comunidade

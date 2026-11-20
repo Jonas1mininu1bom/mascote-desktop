@@ -218,13 +218,17 @@ window.Vida = (() => {
   // Você chuta clicando nela (ela vai para o lado oposto de onde você clicou, como um chute de verdade);
   // o pet corre atrás e chuta de volta na direção do seu mouse. Sem chutes seus por 15 s, ele cansa.
   const R_BOLA = 11;
+  // A bola segue a opção de chão do pet:
+  // - "barra": vista de lado, com gravidade, quicando em cima da barra de tarefas;
+  // - "tela": vista de cima (como o pet anda), sem gravidade: rola pela tela toda e rebate nas bordas.
   function brincar() {
     if (relogio < bravoAte) {
       falar("Não quero brincar com você agora. 😤", 2);
       return mudar("bravo", 1.5);
     }
     const x = limitarX(P.x + (P.olhando || 1) * 70);
-    bola = { x, y: P.y - alturaPx() - 60, vx: 0, vy: 0, giro: 0, r: R_BOLA, chutePet: 0 };
+    const y = noChao() ? P.y - alturaPx() - 60 : P.y - R_BOLA; // na barra ela cai do alto; na tela, aparece nos pés dele
+    bola = { x, y, vx: 0, vy: 0, giro: 0, r: R_BOLA, chutePet: 0 };
     falar(escolha(["Bola! ⚽", "Vamos jogar!", "Chuta pra mim!"]), 1.8);
     mudar("brincando", 15);
   }
@@ -237,26 +241,20 @@ window.Vida = (() => {
     if (d < 2) [dx, dy] = [rand(-0.3, 0.3), -1]; // bem no meio: vai para cima
     else [dx, dy] = [dx / d, dy / d];
     bola.vx = dx * 780;
-    bola.vy = dy * 780 - 160; // um pouco de "levantada", como num chute
+    bola.vy = dy * 780 - (noChao() ? 160 : 0); // na barra, um pouco de "levantada", como num chute
     P.tempo = Math.max(P.tempo, 15); // você está jogando: ele continua
     if (debug) console.warn(`[debug] chute seu: vx=${Math.round(bola.vx)} vy=${Math.round(bola.vy)}`);
     if (Math.random() < 0.35) falar(escolha(["Uau, que chute!", "Lá vou eu!", "Essa é minha!"]), 1.4);
     return true;
   }
-  function atualizarBola(dt) {
-    if (!bola) return mudar("parado", 1);
-    if (debug && relogio - (bola.log || 0) > 0.15) {
-      bola.log = relogio;
-      console.warn(`[debug] bola ${Math.round(bola.x)},${Math.round(bola.y)}`);
-    }
-    const { min, max } = limites();
-    const chaoBola = chaoDe(bola.x);
+  // física da bola na barra de tarefas (de lado, com gravidade)
+  function bolaNaBarra(dt) {
+    const chao = chaoDe(bola.x);
     bola.vy += GRAVIDADE * dt;
     bola.x += bola.vx * dt;
     bola.y += bola.vy * dt;
-    bola.giro += (bola.vx / bola.r) * dt;
-    if (bola.y >= chaoBola - bola.r) {
-      bola.y = chaoBola - bola.r;
+    if (bola.y >= chao - bola.r) {
+      bola.y = chao - bola.r;
       bola.vy = Math.abs(bola.vy) > 80 ? -bola.vy * 0.55 : 0;
       bola.vx *= 1 - Math.min(1, dt * 1.6); // atrito no chão
     }
@@ -264,26 +262,56 @@ window.Vida = (() => {
       bola.y = bola.r; // bateu no teto
       bola.vy = Math.abs(bola.vy) * 0.6;
     }
+  }
+  // física da bola na tela inteira (vista de cima, sem gravidade)
+  function bolaNaTela(dt) {
+    bola.x += bola.vx * dt;
+    bola.y += bola.vy * dt;
+    const atrito = Math.exp(-1.3 * dt); // rolando, perde velocidade aos poucos
+    bola.vx *= atrito;
+    bola.vy *= atrito;
+    if (Math.hypot(bola.vx, bola.vy) < 8) bola.vx = bola.vy = 0;
+    const a = areaDe(bola.x);
+    if (bola.y < a.y + bola.r || bola.y > a.y + a.h - bola.r) {
+      bola.y = Math.max(a.y + bola.r, Math.min(a.y + a.h - bola.r, bola.y));
+      bola.vy = -bola.vy * 0.75;
+    }
+  }
+  function atualizarBola(dt) {
+    if (!bola) return mudar("parado", 1);
+    if (debug && relogio - (bola.log || 0) > 0.15) {
+      bola.log = relogio;
+      console.warn(`[debug] bola ${Math.round(bola.x)},${Math.round(bola.y)}`);
+    }
+    const naBarra = noChao();
+    if (naBarra) bolaNaBarra(dt);
+    else bolaNaTela(dt);
+    bola.giro += (Math.hypot(bola.vx, bola.vy) / bola.r) * Math.sign(bola.vx || 1) * dt;
+    const { min, max } = limites();
     if (bola.x < min + bola.r || bola.x > max - bola.r) {
       bola.x = Math.max(min + bola.r, Math.min(max - bola.r, bola.x));
       bola.vx = -bola.vx * 0.7;
     }
-    // o pet corre pelo chão atrás da bola e chuta de volta na direção do seu mouse
-    const alcance = Math.abs(bola.x - P.x) < larguraPx() / 2 + bola.r && bola.y > chaoBola - alturaPx() * 0.8;
+    // o pet corre atrás e chuta de volta na direção do seu mouse
+    const alcance = naBarra
+      ? Math.abs(bola.x - P.x) < larguraPx() / 2 + bola.r && bola.y > chaoDe(bola.x) - alturaPx() * 0.8
+      : Math.abs(bola.x - P.x) < larguraPx() / 2 + bola.r && Math.abs(bola.y - (P.y - bola.r)) < bola.r + 14;
     if (alcance && relogio - bola.chutePet > 0.6) {
       bola.chutePet = relogio;
-      let dx = cursor.x - bola.x;
-      let dy = cursor.y - bola.y;
+      const dx = cursor.x - bola.x;
+      const dy = cursor.y - bola.y;
       const d = Math.hypot(dx, dy) || 1;
       const forca = Math.min(820, 380 + d * 0.6); // mouse longe: chute mais forte
       bola.vx = (dx / d) * forca;
-      bola.vy = Math.min((dy / d) * forca, -300); // sempre sobe um pouco
+      bola.vy = naBarra ? Math.min((dy / d) * forca, -300) : (dy / d) * forca; // na barra, sempre sobe um pouco
       P.olhando = dx >= 0 ? 1 : -1;
       P.anim = "feliz";
       if (debug) console.warn(`[debug] chute do pet para o mouse: vx=${Math.round(bola.vx)} vy=${Math.round(bola.vy)}`);
       if (Math.random() < 0.3) falar(escolha(["Toma! ⚽", "Pra você!", "Gol!"]), 1.2);
     } else if (!alcance) {
-      andarAte({ x: limitarX(bola.x), y: chaoDe(bola.x) }, dt, 2.4);
+      // na barra ele corre pelo chão; na tela, vai até onde a bola estiver (com os pés na altura dela)
+      const alvo = naBarra ? { x: limitarX(bola.x), y: chaoDe(bola.x) } : { x: limitarX(bola.x), y: limitarY(bola.y + bola.r, bola.x) };
+      andarAte(alvo, dt, 2.4);
       P.anim = "correndo";
     }
     if (P.tempo <= 0) {
