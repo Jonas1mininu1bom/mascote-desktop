@@ -12,9 +12,23 @@ try {
   if (process.platform === "win32") {
     const user32 = koffi.load("user32.dll");
     const SetCursorPos = user32.func("bool __stdcall SetCursorPos(int x, int y)");
+    const mouseEvent = user32.func("void __stdcall mouse_event(uint32_t flags, int dx, int dy, uint32_t dados, uintptr_t extra)");
+    const GetSystemMetrics = user32.func("int __stdcall GetSystemMetrics(int indice)");
+    const MOVE = 0x0001, ABSOLUTO = 0x8000, AREA_TODA = 0x4000;
     mover = (x, y) => {
       const p = screen.dipToScreenPoint({ x, y }); // Windows usa pixels físicos
-      SetCursorPos(Math.round(p.x), Math.round(p.y));
+      // Move como se fosse o mouse de verdade (evento de movimento absoluto), e não só "teleporta":
+      // assim o Windows redesenha o ponteiro (mesmo se ele estava escondido por você estar digitando)
+      // e os programas embaixo veem o mouse passando. As coordenadas vão de 0 a 65535 na área de
+      // todos os monitores juntos.
+      const vx = GetSystemMetrics(76), vy = GetSystemMetrics(77); // canto da área de todos os monitores
+      const vw = GetSystemMetrics(78), vh = GetSystemMetrics(79); // tamanho dela
+      if (vw > 1 && vh > 1) {
+        const nx = Math.round(((p.x - vx) * 65535) / (vw - 1));
+        const ny = Math.round(((p.y - vy) * 65535) / (vh - 1));
+        mouseEvent(MOVE | ABSOLUTO | AREA_TODA, nx, ny, 0, 0);
+      }
+      SetCursorPos(Math.round(p.x), Math.round(p.y)); // garante o ponto exato (arredondamento acima)
     };
   } else if (process.platform === "darwin") {
     const cg = koffi.load("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics");

@@ -554,6 +554,7 @@ let proxPermissao = 1;
 
 let falhasCursor = 0;
 let ultimoCursor = null;
+let contaMoverCursor = 0;
 
 function registrarIpc() {
   const on = (canal, fn) => ipcMain.on(canal, (e, ...a) => origemConfiavel(e) && fn(e, ...a));
@@ -569,6 +570,9 @@ function registrarIpc() {
     // Bloqueado = o cursor fica PARADO no mesmo ponto enquanto mandamos ele ir para outro lugar.
     // (Se ele está se mexendo, é a mão da pessoa: aí quem decide é a regra de "puxou com força" do pet.)
     const p = screen.getCursorScreenPoint();
+    if (process.env.MASCOTE_DEBUG && ++contaMoverCursor % 20 === 0) {
+      log("main", "info", `[mouse] mandei o cursor para ${alvo.x},${alvo.y} e ele está em ${p.x},${p.y}`);
+    }
     const longeDoAlvo = Math.hypot(p.x - alvo.x, p.y - alvo.y) > 4;
     const parado = ultimoCursor && Math.hypot(p.x - ultimoCursor.x, p.y - ultimoCursor.y) <= 1;
     ultimoCursor = p;
