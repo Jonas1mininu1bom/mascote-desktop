@@ -56,7 +56,7 @@
         }
       ],
       "category": "public.app-category.entertainment",
-      "icon": "assets/icone.png",
+      "icon": "assets/icone-grande.png",
       "identity": "-",
       "hardenedRuntime": false,
       "extendInfo": {
@@ -72,7 +72,7 @@
         "deb"
       ],
       "category": "Utility",
-      "icon": "assets/icone.png",
+      "icon": "assets/icone-grande.png",
       "executableArgs": [
         "--ozone-platform=x11"
       ],
