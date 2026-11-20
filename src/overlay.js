@@ -386,6 +386,14 @@ const boca = () => (boca3d && relogio - boca3d.em < 0.3 ? { x: boca3d.x, y: boca
 const mao = () => boca() || ponto("mao", [tamGrade.w - 1, Math.floor(tamGrade.h * 0.6)]);
 const maoTras = () => boca() || ponto("maoTras", [2, Math.floor(tamGrade.h * 0.6)]);
 
+// O bilhete fica sempre acima da altura dos botões do chat (nos dois lados da tela): mais embaixo
+// ele cai em cima da barra de tarefas e não dá para ler. Devolve o y máximo do topo do papel.
+function tetoBilhete(x, altura) {
+  const a = areaDe(x);
+  const folga = tela.chat ? Math.max(0, tela.area.y + tela.area.h - tela.chat.y) : 80;
+  return a.y + a.h - folga - 10 - altura;
+}
+
 function moverBilhete() {
   const b = P.bilhete;
   if (!b) return;
@@ -393,7 +401,9 @@ function moverBilhete() {
   // o papel fica do lado de fora da boca/mão (o lado oposto ao corpo dele)
   const ladoEsq = boca() ? m.x < P.x : P.olhando > 0;
   const x = ladoEsq ? m.x - b.largura + 8 : m.x - 8;
-  window.api.enviar("bilhete:mover", { id: b.id, x, y: m.y - 24 });
+  // se o pet está lá embaixo (na barra de tarefas), ele segura o papel pela borda de baixo, erguido
+  const y = Math.min(m.y - 24, tetoBilhete(x + b.largura / 2, b.altura));
+  window.api.enviar("bilhete:mover", { id: b.id, x, y });
 }
 
 // Resgate: se ele ficar fora de todas as telas (ou a posição virar NaN), volta para casa.
@@ -533,7 +543,8 @@ function atualizar(dt) {
         mudar("parado", 99);
         const ladoInicial = P.lado;
         const lim = limites();
-        window.api.invocar("bilhete:criar", { x: ladoInicial < 0 ? lim.min - 260 : lim.max + 20, y: P.y - 60 }).then((b) => {
+        const xb = ladoInicial < 0 ? lim.min - 260 : lim.max + 20;
+        window.api.invocar("bilhete:criar", { x: xb, y: Math.min(P.y - 60, tetoBilhete(P.x, 150)) }).then((b) => {
           if (!b || P.estado !== "parado") return proximoEstado();
           P.bilhete = b;
           P.olhando = -ladoInicial;

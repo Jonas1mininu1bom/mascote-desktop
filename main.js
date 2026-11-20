@@ -238,6 +238,7 @@ function infoTela() {
     monitores: permitidas.map((d) => rel(d.bounds)), // a tela inteira de cada um (com a barra de tarefas)
     casa,
     painel: chatAberto ? rel(boundsChat(true)) : null,
+    chat: rel(boundsChat(false)), // os botões do chat (fechado): os bilhetes ficam acima da altura deles
   };
 }
 
