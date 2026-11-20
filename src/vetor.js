@@ -38,7 +38,8 @@
       g.fill();
     }
   }
-  function olho(g, x, y, r, s, cor = "#2b2d42") {
+  // lado: para onde fica o meio do rosto (1 = direita, -1 = esquerda). A sobrancelha brava desce para lá.
+  function olho(g, x, y, r, s, cor = "#2b2d42", lado = 1) {
     if (s.modoOlho === "espiral") {
       // tonto: olho em espiral girando
       g.beginPath();
@@ -55,8 +56,8 @@
       return;
     }
     if (s.modoOlho === "bravo") {
-      // sobrancelha franzida (desce para a frente do rosto)
-      linha(g, x - r * 1.3, y - r * 2.1, x + r * 1.3, y - r * 1.2, cor, 1.6);
+      // sobrancelha franzida: alta do lado de fora, baixa do lado do meio do rosto
+      linha(g, x - lado * r * 1.3, y - r * 2.1, x + lado * r * 1.3, y - r * 1.15, cor, 1.6);
     }
     if (s.olhosFechados) {
       g.beginPath();
@@ -237,7 +238,7 @@
     oval(g, 33, cy, 16, 15.5 + r.respira * 0.2);
     pintar(g, "#ffffff", tinta, 2.4);
     olho(g, 31, cy - 2, 2.3, r, tinta);
-    olho(g, 41, cy - 2, 2.3, r, tinta);
+    olho(g, 41, cy - 2, 2.3, r, tinta, -1); // olho da direita: o meio do rosto fica à esquerda dele
     bochecha(g, 27, cy + 4, 3.2);
     bochecha(g, 44, cy + 4, 3.2);
     // boca: sorriso (ou "o" pensando, ou boquinha de dormir)

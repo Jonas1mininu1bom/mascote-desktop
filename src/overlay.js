@@ -204,7 +204,7 @@ function proximoEstado() {
   }
   if (seguirMouseLigado() && Math.random() < 0.08) return mudar("seguir", rand(6, 10));
   if (config.bagunca && r >= 0.35 && r < 0.4) pedirTravessura(); // raro (e o app ainda limita a 1 a cada 3 min)
-  if (config.bagunca && r < 0.35) {
+  if (config.bagunca && (r < 0.35 || debug === "bilhete")) {
     const { min, max } = limites();
     const lado = P.x < (min + max) / 2 ? -1 : 1;
     const x = lado < 0 ? min + larguraPx() / 2 - larguraPx() * 0.6 : max - larguraPx() / 2 + larguraPx() * 0.6;

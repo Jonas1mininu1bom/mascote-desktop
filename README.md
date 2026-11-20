@@ -164,7 +164,8 @@ incluindo erros das páginas. Se o pet sumir da tela, ele volta sozinho para o c
 
 Para depurar: `MASCOTE_DEBUG=perseguir npm start` (persegue o mouse sem parar) ou
 `MASCOTE_DEBUG=travessura npm start` (faz as travessuras ligadas sem intervalo) ou
-`MASCOTE_DEBUG=voltar npm start` (leva o pet para longe e chama de volta).
+`MASCOTE_DEBUG=voltar npm start` (leva o pet para longe e chama de volta) ou
+`MASCOTE_DEBUG=bilhete npm start` (no modo bagunça, ele vai buscar bilhetes toda hora).
 
 ## Segurança
 

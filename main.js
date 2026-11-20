@@ -475,7 +475,14 @@ function criarBilhete({ x, y }) {
   });
   w.setAlwaysOnTop(true, "floating");
   w.loadFile(path.join(__dirname, "src/bilhete.html"), { query: { dados: JSON.stringify(conteudo) } });
-  w.once("ready-to-show", () => w.showInactive());
+  w.once("ready-to-show", () => {
+    w.showInactive();
+    // No Windows, o "sempre no topo" se perde quando a janela nasce escondida: reaplica ao mostrar,
+    // senão o bilhete fica atrás das janelas maximizadas. Depois o pet e o chat voltam para a frente
+    // (o pet é desenhado por cima do papel que ele carrega).
+    w.setAlwaysOnTop(true, "screen-saver");
+    for (const j of [overlay, chat]) if (j && !j.isDestroyed() && j.isVisible()) j.moveTop();
+  });
   w.on("closed", () => {
     bilhetes.delete(id);
     if (overlay && !overlay.isDestroyed()) overlay.webContents.send("bilhete:fechado", id); // no fechamento do app o overlay já foi
