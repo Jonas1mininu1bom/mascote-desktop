@@ -70,9 +70,9 @@ deixa a ampliação nítida (bom para pixel art).
 ## E os pets que vêm com o app?
 
 Palito, Pato e Tartaruga têm `"desenho": "palito" | "pato" | "tartaruga"` no `pet.json`. Com isso,
-eles são desenhados com formas vetoriais suaves (contorno fino, sombra macia no chão e pernas
-animadas), em código, no arquivo `src/vetor.js`. A pixel art do `pet.json` continua servindo de
-reserva e para o ícone da bandeja. Pets da comunidade usam os jeitos 1 e 2 acima: um pet baixado não
+eles são modelos 3D feitos em código com three.js, no arquivo `src/pet3d.js`. Se a placa de vídeo não
+tiver WebGL, o app usa um desenho com volume de `src/vetor.js`. A pixel art do `pet.json` continua
+servindo para o ícone da bandeja. Pets da comunidade usam os jeitos 1 e 2 acima: um pet baixado não
 pode trazer código próprio de desenho, só dados.
 
 As cópias desses pets na sua pasta de pets se atualizam sozinhas quando o app muda, **a não ser que
