@@ -53,7 +53,8 @@ npm start
 | Escolher os bilhetes que ele traz | ⚙️ → Pasta de bilhetes |
 | Ligar travessuras (pegar o mouse, Alt+Tab, navegador) / criar novas | ⚙️ → Travessuras / Pasta de travessuras |
 | Fazer o pet voltar para o canto | ⚙️ → Chamar de volta |
-| Fechar | ⚙️ → Fechar o app, a bandeja, ou **Ctrl+Alt+Shift+Q** |
+| Minimizar | Botão **–** no topo do chat: pet, chat e bilhetes somem e fica só o ícone na bandeja (perto do relógio). Clique nele para trazer de volta |
+| Fechar | Botão **X** no topo do chat, ⚙️ → Fechar o app, a bandeja, ou **Ctrl+Alt+Shift+Q** |
 
 Quando o pet segura o seu mouse no modo bagunça, clique nele para ele soltar.
 

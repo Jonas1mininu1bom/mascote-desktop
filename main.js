@@ -96,6 +96,8 @@ let overlay = null; // tela inteira, transparente, onde o pet vive
 let chat = null; // botão/painel de chat fixo no canto
 let tray = null;
 let chatAberto = false;
+let escondido = false; // minimizado para a bandeja: pet, chat e bilhetes somem e o pet não apronta nada
+let avisouBandeja = false;
 const bilhetes = new Map();
 let proxIdBilhete = 1;
 const MARGEM = 16;
@@ -268,6 +270,30 @@ function criarChat() {
   vigiar("chat", chat);
 }
 
+// Minimizar: esconde tudo e deixa só o ícone na bandeja (perto do relógio). Clicar nele traz de volta.
+function esconderMascote(esconder) {
+  escondido = esconder;
+  const janelas = [overlay, chat, ...bilhetes.values()].filter((w) => w && !w.isDestroyed());
+  for (const w of janelas) {
+    if (esconder) w.hide();
+    else if (w === chat) w.show();
+    else w.showInactive();
+  }
+  if (!esconder) overlay?.setIgnoreMouseEvents(true, { forward: true });
+  montarBandeja();
+  if (esconder && !avisouBandeja && tray && process.platform === "win32") {
+    avisouBandeja = true;
+    try {
+      tray.displayBalloon({
+        title: "Mascote Desktop",
+        content: "Estou aqui na bandeja, perto do relógio. Clique no ícone para me trazer de volta.",
+        noSound: true,
+      });
+    } catch {}
+  }
+  log("main", "info", esconder ? "mascote minimizado para a bandeja" : "mascote de volta na tela");
+}
+
 function abrirChat(aberto) {
   chatAberto = aberto;
   posicionarChat();
@@ -349,7 +375,10 @@ function iconeBandeja() {
 function montarBandeja() {
   const menu = Menu.buildFromTemplate([
     { label: petAtual().nome, enabled: false },
-    { label: "Abrir o chat", click: () => abrirChat(true) },
+    escondido
+      ? { label: "Mostrar o mascote", click: () => esconderMascote(false) }
+      : { label: "Minimizar para a bandeja", click: () => esconderMascote(true) },
+    { label: "Abrir o chat", click: () => (escondido && esconderMascote(false), abrirChat(true)) },
     { label: "Chamar o pet de volta", click: () => overlay.webContents.send("pet:voltar") },
     { label: "Chat de volta para o canto", click: () => ((config.chatPos = undefined), salvarConfig(), posicionarChat()) },
     { type: "separator" },
@@ -368,8 +397,11 @@ function montarBandeja() {
     { label: "Sair", click: () => app.quit() },
   ]);
   try {
-    if (!tray) tray = new Tray(iconeBandeja());
-    else tray.setImage(iconeBandeja());
+    if (!tray) {
+      tray = new Tray(iconeBandeja());
+      // clique no ícone: mostra o mascote se estiver minimizado (no Windows; no macOS o clique abre o menu)
+      tray.on("click", () => escondido && esconderMascote(false));
+    } else tray.setImage(iconeBandeja());
     tray.setToolTip("Mascote Desktop");
     tray.setContextMenu(menu);
   } catch (e) {
@@ -438,12 +470,12 @@ function registrarIpc() {
   handle("inicio", () => ({ pet: petAtual(), config, tela: infoTela(), mouseNativo: require("./src/cursor").disponivel(), debug: process.env.MASCOTE_DEBUG || null }));
   on("pet:ignorar", (_e, ignorar) => overlay?.setIgnoreMouseEvents(ignorar === true, { forward: true }));
   on("pet:moverCursor", (_e, { x, y } = {}) => {
-    if (!config.bagunca || config.travessuras?.["pegar-mouse"] === false || !num(x) || !num(y)) return;
+    if (escondido || !config.bagunca || config.travessuras?.["pegar-mouse"] === false || !num(x) || !num(y)) return;
     const o = areaTotal();
     require("./src/cursor").moverCursor(o.x + x, o.y + y);
   });
   handle("bilhete:criar", (_e, dados) => {
-    if (!config.bagunca || !dados || !num(dados.x) || !num(dados.y)) return null;
+    if (escondido || !config.bagunca || !dados || !num(dados.x) || !num(dados.y)) return null;
     if (bilhetes.size >= 5) {
       log("main", "info", "bilhete: já tem 5 abertos na tela, feche algum para ele trazer outro");
       return null;
@@ -527,7 +559,7 @@ function registrarIpc() {
     return { ...estadoSistema(), cancelado: !aceitou };
   });
   handle("travessura:pedir", () => {
-    if (!config.bagunca) return null;
+    if (escondido || !config.bagunca) return null;
     const t = travessuras.sortear(listaTravessuras(), config.travessuras || {}, {
       semIntervalo: process.env.MASCOTE_DEBUG === "travessura",
       admin: admin.ehAdmin(),
@@ -536,7 +568,7 @@ function registrarIpc() {
     return t;
   });
   on("travessura:executar", async (_e, token) => {
-    if (!config.bagunca || typeof token !== "string") return;
+    if (escondido || !config.bagunca || typeof token !== "string") return;
     try {
       await travessuras.executar(token, {
         abrirLink: (url) => shell.openExternal(url),
@@ -556,6 +588,7 @@ function registrarIpc() {
   });
   on("pet:voltar", () => overlay?.webContents.send("pet:voltar"));
   on("app:sair", () => app.quit());
+  on("app:minimizar", () => esconderMascote(true));
 
   on("chat:abrir", (_e, aberto) => (process.env.MASCOTE_DEBUG && log("main", "info", "[debug] chat:abrir", aberto), abrirChat(aberto === true)));
   handle("chat:arrastar", (_e, ativo) => arrastarChat(ativo === true));
