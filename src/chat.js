@@ -117,6 +117,12 @@ async function carregarTravessuras() {
       selo.append(icone(t.bloqueada ? "cadeado" : "escudo"), t.selo);
       s.append(selo);
     }
+    if (t.aviso) {
+      const aviso = document.createElement("small");
+      aviso.className = "aviso";
+      aviso.textContent = t.aviso;
+      s.append(aviso);
+    }
     l.classList.toggle("bloqueada", Boolean(t.bloqueada));
     if (t.bloqueada) {
       l.title = t.precisaAcessibilidade

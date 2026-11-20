@@ -180,6 +180,13 @@ function pontoAleatorio() {
   return { x, y: limitarY(rand(a.y + a.h * 0.15, a.y + a.h), x) };
 }
 
+// Atividades (pegar/seguir o mouse, buscar bilhete, travessura, dançar): uma de cada vez, com
+// ~3 minutos entre uma e a próxima. O resto (andar, cochilar, acenar) continua normal.
+const INTERVALO_ATIVIDADE = 180;
+let proximaAtividade = 90; // a primeira, 1min30 depois de abrir
+const podeAtividade = () => Boolean(debug) || relogio >= proximaAtividade;
+const comecouAtividade = () => (proximaAtividade = relogio + INTERVALO_ATIVIDADE);
+
 function proximoEstado() {
   if (P.humor === "pensando") return mudar("pensando", 999);
   if (P.humor === "trabalhando") return mudar("trabalhando", 999, { alvo: { x: limitarX(P.x + rand(-40, 40)), y: P.y } });
@@ -191,7 +198,10 @@ function proximoEstado() {
   if (debug === "travessura" && config.bagunca) pedirTravessura();
   if (!config.passear || relogio < ficarAte) {
     const a = P.ancora || tela.casa;
-    if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", 5.1); // um ciclo inteiro da dança
+    if (sabeDancar() && podeAtividade() && Math.random() < CHANCE_DANCAR) {
+      comecouAtividade();
+      return mudar("dancando", 5.1); // um ciclo inteiro da dança
+    }
     if (r < 0.5) return mudar("parado", rand(3, 7));
     if (r < 0.62) return mudar("acenando", 1.6);
     if (r < 0.9) {
@@ -204,20 +214,28 @@ function proximoEstado() {
   }
 
   // sorteio separado: não pode "roubar" a faixa do r que é dos bilhetes e travessuras
-  if (pegarMouseLigado() && Math.random() < CHANCE_PEGAR) {
+  if (pegarMouseLigado() && podeAtividade() && Math.random() < CHANCE_PEGAR) {
     console.info("[mouse] vou pegar o mouse");
+    comecouAtividade();
     return mudar("perseguir", 10);
   }
-  if (seguirMouseLigado() && Math.random() < 0.08) return mudar("seguir", rand(6, 10));
-  if (config.bagunca && r >= 0.35 && r < 0.4) pedirTravessura(); // raro (e o app ainda limita a 1 a cada 3 min)
-  if (config.bagunca && (r < 0.35 || debug === "bilhete")) {
+  if (seguirMouseLigado() && podeAtividade() && Math.random() < 0.08) {
+    comecouAtividade();
+    return mudar("seguir", rand(6, 10));
+  }
+  if (config.bagunca && podeAtividade() && r >= 0.35 && r < 0.4) pedirTravessura(); // raro (e o app ainda limita a 1 a cada 3 min)
+  if (config.bagunca && ((podeAtividade() && r < 0.35) || debug === "bilhete")) {
+    comecouAtividade();
     const { min, max } = limites();
     const lado = P.x < (min + max) / 2 ? -1 : 1;
     const x = lado < 0 ? min + larguraPx() / 2 - larguraPx() * 0.6 : max - larguraPx() / 2 + larguraPx() * 0.6;
     const a = areaDe(x);
     return mudar("buscar", 20, { alvo: { x, y: limitarY(rand(a.y + 220, a.y + a.h), x) }, lado });
   }
-  if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", 5.1); // um ciclo inteiro da dança
+  if (sabeDancar() && podeAtividade() && Math.random() < CHANCE_DANCAR) {
+    comecouAtividade();
+    return mudar("dancando", 5.1); // um ciclo inteiro da dança
+  }
   if (r < 0.45) return mudar("parado", rand(2, 5));
   if (r < 0.85) return mudar("andar", 12, { alvo: pontoAleatorio() });
   if (r < 0.92) return mudar("dormindo", rand(6, 12));
@@ -234,6 +252,7 @@ async function pedirTravessura() {
   const t = await window.api.invocar("travessura:pedir").finally(() => (pedindo = false));
   if (!t || travessura || segurado || ["perseguir", "seguir", "segurando", "buscar", "arrastando"].includes(P.estado)) return;
   travessura = { ...t, tocadas: 0, apertadaAte: 0 };
+  comecouAtividade();
   falar(escolha(t.tipo === "abrir" ? ["Olha isso! 😈", "Pesquisei pra você 🌐"] : ["Hehe 😈", "Ops...", "Segura essa!"]), 2.5);
   mudar("travessura", 15);
   // um tempinho para a pessoa ver as teclas antes de ele apertar
@@ -348,14 +367,20 @@ function ponto(campo, padrao) {
     y: P.y - alturaPx() + (cy + 0.5) * pet.escala,
   };
 }
-const mao = () => ponto("mao", [tamGrade.w - 1, Math.floor(tamGrade.h * 0.6)]);
-const maoTras = () => ponto("maoTras", [2, Math.floor(tamGrade.h * 0.6)]);
+// Com o modelo 3D, o ponto que segura as coisas é a "boca" que ele informa a cada quadro
+// (bico do Pato, boca da Tartaruga, mão do Palito): ela muda de lugar quando ele gira.
+let boca3d = null; // { x, y, em }
+const boca = () => (boca3d && relogio - boca3d.em < 0.3 ? { x: boca3d.x, y: boca3d.y } : null);
+const mao = () => boca() || ponto("mao", [tamGrade.w - 1, Math.floor(tamGrade.h * 0.6)]);
+const maoTras = () => boca() || ponto("maoTras", [2, Math.floor(tamGrade.h * 0.6)]);
 
 function moverBilhete() {
   const b = P.bilhete;
   if (!b) return;
   const m = maoTras();
-  const x = P.olhando > 0 ? m.x - b.largura + 6 : m.x - 6;
+  // o papel fica do lado de fora da boca/mão (o lado oposto ao corpo dele)
+  const ladoEsq = boca() ? m.x < P.x : P.olhando > 0;
+  const x = ladoEsq ? m.x - b.largura + 8 : m.x - 8;
   window.api.enviar("bilhete:mover", { id: b.id, x, y: m.y - 24 });
 }
 
@@ -472,7 +497,12 @@ function atualizar(dt) {
         falar(escolha(["Ei! 😤", "Devolve!", "Tá bom, tá bom..."]), 2);
       }
       // corre em disparada para pontos aleatórios; chegando, escolhe outro
-      if (!puxou && andarAte(P.alvo, dt, Math.max(1, VEL_ARRASTAR / velocidade()))) P.alvo = pontoAleatorio();
+      if (!puxou) {
+        // puxa o mouse andando de costas: olha para o lado contrário de onde está indo
+        const chegou = andarAte(P.alvo, dt, Math.max(1, VEL_ARRASTAR / velocidade()), false);
+        if (Math.abs(P.alvo.x - P.x) > 2) P.olhando = P.alvo.x > P.x ? -1 : 1;
+        if (chegou) P.alvo = pontoAleatorio();
+      }
       const m = mao();
       const area = { w: tela.largura, h: tela.altura };
       P.cursorEsperado = {
@@ -497,8 +527,11 @@ function atualizar(dt) {
           if (!b || P.estado !== "parado") return proximoEstado();
           P.bilhete = b;
           P.olhando = -ladoInicial;
+          // puxa só até ~30% da tela do lado de onde veio: no meio da tela o bilhete atrapalha
           const { min, max } = limites();
-          mudar("arrastando", 20, { alvo: { x: limitarX(rand(min + (max - min) * 0.25, min + (max - min) * 0.75)), y: P.y } });
+          const a = areaDe(ladoInicial < 0 ? min : max - 1);
+          const x = ladoInicial < 0 ? rand(a.x + a.w * 0.12, a.x + a.w * 0.3) : rand(a.x + a.w * 0.7, a.x + a.w * 0.88);
+          mudar("arrastando", 20, { alvo: { x: limitarX(x), y: P.y } });
         });
       } else if (P.tempo <= 0) proximoEstado();
       return;
@@ -679,7 +712,9 @@ function desenhar3D(dt) {
       desenho: pet.desenho, anim: P.anim, estado: P.estado, t: P.tAnim, relogio, x: P.x, y: P.y,
       olhando: P.olhando, alturaPx: alturaPx(), dpr: window.devicePixelRatio || 1,
       planando: P.estado === "caindo" && P.aberto && !!window.Vida?.plana(),
+      deCostas: P.estado === "segurando" || P.estado === "arrastando", // puxando: anda de costas
     });
+    if (img?.boca) boca3d = { ...img.boca, em: relogio };
   } catch (e) {
     console.error("[3d] falhou, voltando para o 2D:", e);
     window.Pet3D = null;
@@ -794,6 +829,21 @@ window.api.ouvir("tela", (t) => {
 });
 window.api.ouvir("pet:trocar", trocarPet);
 window.api.ouvir("brinquedos:abrir", (p) => window.Vida?.abrirMenuBrinquedos(p));
+// o Windows não deixou mexer no cursor (janela de administrador na frente): solta e explica
+let avisouMouse = -999;
+window.api.ouvir("mouse:bloqueado", ({ janelaAdmin } = {}) => {
+  if (P.estado !== "segurando" && P.estado !== "perseguir") return;
+  if (relogio - avisouMouse > 120) {
+    avisouMouse = relogio;
+    falar(
+      janelaAdmin
+        ? "Não consigo puxar o mouse nessa janela: ela é de administrador. Em ⚙️ dá para me dar permissão."
+        : "Ué, o mouse não quis vir comigo... 😕",
+      5
+    );
+  }
+  mudar("parado", 2);
+});
 window.api.ouvir("pet:voltar", () => {
   P.bilhete = null;
   travessura = null;

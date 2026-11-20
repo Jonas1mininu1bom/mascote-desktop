@@ -438,6 +438,14 @@ window.Pet3D = (() => {
 
   // ---------- renderização ----------
   // Devolve { canvas, x, y, w, h } (em px de tela) para o overlay copiar, ou null se não deu.
+  // ponto do mundo 3D que segura as coisas (já com a posição/rotação deste quadro)
+  function pontoDaBoca(m) {
+    if (m.tipo === "pato") return m.bicoCima.localToWorld(new T.Vector3(0, 0, 0.9));
+    if (m.tipo === "tartaruga") return m.cabeca.localToWorld(new T.Vector3(0.03, -0.07, 0.33));
+    if (m.tipo === "palito") return m.bracos[1].localToWorld(new T.Vector3(0, -0.36, 0));
+    return null;
+  }
+
   function desenhar(s) {
     if (!MONTAR[s.desenho] || !iniciar()) return null;
     trocarModelo(s.desenho);
@@ -450,7 +458,8 @@ window.Pet3D = (() => {
       const vx = (s.x - estado.ultX) / dt;
       const vy = (s.y - estado.ultY) / dt;
       const movendo = ANDANDO[s.estado] && Math.hypot(vx, vy) > 15;
-      if (movendo) estado.alvoYaw = Math.atan2(vx, vy / ELEVACAO);
+      // puxando algo (mouse, bilhete), ele anda de costas: olha para o lado contrário do movimento
+      if (movendo) estado.alvoYaw = Math.atan2(vx, vy / ELEVACAO) + (s.deCostas ? Math.PI : 0);
       else if (!ANDANDO[s.estado] && s.anim !== "caindo") estado.alvoYaw = s.olhando > 0 ? 0.75 : -0.75;
     }
     estado.ultX = s.x;
@@ -488,7 +497,16 @@ window.Pet3D = (() => {
     camera.updateProjectionMatrix();
     renderer.render(cena, camera);
     // a origem (pés) cai em y = 82% da imagem, no meio da largura
-    return { canvas: renderer.domElement, x: s.x - larg / 2, y: s.y - alt * 0.82, w: larg, h: alt, topo: s.y - s.alturaPx };
+    const x0 = s.x - larg / 2, y0 = s.y - alt * 0.82;
+    // onde fica a "boca" na tela (bico do Pato, boca da Tartaruga, mão do Palito): é com ela que ele
+    // morde/segura o mouse e os bilhetes. Muda com o ângulo, então é calculada a cada quadro.
+    const p = pontoDaBoca(modelo);
+    let boca = null;
+    if (p) {
+      p.project(camera);
+      boca = { x: x0 + ((p.x + 1) / 2) * larg, y: y0 + ((1 - p.y) / 2) * alt };
+    }
+    return { canvas: renderer.domElement, x: x0, y: y0, w: larg, h: alt, topo: s.y - s.alturaPx, boca };
   }
 
   return { tem: (d) => !!MONTAR[d], desenhar };

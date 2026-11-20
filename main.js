@@ -129,6 +129,7 @@ let chatAberto = false;
 let escondido = false; // minimizado para a bandeja: pet, chat e bilhetes somem e o pet não apronta nada
 let avisouBandeja = false;
 const bilhetes = new Map();
+const LIMITE_BILHETES = 50; // passou disso, o mais antigo sai (eles ficam na tela até a pessoa fechar)
 let proxIdBilhete = 1;
 const MARGEM = 16;
 const BOTAO = 64;
@@ -264,6 +265,7 @@ const naoFocavel = { focusable: false, skipTaskbar: true, hasShadow: false };
 
 function criarOverlay() {
   overlay = new BrowserWindow({
+    icon: ICONE_APP,
     ...areaTotal(),
     ...naoFocavel,
     transparent: true,
@@ -295,6 +297,7 @@ function criarOverlay() {
 
 function criarChat() {
   chat = new BrowserWindow({
+    icon: ICONE_APP,
     ...boundsChat(false),
     transparent: true,
     frame: false,
@@ -422,9 +425,15 @@ function iniciarCursor() {
 // ---------- bandeja ----------
 // A barra de menus do Mac é baixinha (ícones de 18 pontos); Windows e Linux usam 32 e reduzem sozinhos.
 const LADO_BANDEJA = process.platform === "darwin" ? 18 : 32;
+// Ícone do app (o Pato 3D): bandeja e janelas.
+const ICONE_APP = path.join(__dirname, "assets", process.platform === "win32" ? "icone.ico" : "icone.png");
 function iconeBandeja() {
   const pet = petAtual();
   try {
+    if (pet.desenho) {
+      // pets do app são 3D: na bandeja vai o ícone do app (a pixel art antiga não combina mais)
+      return nativeImage.createFromPath(path.join(__dirname, "assets", "icone.png")).resize({ width: LADO_BANDEJA, height: LADO_BANDEJA, quality: "best" });
+    }
     if (pet.tipo === "pixel") {
       // A bandeja do Windows espera um ícone quadrado: centraliza o boneco num quadrado transparente.
       const { buf, w, h } = quadroParaBitmap(pet, pet.animacoes.parado.quadros[0], 2);
@@ -505,6 +514,7 @@ function criarBilhete({ x, y }) {
   const id = proxIdBilhete++;
   const o = areaTotal();
   const w = new BrowserWindow({
+    icon: ICONE_APP,
     x: Math.round(o.x + x),
     y: Math.round(o.y + y),
     width: 240,
@@ -542,6 +552,8 @@ const conversa = new provedores.Conversa({ pegarConfig: () => config.ia, cofre: 
 const pedidosPermissao = new Map();
 let proxPermissao = 1;
 
+let falhasCursor = 0;
+
 function registrarIpc() {
   const on = (canal, fn) => ipcMain.on(canal, (e, ...a) => origemConfiavel(e) && fn(e, ...a));
   const handle = (canal, fn) => ipcMain.handle(canal, (e, ...a) => (origemConfiavel(e) ? fn(e, ...a) : null));
@@ -550,17 +562,28 @@ function registrarIpc() {
   on("pet:moverCursor", (_e, { x, y } = {}) => {
     if (escondido || !config.bagunca || config.travessuras?.["pegar-mouse"] === false || !num(x) || !num(y)) return;
     const o = areaTotal();
-    require("./src/cursor").moverCursor(o.x + x, o.y + y);
+    const alvo = { x: Math.round(o.x + x), y: Math.round(o.y + y) };
+    require("./src/cursor").moverCursor(alvo.x, alvo.y);
+    // O Windows ignora o pedido, sem dar erro, quando a janela da frente é de administrador e o app não é.
+    // Se o cursor não for para onde mandamos várias vezes seguidas, o pet solta e explica o porquê.
+    const p = screen.getCursorScreenPoint();
+    falhasCursor = Math.hypot(p.x - alvo.x, p.y - alvo.y) > 4 ? falhasCursor + 1 : 0;
+    if (falhasCursor >= 5) {
+      falhasCursor = 0;
+      const janelaAdmin = process.platform === "win32" && !admin.ehAdmin() && admin.janelaDaFrenteEhAdmin();
+      log("main", "info", "[mouse] o cursor não obedeceu", janelaAdmin ? "(janela de administrador na frente)" : "");
+      overlay?.webContents.send("mouse:bloqueado", { janelaAdmin });
+    }
   });
   handle("bilhete:criar", (_e, dados) => {
     if (escondido || !config.bagunca || !dados || !num(dados.x) || !num(dados.y)) return null;
     // No máximo 5 na tela: o mais antigo sai para dar lugar ao novo (antes ele parava de trazer,
     // e bilhetes "perdidos", fora da vista, travavam tudo).
-    if (bilhetes.size >= 5) {
+    if (bilhetes.size >= LIMITE_BILHETES) {
       const [idAntigo, antigo] = bilhetes.entries().next().value;
       bilhetes.delete(idAntigo);
       if (!antigo.isDestroyed()) antigo.close();
-      log("main", "info", "bilhete: já tinha 5, fechei o mais antigo");
+      log("main", "info", `bilhete: já tinha ${LIMITE_BILHETES}, fechei o mais antigo`);
     }
     log("main", "info", `bilhete: trazendo um novo (${bilhetes.size + 1} na tela)`);
     return criarBilhete(dados);
@@ -588,7 +611,13 @@ function registrarIpc() {
   // Travessuras "do pet" (ele mesmo faz, não passam pelo sorteio daqui), mas ligam/desligam igual às outras.
   // padrao: como vem quando a pessoa nunca mexeu. admin: só pode ligar com o app rodando como administrador.
   const DO_PET = [
-    { id: "pegar-mouse", nome: "Pegar o mouse", tipo: "mouse", padrao: true, precisa: () => require("./src/cursor").disponivel() },
+    {
+      id: "pegar-mouse", nome: "Pegar o mouse", tipo: "mouse", padrao: true, precisa: () => require("./src/cursor").disponivel(),
+      aviso: () =>
+        process.platform === "win32" && !admin.ehAdmin()
+          ? "Sem permissão de administrador, ele não consegue puxar o mouse quando uma janela de administrador está na frente."
+          : null,
+    },
     { id: "seguir-mouse", nome: "Seguir o mouse", tipo: "seguir", padrao: false },
     { id: "admin-janelas", nome: "Também em janelas de administrador", tipo: "admin", padrao: false, admin: true, precisa: () => travessuras.teclasDisponiveis() && admin.disponivel() },
   ];
@@ -613,6 +642,7 @@ function registrarIpc() {
       precisaAcessibilidade: t.tipo === "teclas" && plataforma.MAC,
       bloqueada: Boolean(bloqueio(t)),
       selo: bloqueio(t) || (t.admin ? "admin" : null),
+      aviso: t.aviso?.() || null,
     }))
   );
   on("travessuras:ligar", (_e, { id, ligada: valor } = {}) => {

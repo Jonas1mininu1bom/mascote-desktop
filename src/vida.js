@@ -210,10 +210,12 @@ window.Vida = (() => {
         falar("Tá bom... te perdoo 😌", 2.5);
       } else falar(escolha(["Nham! Valeu! 😋", "Delícia!", "Barriga cheia ❤"]), 2.2);
       coracao(6);
-      mudar("feliz", 1.6);
+      if (bola) mudar("brincando", 15); // a bola continua em campo: volta para o jogo
+      else mudar("feliz", 1.6);
     } else if (P.tempo <= 0) {
       comida = null;
-      mudar("parado", 1);
+      if (bola) mudar("brincando", 15);
+      else mudar("parado", 1);
     }
   }
 
@@ -231,7 +233,7 @@ window.Vida = (() => {
     }
     const x = limitarX(P.x + (P.olhando || 1) * 70);
     const y = noChao() ? P.y - alturaPx() - 60 : P.y - R_BOLA; // na barra ela cai do alto; na tela, aparece nos pés dele
-    bola = { x, y, vx: 0, vy: 0, giro: 0, r: R_BOLA, chutePet: 0 };
+    bola = { x, y, vx: 0, vy: 0, giro: 0, r: R_BOLA, chutePet: 0, jogou: relogio };
     falar(escolha(["Bola! ⚽", "Vamos jogar!", "Chuta pra mim!"]), 1.8);
     mudar("brincando", 15);
   }
@@ -245,7 +247,8 @@ window.Vida = (() => {
     else [dx, dy] = [dx / d, dy / d];
     bola.vx = dx * 780;
     bola.vy = dy * 780 - (noChao() ? 160 : 0); // na barra, um pouco de "levantada", como num chute
-    P.tempo = Math.max(P.tempo, 15); // você está jogando: ele continua
+    if (P.estado === "brincando") P.tempo = Math.max(P.tempo, 15); // você está jogando: ele continua
+    else if (ocioso()) mudar("brincando", 15); // ele tinha parado: volta a jogar
     if (debug) console.warn(`[debug] chute seu: vx=${Math.round(bola.vx)} vy=${Math.round(bola.vy)}`);
     if (Math.random() < 0.35) falar(escolha(["Uau, que chute!", "Lá vou eu!", "Essa é minha!"]), 1.4);
     return true;
@@ -280,8 +283,9 @@ window.Vida = (() => {
       bola.vy = -bola.vy * 0.75;
     }
   }
-  function atualizarBola(dt) {
-    if (!bola) return mudar("parado", 1);
+  // Física da bola: roda sempre que tem bola em campo, mesmo se o pet estiver fazendo outra coisa
+  // (antes, dar comida no meio do jogo congelava a bola no ar para sempre).
+  function fisicaBola(dt) {
     if (debug && relogio - (bola.log || 0) > 0.15) {
       bola.log = relogio;
       console.warn(`[debug] bola ${Math.round(bola.x)},${Math.round(bola.y)}`);
@@ -295,6 +299,11 @@ window.Vida = (() => {
       bola.x = Math.max(min + bola.r, Math.min(max - bola.r, bola.x));
       bola.vx = -bola.vx * 0.7;
     }
+  }
+  function atualizarBola(dt) {
+    if (!bola) return mudar("parado", 1);
+    bola.jogou = relogio;
+    const naBarra = noChao();
     // o pet corre atrás e chuta de volta na direção do seu mouse
     const alcance = naBarra
       ? Math.abs(bola.x - P.x) < larguraPx() / 2 + bola.r && bola.y > chaoDe(bola.x) - alturaPx() * 0.8
@@ -332,6 +341,11 @@ window.Vida = (() => {
     if (fome > 70 && ocioso() && relogio - ultimaQueixa > 90) {
       ultimaQueixa = relogio;
       falar(escolha(["Tô com fome... 🍽️", "Minha barriga roncou...", "Me dá comida? (botão direito em mim)"]), 3);
+    }
+    if (bola) {
+      fisicaBola(dt);
+      // ficou 20 s fora do jogo (foi arrastado, caiu, ficou tonto...): a bola vai embora
+      if (P.estado !== "brincando" && P.estado !== "comendo" && relogio - bola.jogou > 20) bola = null;
     }
     switch (P.estado) {
       case "caindo":
