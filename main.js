@@ -266,6 +266,19 @@ function criarChat() {
   chat.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   chat.loadFile(path.join(__dirname, "src/chat.html"));
   vigiar("chat", chat);
+  // se a página do chat cair, carrega de novo (senão a janela fica vazia e o botão some/não responde).
+  // Pedidos de permissão pendentes são negados: quem ia responder era a página que caiu.
+  chat.webContents.on("render-process-gone", () => {
+    for (const responder of pedidosPermissao.values()) responder(false);
+    pedidosPermissao.clear();
+    setTimeout(() => {
+      if (!chat || chat.isDestroyed()) return;
+      chatAberto = false;
+      chat.setBounds(boundsChat(false));
+      chat.webContents.reload();
+      log("chat", "warning", "chat recarregado depois de cair");
+    }, 1000);
+  });
 }
 
 function abrirChat(aberto) {
