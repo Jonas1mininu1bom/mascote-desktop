@@ -166,6 +166,7 @@ function estado(ia, cofre) {
         modeloPadrao: p.modelo || "",
         endereco: e.endereco,
         enderecoPadrao: p.endereco || "",
+        enderecoLivre: Boolean(p.enderecoLivre), // só Ollama e "Outra" mostram o campo de endereço
       };
     }),
   };

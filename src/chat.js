@@ -382,6 +382,7 @@ function mostrarIa(estado) {
   $("iaModelo").value = p.modelo;
   $("iaModelo").placeholder = p.modeloPadrao || "nome do modelo";
   $("iaListaModelos").replaceChildren();
+  $("iaLinhaEndereco").hidden = !p.enderecoLivre; // Gemini/OpenAI/OpenRouter: endereço oficial, fixo
   $("iaEndereco").value = p.endereco;
   $("iaEndereco").placeholder = p.enderecoPadrao;
   $("iaLinhaChave").hidden = p.chave === "nao";
