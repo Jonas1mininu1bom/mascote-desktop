@@ -561,6 +561,8 @@ function desenhar(dt) {
   ctx.clearRect(0, 0, tela.largura, tela.altura);
   if (!sprites.parado) return;
 
+  const vetor = pet.desenho && window.Vetor?.[pet.desenho];
+  if (vetor) return desenharVetor(vetor, dt);
   const nome = animacao(P.anim);
   const quadros = sprites[nome];
   const fps = pet.animacoes[nome]?.fps || 4;
@@ -578,7 +580,10 @@ function desenhar(dt) {
   ctx.fill();
   ctx.drawImage(img, dx, dy);
 
-  const topo = dy;
+  desenharExtras(dy, dt);
+}
+
+function desenharExtras(topo, dt) {
   desenharTeclas(topo);
   if (P.estado === "dormindo") {
     ctx.font = "bold 14px system-ui, sans-serif";
@@ -604,6 +609,27 @@ function desenhar(dt) {
     ctx.fillText("♥", c.x, c.y);
   }
   ctx.globalAlpha = 1;
+}
+
+// Pets com "desenho": formas vetoriais suaves (vetor.js) em vez de pixel art.
+function desenharVetor(vetor, dt) {
+  const w = larguraPx();
+  const h = alturaPx();
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.translate(Math.round(P.x - w / 2), Math.round(P.y - h));
+  if (P.olhando < 0) {
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
+  }
+  try {
+    vetor(ctx, { w, h, anim: P.anim, t: P.tAnim, relogio });
+  } catch (e) {
+    console.error("[vetor] falhou, voltando para a pixel art:", e);
+    pet.desenho = null;
+  }
+  ctx.restore();
+  desenharExtras(Math.round(P.y - h), dt);
 }
 
 function ajustarCanvas() {
