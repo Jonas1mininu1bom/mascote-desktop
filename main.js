@@ -1,0 +1,318 @@
+// Mascote Desktop: processo principal do Electron.
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, dialog, globalShortcut } = require("electron");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { listarPets, quadroParaBitmap } = require("./src/pets");
+const { ChatClaude } = require("./src/claude");
+
+if (process.platform === "linux") app.commandLine.appendSwitch("enable-transparent-visuals");
+if (!app.requestSingleInstanceLock()) app.quit();
+
+// ---------- configuração ----------
+const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir() };
+let config = { ...PADRAO };
+const arqConfig = () => path.join(app.getPath("userData"), "config.json");
+const pastaPetsUsuario = () => path.join(app.getPath("userData"), "pets");
+
+function carregarConfig() {
+  try {
+    config = { ...PADRAO, ...JSON.parse(fs.readFileSync(arqConfig(), "utf8")) };
+  } catch {
+    config = { ...PADRAO };
+  }
+  if (!fs.existsSync(config.pasta)) config.pasta = os.homedir();
+}
+function salvarConfig() {
+  fs.mkdirSync(path.dirname(arqConfig()), { recursive: true });
+  fs.writeFileSync(arqConfig(), JSON.stringify(config, null, 2));
+}
+
+// ---------- pets ----------
+let pets = [];
+const petAtual = () => pets.find((p) => p.id === config.pet) || pets.find((p) => p.id === "palito") || pets[0];
+function recarregarPets() {
+  fs.mkdirSync(pastaPetsUsuario(), { recursive: true });
+  pets = listarPets([path.join(__dirname, "pets"), pastaPetsUsuario()]);
+}
+
+// ---------- janelas ----------
+let overlay = null; // tela inteira, transparente, onde o pet vive
+let chat = null; // botão/painel de chat fixo no canto
+let tray = null;
+let chatAberto = false;
+const bilhetes = new Map();
+let proxIdBilhete = 1;
+const MARGEM = 16;
+const BOTAO = 64;
+const PAINEL = { w: 360, h: 520 };
+
+const tela = () => screen.getPrimaryDisplay();
+
+function boundsChat(aberto) {
+  const wa = tela().workArea;
+  const w = aberto ? PAINEL.w : BOTAO;
+  const h = aberto ? PAINEL.h : BOTAO;
+  return { x: wa.x + wa.width - w - MARGEM, y: wa.y + wa.height - h - MARGEM, width: w, height: h };
+}
+
+// Informações da tela no sistema de coordenadas do overlay.
+function infoTela() {
+  const d = tela();
+  const o = d.bounds;
+  const wa = d.workArea;
+  const b = boundsChat(false);
+  return {
+    largura: o.width,
+    altura: o.height,
+    area: { x: wa.x - o.x, y: wa.y - o.y, w: wa.width, h: wa.height },
+    // o pet nasce (e mora) ao lado do botão de chat
+    casa: { x: b.x - o.x - 40, y: wa.y - o.y + wa.height - 6 },
+  };
+}
+
+const naoFocavel = { focusable: false, skipTaskbar: true, hasShadow: false };
+
+function criarOverlay() {
+  const { bounds } = tela();
+  overlay = new BrowserWindow({
+    ...bounds,
+    ...naoFocavel,
+    transparent: true,
+    frame: false,
+    resizable: false,
+    movable: false,
+    alwaysOnTop: true,
+    backgroundColor: "#00000000",
+    webPreferences: { preload: path.join(__dirname, "src/preload.js") },
+  });
+  overlay.setAlwaysOnTop(true, "screen-saver");
+  overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  overlay.setIgnoreMouseEvents(true, { forward: true });
+  overlay.loadFile(path.join(__dirname, "src/overlay.html"));
+}
+
+function criarChat() {
+  chat = new BrowserWindow({
+    ...boundsChat(false),
+    transparent: true,
+    frame: false,
+    resizable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    alwaysOnTop: true,
+    backgroundColor: "#00000000",
+    webPreferences: { preload: path.join(__dirname, "src/preload.js") },
+  });
+  chat.setAlwaysOnTop(true, "screen-saver");
+  chat.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  chat.loadFile(path.join(__dirname, "src/chat.html"));
+}
+
+function abrirChat(aberto) {
+  chatAberto = aberto;
+  chat.setBounds(boundsChat(aberto));
+  chat.webContents.send("chat:estado", aberto);
+  // o pet anda para o lado do chat, para não ficar escondido atrás dele
+  overlay?.webContents.send("chat:estado", { aberto, esquerda: boundsChat(aberto).x - tela().bounds.x });
+  if (aberto) chat.focus();
+}
+
+function enviarParaTodos(canal, dados) {
+  for (const w of [overlay, chat]) if (w && !w.isDestroyed()) w.webContents.send(canal, dados);
+}
+
+// Envia a posição do mouse para o overlay (~60 vezes por segundo).
+function iniciarCursor() {
+  setInterval(() => {
+    if (!overlay || overlay.isDestroyed()) return;
+    const p = screen.getCursorScreenPoint();
+    const o = tela().bounds;
+    overlay.webContents.send("cursor", { x: p.x - o.x, y: p.y - o.y });
+  }, 16);
+}
+
+// ---------- bandeja ----------
+function iconeBandeja() {
+  const pet = petAtual();
+  try {
+    if (pet.tipo === "pixel") {
+      const { buf, w, h } = quadroParaBitmap(pet, pet.animacoes.parado.quadros[0], 1);
+      return nativeImage.createFromBitmap(buf, { width: w, height: h }).resize({ height: 22 });
+    }
+    return nativeImage.createFromPath(new URL(pet.animacoes.parado.quadros[0]).pathname).resize({ height: 22 });
+  } catch {
+    return nativeImage.createEmpty();
+  }
+}
+
+function montarBandeja() {
+  const menu = Menu.buildFromTemplate([
+    { label: `${petAtual().nome} 🐾`, enabled: false },
+    { label: "Abrir o chat", click: () => abrirChat(true) },
+    { label: "Chamar o pet de volta", click: () => overlay.webContents.send("pet:voltar") },
+    { type: "separator" },
+    { label: "Passear pela tela", type: "checkbox", checked: config.passear, click: (i) => mudarConfig({ passear: i.checked }) },
+    { label: "Modo bagunça (pega o mouse, traz bilhetes)", type: "checkbox", checked: config.bagunca, click: (i) => mudarConfig({ bagunca: i.checked }) },
+    { type: "separator" },
+    {
+      label: "Escolher pet",
+      submenu: pets.map((p) => ({ label: p.nome, type: "radio", checked: p.id === petAtual().id, click: () => escolherPet(p.id) })),
+    },
+    { label: "Abrir pasta de pets…", click: () => shell.openPath(pastaPetsUsuario()) },
+    { label: "Recarregar pets", click: () => escolherPet(config.pet) },
+    { type: "separator" },
+    { label: "Sair", click: () => app.quit() },
+  ]);
+  try {
+    if (!tray) tray = new Tray(iconeBandeja());
+    else tray.setImage(iconeBandeja());
+    tray.setToolTip("Mascote Desktop");
+    tray.setContextMenu(menu);
+  } catch (e) {
+    console.warn("[bandeja] indisponível:", e.message);
+  }
+}
+
+function mudarConfig(parcial) {
+  config = { ...config, ...parcial };
+  if (!config.passear) config.bagunca = false; // bagunça precisa que ele possa andar
+  if (parcial.bagunca) config.passear = true;
+  salvarConfig();
+  enviarParaTodos("config", config);
+  montarBandeja();
+}
+
+function escolherPet(id) {
+  recarregarPets();
+  mudarConfig({ pet: id });
+  enviarParaTodos("pet:trocar", petAtual());
+}
+
+// ---------- bilhetes ----------
+function criarBilhete({ x, y, conteudo }) {
+  const id = proxIdBilhete++;
+  const o = tela().bounds;
+  const w = new BrowserWindow({
+    x: Math.round(o.x + x),
+    y: Math.round(o.y + y),
+    width: 240,
+    height: 150,
+    frame: false,
+    resizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    webPreferences: { preload: path.join(__dirname, "src/preload.js") },
+  });
+  w.setAlwaysOnTop(true, "floating");
+  w.loadFile(path.join(__dirname, "src/bilhete.html"), { query: { dados: JSON.stringify(conteudo || {}) } });
+  w.once("ready-to-show", () => w.showInactive());
+  w.on("closed", () => {
+    bilhetes.delete(id);
+    overlay?.webContents.send("bilhete:fechado", id);
+  });
+  bilhetes.set(id, w);
+  return { id, largura: 240, altura: 150 };
+}
+
+// ---------- IPC ----------
+const conversa = new ChatClaude();
+const pedidosPermissao = new Map();
+let proxPermissao = 1;
+
+function registrarIpc() {
+  ipcMain.handle("inicio", () => ({ pet: petAtual(), config, tela: infoTela(), mouseNativo: require("./src/cursor").disponivel() }));
+  ipcMain.on("pet:ignorar", (_e, ignorar) => overlay?.setIgnoreMouseEvents(ignorar, { forward: true }));
+  ipcMain.on("pet:moverCursor", (_e, { x, y }) => {
+    if (!config.bagunca) return;
+    const o = tela().bounds;
+    require("./src/cursor").moverCursor(o.x + x, o.y + y);
+  });
+  ipcMain.handle("bilhete:criar", (_e, dados) => (config.bagunca && bilhetes.size < 5 ? criarBilhete(dados) : null));
+  ipcMain.on("bilhete:mover", (_e, { id, x, y }) => {
+    const w = bilhetes.get(id);
+    const o = tela().bounds;
+    if (w && !w.isDestroyed()) w.setPosition(Math.round(o.x + x), Math.round(o.y + y));
+  });
+  ipcMain.on("bilhete:fechar", (e) => BrowserWindow.fromWebContents(e.sender)?.close());
+
+  ipcMain.on("config:mudar", (_e, parcial) => mudarConfig(parcial));
+  ipcMain.handle("pets:listar", () => pets.map((p) => ({ id: p.id, nome: p.nome })));
+  ipcMain.on("pets:escolher", (_e, id) => escolherPet(id));
+  ipcMain.on("pets:abrirPasta", () => shell.openPath(pastaPetsUsuario()));
+  ipcMain.on("pet:voltar", () => overlay?.webContents.send("pet:voltar"));
+  ipcMain.on("app:sair", () => app.quit());
+
+  ipcMain.on("chat:abrir", (_e, aberto) => abrirChat(aberto));
+  ipcMain.handle("chat:escolherPasta", async () => {
+    const r = await dialog.showOpenDialog(chat, { properties: ["openDirectory"], defaultPath: config.pasta });
+    if (!r.canceled && r.filePaths[0]) {
+      mudarConfig({ pasta: r.filePaths[0] });
+      conversa.novaConversa();
+    }
+    return config.pasta;
+  });
+  ipcMain.on("chat:nova", () => conversa.novaConversa());
+  ipcMain.on("chat:parar", () => conversa.parar());
+  ipcMain.on("chat:responderPermissao", (_e, { id, ok }) => {
+    pedidosPermissao.get(id)?.(ok);
+    pedidosPermissao.delete(id);
+  });
+  ipcMain.on("chat:enviar", (_e, texto) => {
+    const pet = petAtual();
+    const humor = (h) => overlay?.webContents.send("pet:humor", h);
+    humor("pensando");
+    conversa.enviar(
+      texto,
+      { pasta: config.pasta, nomePet: pet.nome, personalidade: pet.personalidade },
+      {
+        texto: (t) => {
+          chat.webContents.send("chat:texto", t);
+          humor("falando");
+        },
+        ferramenta: (r) => {
+          chat.webContents.send("chat:ferramenta", r);
+          humor("trabalhando");
+        },
+        permissao: (dados) =>
+          new Promise((resolve) => {
+            const id = proxPermissao++;
+            pedidosPermissao.set(id, resolve);
+            if (!chatAberto) abrirChat(true);
+            chat.webContents.send("chat:permissao", { id, ...dados });
+            humor("pensando");
+          }),
+        erro: (m) => chat.webContents.send("chat:erro", m),
+        fim: () => {
+          chat.webContents.send("chat:fim");
+          humor("feliz");
+        },
+      }
+    );
+  });
+}
+
+// ---------- início ----------
+app.whenReady().then(() => {
+  carregarConfig();
+  recarregarPets();
+  if (pets.length === 0) {
+    dialog.showErrorBox("Mascote Desktop", "Nenhum pet encontrado na pasta pets/.");
+    return app.quit();
+  }
+  registrarIpc();
+  criarOverlay();
+  criarChat();
+  montarBandeja();
+  iniciarCursor();
+  globalShortcut.register("CommandOrControl+Alt+Shift+Q", () => app.quit());
+  screen.on("display-metrics-changed", () => {
+    overlay?.setBounds(tela().bounds);
+    chat?.setBounds(boundsChat(chatAberto));
+    overlay?.webContents.send("tela", infoTela());
+  });
+});
+
+app.on("will-quit", () => globalShortcut.unregisterAll());
+app.on("window-all-closed", () => app.quit());
