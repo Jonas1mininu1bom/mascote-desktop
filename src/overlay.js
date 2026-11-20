@@ -28,10 +28,9 @@ const alturaPx = () => tamGrade.h * pet.escala;
 const velocidade = () => pet.velocidade * 60; // pixels por segundo
 const VEL_PERSEGUIR = 900; // px/s correndo atrás do mouse
 const RAIO_PEGAR = 26; // distância da mão até o mouse para "pegar"
-// Pegar o mouse no estilo do Desktop Goose: guarda a distância mão→mouse na hora da mordida,
-// corre em disparada levando o mouse junto, e solta se a pessoa puxar o mouse com força.
+// Pegar o mouse: morde o cursor, guarda a distância boca→mouse e corre levando o mouse junto.
+// O pet manda: mesmo que a pessoa mexa o mouse, ele segura até o tempo da pegada acabar.
 const VEL_ARRASTAR = 560; // px/s em disparada com o mouse
-const RAIO_SOLTAR = 200; // se o mouse ficar mais longe que isso do lugar esperado, a pessoa ganhou
 const CHANCE_PEGAR = 0.1; // chance, a cada decisão no modo bagunça, de ir atrás do mouse
 const VEL_VOLTAR = 450; // px/s voltando para casa
 let ficarAte = 0; // depois de "chamar de volta", fica em casa até este tempo (relógio)
@@ -490,27 +489,19 @@ function atualizar(dt) {
       return;
     }
     case "segurando": {
-      // a pessoa puxou o mouse para longe (mais forte que o pet): ele solta
-      const puxou = Math.hypot(cursor.x - P.cursorEsperado.x, cursor.y - P.cursorEsperado.y) > RAIO_SOLTAR;
-      if (puxou) {
-        console.info("[mouse] a pessoa puxou o mouse de volta");
-        falar(escolha(["Ei! 😤", "Devolve!", "Tá bom, tá bom..."]), 2);
-      }
-      // corre em disparada para pontos aleatórios; chegando, escolhe outro
-      if (!puxou) {
-        // puxa o mouse andando de costas: olha para o lado contrário de onde está indo
-        const chegou = andarAte(P.alvo, dt, Math.max(1, VEL_ARRASTAR / velocidade()), false);
-        if (Math.abs(P.alvo.x - P.x) > 2) P.olhando = P.alvo.x > P.x ? -1 : 1;
-        if (chegou) P.alvo = pontoAleatorio();
-      }
+      // corre em disparada para pontos aleatórios, puxando o mouse andando de costas
+      // (mesmo que a pessoa mexa o mouse: a cada quadro ele volta para a boca do pet)
+      const chegou = andarAte(P.alvo, dt, Math.max(1, VEL_ARRASTAR / velocidade()), false);
+      if (Math.abs(P.alvo.x - P.x) > 2) P.olhando = P.alvo.x > P.x ? -1 : 1;
+      if (chegou) P.alvo = pontoAleatorio();
       const m = mao();
       const area = { w: tela.largura, h: tela.altura };
       P.cursorEsperado = {
         x: Math.max(0, Math.min(area.w - 1, m.x + P.offset.x)),
         y: Math.max(0, Math.min(area.h - 1, m.y + P.offset.y)),
       };
-      if (!puxou) window.api.enviar("pet:moverCursor", P.cursorEsperado);
-      if (puxou || P.tempo <= 0 || !pegarMouseLigado()) {
+      window.api.enviar("pet:moverCursor", P.cursorEsperado);
+      if (P.tempo <= 0 || !pegarMouseLigado()) {
         P.x = limitarX(P.x);
         if (window.Vida?.precisaCair()) return Vida.cair();
         mudar("feliz", 1.2);

@@ -110,7 +110,7 @@ ao entrar no Mac"; no Linux, "Iniciar com o Linux").
 | Fechar | Botão **X** no topo do chat, ⚙️ → Fechar o app, a bandeja, ou **Ctrl+Alt+Shift+Q** (no Mac, **Cmd+Option+Shift+Q**) |
 | Abrir de novo | Atalho **Mascote Desktop** (se já estiver aberto, ele volta da bandeja e abre o chat) |
 
-Quando o pet rouba o seu mouse no modo bagunça, puxe o mouse com força para longe que ele solta.
+Quando o pet rouba o seu mouse no modo bagunça, não adianta puxar: ele segura até cansar (alguns segundos).
 
 ### Imagens no chat
 
@@ -185,8 +185,8 @@ e edite o `travessuras.json`:
   administrador.
 
 Além dessas, há duas que o próprio pet faz: **Seguir o mouse** (vai atrás do cursor sem pegar) e
-**Pegar o mouse**, que imita o Desktop Goose. Ele morde o cursor, corre segurando e solta se você
-puxar com força.
+**Pegar o mouse**: ele morde o cursor e sai correndo de costas, puxando. Não adianta puxar de volta:
+ele só solta quando cansa.
 
 ### Permissão de administrador (opcional)
 
