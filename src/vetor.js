@@ -499,8 +499,8 @@
 
 
   // ---------- Pato 3D ----------
-  // Pato gordinho de óculos escuros, com a mesma luz/volume do Palito 3D. Tem a "dancinha":
-  // balança de um lado para o outro no ritmo, quica, bate as asas alternadas e mexe a cabeça.
+  // Pato gordinho de óculos escuros, com a mesma luz/volume do Palito 3D, gingado de pato no
+  // andar e uma dancinha (desfile, volta no lugar e rebolado de asas abertas).
   function pato3d(g, s) {
     const { w, h } = s;
     const r = ritmo(s);
@@ -508,45 +508,98 @@
     g.scale(w / 64, h / 64);
     const danca = s.anim === "dancando";
     const plana = !!s.planando; // caindo com as asas abertas (no lugar do paraquedas)
-    const fase = s.t * TAU * 2; // 2 batidas por segundo
-    const lado = danca ? Math.sin(fase / 2) : 0; // -1..1, um passo para cada lado por batida
-    const quica = danca ? Math.abs(Math.sin(fase)) * 3.2 : 0;
+    const andando = !danca && !plana && r.anda > 0;
+
+    // ---- pose do momento ----
+    // A dança segue o vídeo de referência em 3 partes (ciclo de 5,1 s):
+    //  1) desfile: passos marcados levantando bem os pés, asas um pouco abertas;
+    //  2) dá uma volta no lugar (gira) sem parar de marchar;
+    //  3) rebola de um lado para o outro com as asas abertas e a cabeça inclinando.
+    // O andar é um gingado de pato: o corpo rola para o lado do pé que está no chão e o
+    // pé que sobe vai para trás mostrando a sola.
+    const pose = { lado: 0, rot: 0, giro: 1, quica: 0, asaFrente: null, asaTras: null, inclina: 0, bob: 0, pes: {} };
+    const T = danca ? s.t % 5.1 : 0;
+    const marchar = (freq, alto) => {
+      const p = Math.sin(T * TAU * freq);
+      pose.rot = p * 0.1 + 0.05;
+      pose.quica = Math.abs(p) * 1.5;
+      for (const ld of [-1, 1]) {
+        const sobe = Math.max(0, p * ld);
+        pose.pes[ld] = { levanta: sobe * alto, anda: p * ld * 3.5, ang: -sobe * 0.5 };
+      }
+      const bate = Math.sin(T * TAU * freq * 2);
+      pose.asaFrente = 0.45 + bate * 0.2;
+      pose.asaTras = -0.45 - bate * 0.2;
+      pose.bob = Math.sin(T * TAU * freq * 2 + 0.6) * 1.4;
+    };
+    if (danca && T < 2.6) {
+      marchar(1.25, 8);
+      if (T >= 1.6) pose.giro = Math.cos(((T - 1.6) / 1.0) * TAU); // uma volta inteira
+    } else if (danca) {
+      const lado = Math.sin((T - 2.6) * TAU);
+      pose.lado = lado;
+      pose.rot = lado * 0.15;
+      pose.quica = Math.abs(Math.sin((T - 2.6) * TAU * 2)) * 2.4;
+      const flap = Math.sin(T * TAU * 3) * 0.22;
+      pose.asaFrente = 1.15 + flap + Math.max(0, lado) * 0.3;
+      pose.asaTras = -0.85 - flap - Math.max(0, -lado) * 0.3;
+      pose.inclina = -lado * 0.22;
+      pose.bob = Math.sin((T - 2.6) * TAU * 2 + 0.6) * 1.6;
+      for (const ld of [-1, 1]) pose.pes[ld] = { levanta: Math.max(0, -lado * ld) * 2.5, anda: lado * 2, ang: 0 };
+    } else if (andando) {
+      pose.rot = r.passo * 0.12;
+      for (const ld of [-1, 1]) {
+        const sobe = Math.max(0, -r.passo * ld);
+        pose.pes[ld] = { levanta: sobe * 5.5, anda: r.passo * 5 * ld, ang: sobe * 0.7 };
+      }
+    }
+    const lado = pose.lado;
+    const quica = pose.quica;
     const sobe = -r.quique - r.pulo - quica;
-    sombra3d(g, 32 + lado * 2, 62.5, 19, -sobe + (s.anim === "caindo" ? 30 : 0));
+    sombra3d(g, 32 + lado * 2, 62.5, 19 * (0.75 + 0.25 * Math.abs(pose.giro)), -sobe + (s.anim === "caindo" ? 30 : 0));
+    // girando: espelha tudo em volta do meio (fica fininho no meio da volta)
+    g.translate(32, 0);
+    g.scale(Math.abs(pose.giro) < 0.12 ? 0.12 * Math.sign(pose.giro || 1) : pose.giro, 1);
+    g.translate(-32, 0);
 
     const AMARELO = ["#fff7c2", "#ffd84d", "#e3a614", "#a8780f"];
     const LARANJA = ["#ffc58a", "#ff9a2e", "#d4691a", "#9c4a0f"];
-    // pés: na dança, o pé do lado para onde ele vai levanta
+    // pés grandes e chatos de pato
     for (const [px, ld] of [[25, -1], [39, 1]]) {
-      const levanta = plana ? 5 : danca ? Math.max(0, lado * ld) * 3.5 : Math.max(0, -r.passo * ld) * 2.5;
-      const anda = plana ? -4 : r.passo * 4.5 * ld;
-      const fx = px + anda + lado * 2.5;
-      const fy = 61.5 - levanta;
+      const pe = pose.pes[ld] || { levanta: plana ? 5 : 0, anda: plana ? -4 : 0, ang: plana ? 0.5 : 0 };
+      const fx = px + pe.anda + lado * 2.5;
+      const fy = 61.5 - pe.levanta;
       tubo(g, (c) => { c.beginPath(); c.moveTo(px + lado * 3, 53 + sobe * 0.6); c.lineTo(fx, fy); }, 2.8, ["#9c4a0f", "#f08a26", "#ffd0a0"], r, ld < 0);
+      g.save();
+      g.translate(fx, fy);
+      g.rotate(pe.ang);
       g.beginPath();
-      g.moveTo(fx - 3.5, fy + 0.8);
-      g.quadraticCurveTo(fx + 3, fy - 3, fx + 7.5, fy + 1);
-      g.quadraticCurveTo(fx + 2, fy + 2.6, fx - 3.5, fy + 0.8);
-      const gp = g.createLinearGradient(0, fy - 3, 0, fy + 2.5);
+      g.moveTo(-3.5, 0.8);
+      g.quadraticCurveTo(3, -3.2, 8.5, 0.6);
+      g.quadraticCurveTo(7, 2.4, 5.5, 1.6);
+      g.quadraticCurveTo(4, 3, 2, 2.2);
+      g.quadraticCurveTo(-1, 3, -3.5, 0.8);
+      const gp = g.createLinearGradient(0, -3, 0, 2.5);
       gp.addColorStop(0, ld < 0 ? "#e8892c" : "#ffb04a");
       gp.addColorStop(1, "#c0560e");
       pintar(g, gp, "#8a3f0c", 1);
+      g.restore();
     }
 
     g.save();
-    // gira o corpo todo em volta dos pés (rebolado), quica e achata um pouco ao "pousar"
+    // gira o corpo todo em volta dos pés (gingado/rebolado), quica e achata um pouco ao "pousar"
     g.translate(32, 60);
-    g.rotate(lado * 0.13 + (plana ? 0.18 + Math.sin(s.t * 3) * 0.05 : 0));
-    const achata = danca ? 1 - Math.max(0, Math.cos(fase)) * 0.05 : 1;
+    g.rotate(pose.rot + (plana ? 0.18 + Math.sin(s.t * 3) * 0.05 : 0));
+    const achata = danca ? 1 - Math.max(0, Math.cos(T * TAU * 2.5)) * 0.05 : 1;
     g.scale(2 - achata, achata);
     g.translate(-32 + lado * 2.5, -60 + sobe);
 
     // asa de trás (aparece do outro lado do corpo)
-    const asaTras = danca ? -Math.max(0, -lado) * 1.1 : 0;
+    const abreTras = plana || pose.asaTras != null;
     g.save();
     g.translate(40, 40);
-    g.rotate(plana ? -0.9 + Math.sin(s.t * 3) * 0.08 : 0.35 - asaTras);
-    oval(g, plana ? 9 : 3, -2, plana ? 15 : 8, plana ? 5 : 5.5);
+    g.rotate(plana ? -0.9 + Math.sin(s.t * 3) * 0.08 : pose.asaTras ?? 0.35);
+    oval(g, abreTras ? 7 : 3, -2, abreTras ? (plana ? 15 : 11) : 8, 5.2);
     pintar(g, "#d9a31a", "#a8780f", 1.1);
     g.restore();
     // rabinho
@@ -560,8 +613,8 @@
     oval(g, 34, 49, 11, 6.5);
     pintar(g, "rgba(255,250,215,0.55)");
     // cabeça (balança contra o corpo, no contratempo)
-    const bob = danca ? Math.sin(fase + 0.6) * 1.6 : 0;
-    const inclina = danca ? -lado * 0.18 : 0;
+    const bob = pose.bob;
+    const inclina = pose.inclina;
     const cabY = (s.anim === "dormindo" ? 24 : 21) + bob;
     g.save();
     g.translate(38, cabY);
@@ -571,7 +624,7 @@
     for (const [x, a] of [[33, -0.5], [36, -0.15]]) {
       g.save();
       g.translate(x, cabY - 11.5);
-      g.rotate(a + (danca ? Math.sin(fase) * 0.25 : 0));
+      g.rotate(a + (danca ? Math.sin(T * TAU * 2.5) * 0.25 : 0));
       oval(g, 0, -2.5, 1.8, 3.6);
       pintar(g, "#ffd84d", "#a8780f", 1);
       g.restore();
@@ -579,7 +632,7 @@
     esfera(g, 38, cabY, 13, 12.5, AMARELO, r, 1.6);
     // bico largo de pato
     const by = cabY + 4;
-    const abre = r.mastiga ? 3 : danca && Math.sin(fase) > 0.7 ? 1.5 : 0; // "canta" na batida
+    const abre = r.mastiga ? 3 : danca && Math.sin(T * TAU * 2.5) > 0.7 ? 1.5 : 0; // "canta" na batida
     g.beginPath();
     g.moveTo(47, by - 3);
     g.bezierCurveTo(56, by - 5.5, 62, by - 3, 61.5, by + 0.5);
@@ -635,8 +688,8 @@
     // asa da frente: na dança sobe e desce no ritmo, oposta à de trás
     const bate = plana
       ? 1.0 + Math.sin(s.t * 3) * 0.08
-      : danca
-      ? -Math.max(0, lado) * 1.2 - 0.15
+      : pose.asaFrente != null
+      ? pose.asaFrente
       : s.anim === "caindo"
         ? Math.sin(s.t * 22) * 0.6 - 0.4
         : ["acenando", "feliz", "travessura"].includes(s.anim)

@@ -191,7 +191,7 @@ function proximoEstado() {
   if (debug === "travessura" && config.bagunca) pedirTravessura();
   if (!config.passear || relogio < ficarAte) {
     const a = P.ancora || tela.casa;
-    if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", rand(4, 6));
+    if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", 5.1); // um ciclo inteiro da dança
     if (r < 0.5) return mudar("parado", rand(3, 7));
     if (r < 0.62) return mudar("acenando", 1.6);
     if (r < 0.9) {
@@ -217,7 +217,7 @@ function proximoEstado() {
     const a = areaDe(x);
     return mudar("buscar", 20, { alvo: { x, y: limitarY(rand(a.y + 220, a.y + a.h), x) }, lado });
   }
-  if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", rand(4, 6));
+  if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", 5.1); // um ciclo inteiro da dança
   if (r < 0.45) return mudar("parado", rand(2, 5));
   if (r < 0.85) return mudar("andar", 12, { alvo: pontoAleatorio() });
   if (r < 0.92) return mudar("dormindo", rand(6, 12));
