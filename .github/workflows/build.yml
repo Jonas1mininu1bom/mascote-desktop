@@ -80,7 +80,8 @@ jobs:
         with:
           path: instaladores
           merge-multiple: true
-      - uses: softprops/action-gh-release@v2
+      # fixada por SHA (= v2): ela tem permissão de escrita, e uma tag pode ser movida pelo dono
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: instaladores/*
           generate_release_notes: true

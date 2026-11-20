@@ -385,3 +385,89 @@ ponte.ouvir("pet:trocar", (p) => {
   petAtualId = d.pet.id;
   adicionar("pet", saudacao(d.pet));
 })();
+
+// ---------- IA do chat (Claude Code, Gemini, OpenAI, Ollama...) ----------
+// A chave nunca volta para cá: a página só sabe se existe uma salva.
+let ia = null;
+const iaEscolhida = () => ia?.provedores.find((p) => p.id === $("iaProvedor").value);
+
+function avisoIa(texto, falhou = false) {
+  $("iaAviso").textContent = texto || "";
+  $("iaAviso").classList.toggle("falhou", falhou);
+}
+
+function mostrarIa(estado) {
+  ia = estado;
+  const sel = $("iaProvedor");
+  if (sel.options.length !== ia.provedores.length) {
+    sel.replaceChildren(...ia.provedores.map((p) => Object.assign(document.createElement("option"), { value: p.id, textContent: p.nome })));
+  }
+  sel.value = ia.atual;
+  const p = iaEscolhida();
+  $("iaDica").textContent = p.dica || "";
+  $("iaCampos").hidden = p.id === "claude";
+  $("iaModelo").value = p.modelo;
+  $("iaModelo").placeholder = p.modeloPadrao || "nome do modelo";
+  $("iaListaModelos").replaceChildren();
+  $("iaLinhaEndereco").hidden = !p.enderecoLivre; // Gemini/OpenAI/OpenRouter: endereço oficial, fixo
+  $("iaEndereco").value = p.endereco;
+  $("iaEndereco").placeholder = p.enderecoPadrao;
+  $("iaLinhaChave").hidden = p.chave === "nao";
+  $("iaChave").value = "";
+  $("iaChave").placeholder = p.chaveSalva
+    ? "salva (cole outra para trocar)"
+    : p.temChave
+      ? `usando ${p.variaveis.join(" ou ")}`
+      : p.chave === "opcional"
+        ? "opcional"
+        : "cole a chave aqui";
+  $("iaApagarChave").hidden = !p.chaveSalva;
+  $("iaPegarChave").hidden = !p.linkChave;
+  if (p.id !== "claude" && p.chave !== "nao" && !ia.cofreSeguro) {
+    avisoIa(
+      "Este sistema não tem um cofre de senhas (no Linux: GNOME Keyring ou KWallet), então não dá para salvar a chave com segurança. " +
+        (p.variaveis.length ? `Defina a variável ${p.variaveis[0]} antes de abrir o app.` : "Use uma API sem chave."),
+      true
+    );
+  } else if (p.id !== "claude" && p.chave === "sim" && !p.temChave) avisoIa("Falta a chave para conversar.", true);
+  else avisoIa("");
+}
+
+async function carregarIa() {
+  mostrarIa(await ponte.invocar("ia:estado"));
+}
+
+async function salvarIa(pedido, mensagem) {
+  const r = await ponte.invocar("ia:salvar", pedido);
+  mostrarIa(r.estado);
+  if (!r.ok) return avisoIa(r.erro, true);
+  if (mensagem) avisoIa(mensagem);
+}
+
+$("iaProvedor").onchange = async (e) => {
+  const antes = ia?.atual;
+  await salvarIa({ provedor: e.target.value });
+  const p = iaEscolhida();
+  if (p && p.id !== antes) adicionar("info", `Agora quem responde é ${p.nome}. Conversa nova.`);
+};
+$("iaSalvar").onclick = () =>
+  salvarIa(
+    { provedor: $("iaProvedor").value, modelo: $("iaModelo").value, endereco: $("iaEndereco").value, chave: $("iaChave").value },
+    "Salvo."
+  );
+$("iaApagarChave").onclick = () => salvarIa({ provedor: $("iaProvedor").value, apagarChave: true }, "Chave apagada.");
+$("iaPegarChave").onclick = () => ponte.enviar("ia:abrirLink", $("iaProvedor").value);
+$("iaVerModelos").onclick = async () => {
+  // usa o que está digitado agora (endereço e chave), então salva antes de perguntar à API
+  const r0 = await ponte.invocar("ia:salvar", { provedor: $("iaProvedor").value, endereco: $("iaEndereco").value, chave: $("iaChave").value });
+  if (!r0.ok) return avisoIa(r0.erro, true);
+  const modelo = $("iaModelo").value;
+  mostrarIa(r0.estado);
+  $("iaModelo").value = modelo;
+  avisoIa("Buscando os modelos…");
+  const r = await ponte.invocar("ia:modelos", $("iaProvedor").value);
+  if (!r.ok) return avisoIa(r.erro, true);
+  $("iaListaModelos").replaceChildren(...r.modelos.map((m) => Object.assign(document.createElement("option"), { value: m })));
+  avisoIa(r.modelos.length ? `${r.modelos.length} modelos. Clique no campo Modelo para escolher.` : "A API não listou nenhum modelo.");
+};
+$("btnAjustes").addEventListener("click", carregarIa);

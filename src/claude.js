@@ -8,9 +8,15 @@ async function carregarSdk() {
 }
 
 // Descrição curta de uma ferramenta, para mostrar no chat.
-function resumoFerramenta(nome, entrada = {}) {
-  const alvo = entrada.command || entrada.file_path || entrada.path || entrada.pattern || entrada.url || "";
-  return alvo ? `${nome}: ${String(alvo).slice(0, 160)}` : nome;
+// max: no chat, um resumo curto; no pedido de permissão, o texto INTEIRO (senão um comando comprido
+// poderia esconder a parte perigosa depois do corte, e a pessoa aprovaria sem ver).
+const MAX_PERMISSAO = 4000;
+function alvoDe(entrada = {}) {
+  return String(entrada.command || entrada.file_path || entrada.path || entrada.pattern || entrada.url || "");
+}
+function resumoFerramenta(nome, entrada = {}, max = 160) {
+  const alvo = alvoDe(entrada);
+  return alvo ? `${nome}: ${alvo.slice(0, max)}` : nome;
 }
 
 // Monta o "personagem" a partir do pet.json. A persona muda só o JEITO de falar:
@@ -84,7 +90,10 @@ class ChatClaude {
           },
           // Toda ferramenta que mexe no computador pede aprovação no próprio chat.
           canUseTool: async (nome, entrada) => {
-            const ok = await eventos.permissao({ nome, resumo: resumoFerramenta(nome, entrada) });
+            if (alvoDe(entrada).length > MAX_PERMISSAO) {
+              return { behavior: "deny", message: "Comando longo demais para a pessoa conferir. Divida em partes menores." };
+            }
+            const ok = await eventos.permissao({ nome, resumo: resumoFerramenta(nome, entrada, MAX_PERMISSAO) });
             return ok
               ? { behavior: "allow", updatedInput: entrada }
               : { behavior: "deny", message: "A pessoa não permitiu esta ação." };
@@ -120,4 +129,4 @@ class ChatClaude {
   }
 }
 
-module.exports = { ChatClaude };
+module.exports = { ChatClaude, promptDoPersonagem };
