@@ -38,6 +38,18 @@ npm install
 npm start
 ```
 
+### Abrir como um aplicativo (Windows)
+
+Para não precisar do terminal toda vez, crie os atalhos uma vez:
+
+```bash
+npm run atalho
+```
+
+Isso coloca **Mascote Desktop**, com ícone próprio, no Menu Iniciar e na Área de Trabalho. É só
+clicar para abrir, como qualquer programa, sem janela de terminal. Para tirar os atalhos:
+`npm run atalho -- --remover`. Para ele abrir sozinho junto com o PC, use ⚙️ → Iniciar com o Windows.
+
 ## Como usar
 
 | Ação | Como |
