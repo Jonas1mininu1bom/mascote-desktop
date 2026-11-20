@@ -24,6 +24,17 @@ window.Vida = (() => {
     for (let i = 0; i < n; i++) coracoes.push({ x: P.x + rand(-15, 15), y: P.y - alturaPx(), vy: rand(30, 60), vx: rand(-15, 15), vida: 1.4 });
   };
 
+  // o canto do overlay mudou (um monitor girou ou mudou): leva a comida e a bola junto
+  function deslocar(dx, dy) {
+    for (const o of [comida, bola]) {
+      if (!o) continue;
+      o.x += dx;
+      o.y += dy;
+      if (typeof o.chao === "number") o.chao += dy;
+    }
+    fecharMenu();
+  }
+
   // ---------- queda ----------
   function precisaCair() {
     return noChao() && P.y < chao() - 4;
@@ -499,7 +510,7 @@ window.Vida = (() => {
   }
 
   return {
-    precisaCair, cair, pegou, segurando, soltou, carinhoRecusado,
+    precisaCair, cair, pegou, segurando, soltou, carinhoRecusado, deslocar,
     abrirMenu, abrirMenuBrinquedos, sobreMenu, cliqueNoMenu, sobreBola, cliqueNaBola, atualizar, desenhar, plana,
   };
 })();

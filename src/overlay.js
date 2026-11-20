@@ -820,7 +820,16 @@ window.api.ouvir("config", (c) => {
 window.addEventListener("error", (e) => console.error("[overlay]", e.message, e.filename + ":" + e.lineno));
 window.addEventListener("unhandledrejection", (e) => console.error("[overlay] promessa:", e.reason?.message || e.reason));
 window.api.ouvir("tela", (t) => {
-  const antiga = tela.casa;
+  // Se um monitor mudou (girou, foi ligado, mudou de resolução), o canto do overlay pode ter mudado.
+  // As posições são contadas a partir dele: converte tudo, senão o pet "pula" para outro lugar.
+  const dx = (tela.origem?.x ?? t.origem?.x ?? 0) - (t.origem?.x ?? 0);
+  const dy = (tela.origem?.y ?? t.origem?.y ?? 0) - (t.origem?.y ?? 0);
+  if (dx || dy) {
+    for (const p of [P, P.ancora, P.alvo, P.cursorEsperado]) if (p) Object.assign(p, { x: p.x + dx, y: p.y + dy });
+    if (segurado?.inicio) Object.assign(segurado.inicio, { x: segurado.inicio.x + dx, y: segurado.inicio.y + dy });
+    window.Vida?.deslocar?.(dx, dy);
+  }
+  const antiga = { x: tela.casa.x + dx, y: tela.casa.y + dy };
   tela = t;
   ajustarCanvas();
   limiteBalao = t.painel ? t.painel.x - 6 : null;

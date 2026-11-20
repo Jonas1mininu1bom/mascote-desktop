@@ -230,6 +230,7 @@ function infoTela() {
       ? casaPara(boundsChat(chatAberto))
       : { x: wa.x + wa.width - 60 - o.x, y: wa.y + wa.height - 2 - o.y };
   return {
+    origem: { x: o.x, y: o.y }, // canto do overlay na área de trabalho (muda quando um monitor muda)
     largura: o.width,
     altura: o.height,
     area: rel(wa), // tela da casa
