@@ -33,6 +33,8 @@ Mecânicas inspiradas nos pets de desktop clássicos, com personagens e código 
   claude   # faça o login uma vez e saia
   ```
   Alternativa: defina a variável `ANTHROPIC_API_KEY`.
+- **Ou outra IA:** o chat também funciona com o Gemini, a OpenAI, o OpenRouter, o Ollama (offline)
+  ou qualquer API no formato da OpenAI. Veja [Usar outra IA](#usar-outra-ia).
 
 ## Rodar
 
@@ -173,13 +175,35 @@ Para depurar: `MASCOTE_DEBUG=perseguir npm start` (persegue o mouse sem parar) o
 `MASCOTE_DEBUG=voltar npm start` (leva o pet para longe e chama de volta) ou
 `MASCOTE_DEBUG=bilhete npm start` (no modo bagunça, ele vai buscar bilhetes toda hora).
 
+## Usar outra IA
+
+O Claude Code é o padrão, mas dá para trocar em ⚙️ → **IA do chat**:
+
+| IA | O que precisa |
+| --- | --- |
+| Claude Code | Claude Code instalado e logado (ou `ANTHROPIC_API_KEY`) |
+| Gemini (Google) | Chave grátis do [Google AI Studio](https://aistudio.google.com/apikey) |
+| OpenAI (ChatGPT) | Chave da [API da OpenAI](https://platform.openai.com/api-keys) |
+| OpenRouter | Chave do [OpenRouter](https://openrouter.ai/keys) (modelos de várias empresas) |
+| Ollama | [Ollama](https://ollama.com) aberto e um modelo com ferramentas (ex.: `ollama pull qwen3`) |
+| Outra | Endereço de qualquer API compatível com OpenAI (LM Studio, Groq, DeepSeek, Mistral...) |
+
+- Cole a chave e clique em **Salvar**. O botão **Ver** lista os modelos que a sua chave pode usar.
+- A chave fica criptografada no cofre do sistema (Windows: DPAPI, macOS: Keychain, Linux: GNOME
+  Keyring ou KWallet) e nunca volta para a página do chat. Se o Linux não tiver cofre, o app não
+  salva a chave: use a variável `GEMINI_API_KEY`, `OPENAI_API_KEY` ou `OPENROUTER_API_KEY`.
+- Com essas IAs, o pet usa as próprias ferramentas: listar, ler e procurar arquivos na pasta de
+  trabalho (livre), e escrever, editar, rodar comandos ou mexer fora da pasta (**sempre pede
+  Permitir/Negar**).
+- Trocar de IA ou de modelo começa uma conversa nova.
+
 ## Segurança
 
 - As páginas rodam isoladas (`contextIsolation` + `sandbox`, sem Node) e só falam com o
   processo principal por uma lista fixa de canais, com os dados validados.
 - Nenhuma janela navega para fora do app, abre pop-ups ou recebe permissões do navegador.
 
-O pet usa o Claude Code, que pode ler arquivos e rodar comandos. **Toda ação que mexe
+O pet usa o Claude Code (ou a IA escolhida), que pode ler arquivos e rodar comandos. **Toda ação que mexe
 no computador aparece no chat com os botões Permitir e Negar.** Nada roda sem você
 aprovar.
 

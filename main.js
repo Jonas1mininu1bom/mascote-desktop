@@ -1,11 +1,12 @@
 // Mascote Desktop: processo principal do Electron.
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, dialog, globalShortcut, session } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, dialog, globalShortcut, session, safeStorage } = require("electron");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { listarPets, copiarPetsPadrao, quadroParaBitmap } = require("./src/pets");
-const { ChatClaude } = require("./src/claude");
+const provedores = require("./src/provedores");
+const { criarCofre } = require("./src/provedores/chaves");
 const bilhetesMod = require("./src/bilhetes");
 const travessuras = require("./src/travessuras");
 const admin = require("./src/admin");
@@ -494,7 +495,10 @@ function criarBilhete({ x, y }) {
 }
 
 // ---------- IPC ----------
-const conversa = new ChatClaude();
+// Chat: Claude Code por padrão, ou outra IA escolhida em Ajustes (config.ia). Chaves no cofre do sistema.
+let cofreChaves = null;
+const cofre = () => (cofreChaves ||= criarCofre({ arquivo: path.join(app.getPath("userData"), "chaves.json"), safeStorage }));
+const conversa = new provedores.Conversa({ pegarConfig: () => config.ia, cofre: { pegar: (id) => cofre().pegar(id) } });
 const pedidosPermissao = new Map();
 let proxPermissao = 1;
 
@@ -651,6 +655,28 @@ function registrarIpc() {
     return config.pasta;
   });
   on("chat:nova", () => conversa.novaConversa());
+  // ---------- qual IA conversa ----------
+  handle("ia:estado", () => provedores.estado(config.ia, cofre()));
+  handle("ia:salvar", (_e, pedido) => {
+    try {
+      mudarConfig({ ia: provedores.aplicar(config.ia, pedido, cofre()) });
+      return { ok: true, estado: provedores.estado(config.ia, cofre()) };
+    } catch (e) {
+      return { ok: false, erro: e.message, estado: provedores.estado(config.ia, cofre()) };
+    }
+  });
+  handle("ia:modelos", async (_e, id) => {
+    try {
+      return { ok: true, modelos: await provedores.listarModelos(config.ia, id, cofre()) };
+    } catch (e) {
+      return { ok: false, erro: e.message };
+    }
+  });
+  // só abre os links fixos de "onde pegar a chave", nunca um endereço vindo da página
+  on("ia:abrirLink", (_e, id) => {
+    const link = provedores.PROVEDORES.find((p) => p.id === id)?.linkChave;
+    if (link) shell.openExternal(link);
+  });
   on("chat:parar", () => conversa.parar());
   on("chat:responderPermissao", (_e, { id, ok } = {}) => {
     pedidosPermissao.get(id)?.(ok === true);

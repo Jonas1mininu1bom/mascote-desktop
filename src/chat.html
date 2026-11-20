@@ -92,6 +92,16 @@
   #ajustes select, #ajustes .acoes button { font: inherit; margin-top: 4px; }
   #ajustes .acoes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   #ajustes .acoes button { background: var(--bolha-pet); color: var(--texto); border: 1px solid var(--borda); border-radius: 8px; padding: 4px 8px; cursor: pointer; }
+  #ia { margin: 10px 0; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 8px; }
+  #ia label.campo { display: block; margin: 6px 0 0; cursor: default; }
+  #ia .linha { display: flex; gap: 6px; }
+  #ia input[type=text], #ia input[type=password] { font: inherit; width: 100%; min-width: 0; margin-top: 3px; color: var(--texto); background: var(--bolha-pet);
+    border: 1px solid var(--borda); border-radius: 6px; padding: 3px 6px; outline: none; }
+  #ia input:focus { border-color: var(--destaque); }
+  #ia .linha button { font: inherit; margin-top: 3px; background: var(--bolha-pet); color: var(--texto); border: 1px solid var(--borda); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+  #ia #iaSalvar { background: var(--destaque); color: #fff; border-color: transparent; }
+  #ia #iaAviso.falhou { color: #b42318; }
+  #ia [hidden] { display: none !important; }
 
   #mensagens { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
   .msg { max-width: 85%; padding: 8px 11px; border-radius: 14px; white-space: pre-wrap; word-wrap: break-word; line-height: 1.35; }
@@ -138,6 +148,18 @@
       <option value="barra">Só em cima da barra de tarefas</option>
     </select></label>
     <small class="dica">Botão direito no pet abre um menu para dar comida e brincar. No modo barra de tarefas, solte ele lá de cima para ver o paraquedas.</small>
+    <div id="ia"><b>IA do chat</b><small>Quem responde e trabalha por trás do pet.</small>
+      <label style="display:block"><select id="iaProvedor"></select></label>
+      <small id="iaDica" class="dica"></small>
+      <div id="iaCampos">
+        <label class="campo">Modelo <span class="linha"><input id="iaModelo" type="text" list="iaListaModelos" spellcheck="false" autocomplete="off"><button type="button" id="iaVerModelos" title="Buscar os modelos disponíveis">Ver</button></span></label>
+        <datalist id="iaListaModelos"></datalist>
+        <label class="campo" id="iaLinhaEndereco">Endereço da API <input id="iaEndereco" type="text" spellcheck="false" autocomplete="off"></label>
+        <label class="campo" id="iaLinhaChave">Chave de API <span class="linha"><input id="iaChave" type="password" spellcheck="false" autocomplete="off"><button type="button" id="iaApagarChave" title="Apagar a chave salva">Apagar</button></span></label>
+        <div class="acoes"><button type="button" id="iaSalvar">Salvar</button><button type="button" id="iaPegarChave">Onde pego a chave?</button></div>
+      </div>
+      <small id="iaAviso" class="dica"></small>
+    </div>
     <label id="linhaIniciar" hidden><input type="checkbox" id="iniciarComWindows"><span>Iniciar com o Windows<small>Abre sozinho quando você liga o computador.</small></span></label>
     <div id="travessuras"><b>Travessuras</b><small>De vez em quando, só no modo bagunça.</small><div id="listaTravessuras"></div></div>
     <div id="admin" hidden>
