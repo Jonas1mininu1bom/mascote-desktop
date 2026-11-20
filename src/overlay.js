@@ -258,7 +258,10 @@ function proximoEstado() {
     const lado = P.x < (min + max) / 2 ? -1 : 1;
     const x = lado < 0 ? min + larguraPx() / 2 - larguraPx() * 0.6 : max - larguraPx() / 2 + larguraPx() * 0.6;
     const a = areaDe(x);
-    return mudar("buscar", 20, { alvo: { x, y: limitarY(rand(a.y + 220, a.y + a.h), x) }, lado });
+    // na tela inteira, nada de buscar lá embaixo: com o papel pendurado no bico, ele ficaria em cima
+    // da barra de tarefas. A boca fica a ~70% da altura do pet, e o papel começa 24 px acima dela.
+    const yMax = tetoBilhete(x, 150) + 24 + alturaPx() * 0.7 - 20; // folga: o passo balança a boca
+    return mudar("buscar", 20, { alvo: { x, y: limitarY(Math.min(rand(a.y + 220, a.y + a.h), yMax), x) }, lado });
   }
   if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", 5.1); // dança quando der vontade
   if (r < 0.45) return mudar("parado", rand(2, 5));
@@ -420,7 +423,9 @@ function moverBilhete() {
   // aí ele carrega o papel em cima da cabeça, como uma placa (a cabeça fica na altura do chat)
   const teto = tetoBilhete(x + b.largura / 2, b.altura);
   if (P.voando) return window.api.enviar("bilhete:mover", { id: b.id, x, y: Math.min(m.y - 24, teto) });
-  P.bilheteNaCabeca = m.y - 24 > teto;
+  // bico ou cabeça: decide uma vez, no começo do arrasto (senão o balanço do passo fazia o papel
+  // pular de um para o outro quando ele estava bem no limite)
+  if (P.bilheteNaCabeca == null) P.bilheteNaCabeca = m.y - 24 > teto;
   if (P.bilheteNaCabeca) {
     const balanco = Math.sin(relogio * 9) * 3; // sobe e desce um pouquinho com os passos
     const y = P.y - alturaPx() - b.altura + 12 + balanco;
@@ -576,7 +581,7 @@ function atualizar(dt) {
           const { min, max } = limites();
           const a = areaDe(ladoInicial < 0 ? min : max - 1);
           const x = ladoInicial < 0 ? rand(a.x + a.w * 0.12, a.x + a.w * 0.3) : rand(a.x + a.w * 0.7, a.x + a.w * 0.88);
-          mudar("arrastando", 20, { alvo: { x: limitarX(x), y: P.y } });
+          mudar("arrastando", 20, { alvo: { x: limitarX(x), y: P.y }, bilheteNaCabeca: null });
         });
       } else if (P.tempo <= 0) P.voando ? mudar("pousando", 6) : proximoEstado();
       return;
@@ -593,7 +598,7 @@ function atualizar(dt) {
         P.bilhete = null;
         // com o papel em cima da cabeça, o balão de fala cobriria o texto dele
         if (!P.bilheteNaCabeca) falar(escolha(["Trouxe pra você!", "Um presente 💌", "Leia isso!"]), 2.5);
-        P.bilheteNaCabeca = false;
+        P.bilheteNaCabeca = null;
         if (P.voando) return mudar("pousando", 6); // desce batendo as asas
         mudar("feliz", 1.5);
       }
@@ -663,12 +668,14 @@ window.addEventListener("mouseup", () => {
     for (let i = 0; i < 5; i++) coracoes.push({ x: P.x + rand(-15, 15), y: P.y - alturaPx(), vy: rand(30, 60), vx: rand(-15, 15), vida: 1.4 });
     if (Math.random() < 0.4 && pet.falas.length) falar(escolha(pet.falas));
     if (P.humor === "pensando" || P.humor === "trabalhando") return mudar(P.humor, 999);
+    if (window.Vida?.voltarAoJogo()) return; // estava jogando bola: continua o jogo
     return mudar("feliz", 1.4);
   }
   P.x = limitarX(P.x);
   P.y = limitarY(Math.max(P.y, areaDe(P.x).y + alturaPx()));
   P.ancora = { x: P.x, y: P.y };
   falar(escolha(["Uhul!", "De novo!", "Que passeio!"]), 1.8); // só se irrita no chacoalhão
+  if (window.Vida?.voltarAoJogo()) return;
   mudar("feliz", 1.2);
 });
 
