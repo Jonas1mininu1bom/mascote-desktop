@@ -81,6 +81,8 @@ document.querySelector("header").addEventListener("pointerdown", (e) => {
 });
 document.querySelector("header").addEventListener("pointerup", () => ponte.invocar("chat:arrastar", false));
 $("fechar").onclick = () => ponte.enviar("chat:abrir", false);
+$("minimizar").onclick = () => ponte.enviar("app:minimizar");
+$("sairApp").onclick = () => ponte.enviar("app:sair");
 async function carregarTelas() {
   const lista = await ponte.invocar("telas:listar");
   const opcoes = [{ id: "todas", nome: "Todas as telas" }, ...lista];
