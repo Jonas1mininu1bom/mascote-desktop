@@ -41,6 +41,7 @@ function mostrarConfig(c) {
   $("pastaNome").textContent = c.pasta;
   $("pets").value = c.pet;
   $("chao").value = c.chao === "barra" ? "barra" : "tela";
+  $("frequencia").value = String([1, 3, 5, 10].includes(c.frequencia) ? c.frequencia : 3);
 }
 
 async function carregarPets() {
@@ -97,6 +98,7 @@ async function carregarTelas() {
 }
 $("telas").onchange = (e) => ponte.enviar("config:mudar", { telas: e.target.value });
 $("chao").onchange = (e) => ponte.enviar("config:mudar", { chao: e.target.value });
+$("frequencia").onchange = (e) => ponte.enviar("config:mudar", { frequencia: Number(e.target.value) });
 
 async function carregarTravessuras() {
   const lista = await ponte.invocar("travessuras:listar");
