@@ -1,5 +1,5 @@
 // Mascote Desktop: processo principal do Electron.
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, dialog, globalShortcut, session, safeStorage } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, dialog, globalShortcut, session, safeStorage, powerMonitor } = require("electron");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -315,6 +315,7 @@ function criarOverlay() {
     webPreferences: prefsSeguras(),
   });
   overlay.setAlwaysOnTop(true, "screen-saver");
+  segurarTopo(overlay);
   overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlay.setIgnoreMouseEvents(true, { forward: true });
   // no Windows, uma janela criada num monitor com escala diferente da do principal pode nascer com
@@ -347,6 +348,7 @@ function criarChat() {
     webPreferences: prefsSeguras(),
   });
   chat.setAlwaysOnTop(true, "screen-saver");
+  segurarTopo(chat);
   chat.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   // mesmo motivo do overlay: num monitor com outra escala, a janela pode nascer do tamanho errado
   chat.setBounds(boundsChat(false));
@@ -913,6 +915,50 @@ function filtrarConfigDaPagina(parcial) {
 const resumoTelas = () =>
   screen.getAllDisplays().map((d) => ({ id: d.id, bounds: d.bounds, workArea: d.workArea, escala: d.scaleFactor, principal: d.id === screen.getPrimaryDisplay().id }));
 
+// ---------- sempre no topo ----------
+// Quando o app abre junto com o Windows, ele nasce antes da área de trabalho ficar pronta: a barra
+// de tarefas e os outros programas da inicialização aparecem depois e o Windows tira o "sempre no
+// topo" do pet e do chat (abrindo pela mão isso não acontece). Por isso reaplicamos o topo algumas
+// vezes logo depois de abrir, depois de tempos em tempos, e quando o PC volta da suspensão, é
+// desbloqueado ou os monitores mudam. Desligar e ligar de novo força o Windows a refazer a ordem;
+// moveTop não rouba o foco de quem está digitando.
+let ultimoReforco = 0;
+function reforcarTopo(motivo) {
+  if (escondido) return;
+  ultimoReforco = Date.now();
+  const vivas = (lista) => lista.filter((w) => w && !w.isDestroyed() && w.isVisible());
+  // bilhetes primeiro: o pet (overlay) e o chat ficam por cima do papel
+  for (const w of [...vivas([...bilhetes.values()]), ...vivas([overlay, chat])]) {
+    w.setAlwaysOnTop(false);
+    w.setAlwaysOnTop(true, "screen-saver");
+    w.moveTop();
+  }
+  if (motivo) log("main", "info", "topo reaplicado:", motivo);
+}
+
+function vigiarTopo() {
+  // só no Windows: no Mac e no Linux o topo não se perde assim, e o desliga-liga pode piscar
+  if (!plataforma.WIN) return;
+  // logo depois de abrir (a área de trabalho pode levar até um minuto para terminar de carregar)
+  for (const s of [1, 3, 6, 10, 20, 40, 60, 90]) setTimeout(() => reforcarTopo(`início +${s}s`), s * 1000);
+  // de tempos em tempos, para pegar programas que se colocam no topo depois
+  setInterval(() => reforcarTopo(), 15000);
+  for (const ev of ["display-metrics-changed", "display-added", "display-removed"]) screen.on(ev, () => setTimeout(() => reforcarTopo(ev), 1000));
+  for (const ev of ["resume", "unlock-screen", "user-did-become-active"]) {
+    try {
+      powerMonitor.on(ev, () => setTimeout(() => reforcarTopo(ev), 1500));
+    } catch {}
+  }
+}
+
+// se o sistema tirar o topo da janela, devolve (ignorando o desliga-liga do próprio reforcarTopo)
+function segurarTopo(w) {
+  w.on("always-on-top-changed", (_e, noTopo) => {
+    if (noTopo || escondido || Date.now() - ultimoReforco < 2000) return;
+    setTimeout(() => reforcarTopo("topo perdido"), 500);
+  });
+}
+
 // ---------- início ----------
 app.whenReady().then(async () => {
   log("main", "info", `iniciando v${app.getVersion()} (Electron ${process.versions.electron}, ${process.platform}), telas:`, resumoTelas());
@@ -945,6 +991,7 @@ app.whenReady().then(async () => {
     else overlay?.webContents.send("tela", infoTela());
   };
   for (const ev of ["display-metrics-changed", "display-added", "display-removed"]) screen.on(ev, telasMudaram);
+  vigiarTopo();
 });
 
 app.on("will-quit", () => globalShortcut.unregisterAll());
