@@ -587,6 +587,7 @@ function criarBilhete({ x, y }) {
     // senão o bilhete fica atrás das janelas maximizadas. Depois o pet e o chat voltam para a frente
     // (o pet é desenhado por cima do papel que ele carrega).
     w.setAlwaysOnTop(true, "screen-saver");
+    segurarTopo(w); // só depois de ligar o topo, senão o "floating" → "screen-saver" contaria como perda
     for (const j of [overlay, chat]) if (j && !j.isDestroyed() && j.isVisible()) j.moveTop();
   });
   w.on("closed", () => {
@@ -930,14 +931,18 @@ const resumoTelas = () =>
 // desbloqueado ou os monitores mudam. Desligar e ligar de novo força o Windows a refazer a ordem;
 // moveTop não rouba o foco de quem está digitando.
 let ultimoReforco = 0;
-function reforcarTopo(motivo) {
+// leve = só traz para a frente as janelas que ainda estão no topo (sem desliga-liga, não pisca);
+// quem perdeu o topo leva o desliga-liga mesmo no modo leve
+function reforcarTopo(motivo, { leve = false } = {}) {
   if (escondido) return;
   ultimoReforco = Date.now();
   const vivas = (lista) => lista.filter((w) => w && !w.isDestroyed() && w.isVisible());
   // bilhetes primeiro: o pet (overlay) e o chat ficam por cima do papel
   for (const w of [...vivas([...bilhetes.values()]), ...vivas([overlay, chat])]) {
-    w.setAlwaysOnTop(false);
-    w.setAlwaysOnTop(true, "screen-saver");
+    if (!leve || !w.isAlwaysOnTop()) {
+      w.setAlwaysOnTop(false);
+      w.setAlwaysOnTop(true, "screen-saver");
+    }
     w.moveTop();
   }
   if (motivo) log("main", "info", "topo reaplicado:", motivo);
@@ -949,7 +954,7 @@ function vigiarTopo() {
   // logo depois de abrir (a área de trabalho pode levar até um minuto para terminar de carregar)
   for (const s of [1, 3, 6, 10, 20, 40, 60, 90]) setTimeout(() => reforcarTopo(`início +${s}s`), s * 1000);
   // de tempos em tempos, para pegar programas que se colocam no topo depois
-  setInterval(() => reforcarTopo(), 15000);
+  setInterval(() => reforcarTopo(null, { leve: true }), 15000);
   for (const ev of ["display-metrics-changed", "display-added", "display-removed"]) screen.on(ev, () => setTimeout(() => reforcarTopo(ev), 1000));
   for (const ev of ["resume", "unlock-screen", "user-did-become-active"]) {
     try {
@@ -959,10 +964,16 @@ function vigiarTopo() {
 }
 
 // se o sistema tirar o topo da janela, devolve (ignorando o desliga-liga do próprio reforcarTopo)
+// Só no Windows, como o vigiarTopo. Várias janelas perdendo o topo juntas geram um reforço só.
+let reforcoPendente = null;
 function segurarTopo(w) {
+  if (!plataforma.WIN) return;
   w.on("always-on-top-changed", (_e, noTopo) => {
-    if (noTopo || escondido || Date.now() - ultimoReforco < 2000) return;
-    setTimeout(() => reforcarTopo("topo perdido"), 500);
+    if (noTopo || escondido || reforcoPendente || Date.now() - ultimoReforco < 2000) return;
+    reforcoPendente = setTimeout(() => {
+      reforcoPendente = null;
+      reforcarTopo("topo perdido");
+    }, 500);
   });
 }
 
