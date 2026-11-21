@@ -12,7 +12,7 @@ const teclado = require("./teclado");
 // Cada sistema traduz do seu jeito (veja teclado.js): no Mac, "alt" vira Command.
 const TECLAS = Object.fromEntries(teclado.NOMES.map((n) => [n, true]));
 const MAX_VEZES = 10;
-const INTERVALO_MIN = 3 * 60 * 1000; // no mínimo 3 minutos entre travessuras
+const INTERVALO_MIN = 3 * 60 * 1000; // padrão: no mínimo 3 minutos entre travessuras
 
 // ---------- apertar teclas (Windows, macOS e Linux com X11) ----------
 const keybd = (nome, soltar) => teclado.apertar(nome, soltar);
@@ -139,9 +139,9 @@ function listar({ arqPadrao, pastaUsuario }) {
 let ultima = Date.now(); // conta a partir da abertura: nada de travessura logo que o app abre
 let pendente = null; // travessura sorteada esperando o pet chegar na hora de executar
 
-function sortear(lista, ligadas, { semIntervalo = false, admin = false } = {}) {
+function sortear(lista, ligadas, { semIntervalo = false, admin = false, intervalo = INTERVALO_MIN } = {}) {
   if (pendente && Date.now() < pendente.ate) return null; // já tem uma em andamento
-  if (!semIntervalo && Date.now() - ultima < INTERVALO_MIN) return null;
+  if (!semIntervalo && Date.now() - ultima < intervalo) return null;
   const ativas = lista.filter((t) => ligadas[t.id] === true && (!t.admin || admin));
   if (!ativas.length) return null;
   const t = ativas[Math.floor(Math.random() * ativas.length)];

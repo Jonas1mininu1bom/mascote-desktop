@@ -256,6 +256,9 @@ window.Pet3D = (() => {
   }
 
   // ---------- animação ----------
+  // para abrir as asas do pato (girar em volta de eixos, sem criar objetos a cada quadro)
+  const EIXO_Y = T ? new T.Vector3(0, 1, 0) : null, EIXO_Z = T ? new T.Vector3(0, 0, 1) : null;
+  const qBate = T ? new T.Quaternion() : null, qAbre = T ? new T.Quaternion() : null, qDeita = T ? new T.Quaternion() : null;
   const ANDANDO = { andar: 1, voltar: 1, buscar: 1, seguir: 1, perseguir: 1.6, arrastando: 0.8, segurando: 1.6, brincando: 1.6, trabalhando: 1.3 };
   function animar(m, s, dt) {
     const anim = s.anim;
@@ -291,13 +294,29 @@ window.Pet3D = (() => {
       const asa = (abre, bate = 0) => m.asas.forEach((a, i) => (a.rotation.z = (i ? -1 : 1) * -(abre + bate)));
       // asas abertas de verdade: a parte comprida (que aponta para trás) gira para o lado
       // e a ponta sobe. abre 0..1 (1 = esticada para o lado), sobe em radianos.
+      // A asa é uma placa em pé encostada no corpo, com a ponta para trás. Para abrir: deita a placa
+      // (gira no próprio comprimento), aponta a ponta para fora e bate em volta do eixo do corpo.
       const abrir = (abre, sobe = 0) =>
         m.asas.forEach((a, i) => {
           const l = i ? 1 : -1;
-          a.rotation.order = "ZYX";
-          a.rotation.set(0, -l * 1.35 * abre, l * sobe);
+          qBate.setFromAxisAngle(EIXO_Z, l * sobe);
+          qAbre.setFromAxisAngle(EIXO_Y, -l * (Math.PI / 2) * abre);
+          qDeita.setFromAxisAngle(EIXO_Z, -l * (Math.PI / 2) * abre);
+          a.quaternion.copy(qBate).multiply(qAbre).multiply(qDeita);
         });
-      if (anda) {
+      if (s.voando) {
+        // voando: asas abertas batendo rápido, patinhas recolhidas, corpo subindo e descendo
+        const bate = Math.sin(s.relogio * 16);
+        abrir(1, 0.15 + bate * 0.65);
+        m.corpo.rotation.x = 0.2;
+        m.corpo.position.y += bate * 0.03;
+        m.pernas.forEach(({ p, pe }) => {
+          p.rotation.x = -0.8;
+          pe.rotation.x = 0.6;
+        });
+        m.pescoco.rotation.x = 0.1;
+        m.bicoBaixo.rotation.x = 0.35; // segurando o papel
+      } else if (anda) {
         // gingado: o corpo rola para o lado do pé no chão, o pé que sobe vai para trás
         m.raiz.rotation.z = passo * 0.14;
         m.corpo.position.y += Math.abs(passo) * 0.03;
@@ -440,7 +459,8 @@ window.Pet3D = (() => {
   // Devolve { canvas, x, y, w, h } (em px de tela) para o overlay copiar, ou null se não deu.
   // ponto do mundo 3D que segura as coisas (já com a posição/rotação deste quadro)
   function pontoDaBoca(m) {
-    if (m.tipo === "pato") return m.bicoCima.localToWorld(new T.Vector3(0, 0, 0.9));
+    // um pouco além da ponta do bico: a seta do mouse fica na frente da cara, e não por cima da cabeça
+    if (m.tipo === "pato") return m.bicoCima.localToWorld(new T.Vector3(0, -0.5, 2.2));
     if (m.tipo === "tartaruga") return m.cabeca.localToWorld(new T.Vector3(0.03, -0.07, 0.33));
     if (m.tipo === "palito") return m.bracos[1].localToWorld(new T.Vector3(0, -0.36, 0));
     return null;
