@@ -187,10 +187,13 @@ function aplicarJanelaOverlay() {
   }, 120);
 }
 // O overlay avisa onde o pet está; se ele foi para outro monitor, a janela vai junto.
+// Só para monitores em que ele pode ficar: com só uma tela escolhida em ⚙️, o centro do pet às vezes
+// passa uns pixels da borda; ir junto mandava a tela de novo, o overlay via o pet "fora das telas" e
+// chamava ele de volta para o chat.
 function petEm(x, y) {
   const o = areaTotal();
   const d = screen.getDisplayNearestPoint({ x: Math.round(o.x + x), y: Math.round(o.y + y) });
-  if (!telasDoOverlay().some((t) => t.id === d.id) || d.id === telaDaJanela().id) return;
+  if (!telasPermitidas().some((t) => t.id === d.id) || d.id === telaDaJanela().id) return;
   idTelaJanela = d.id;
   aplicarJanelaOverlay();
   overlay?.webContents.send("tela", infoTela());
