@@ -467,12 +467,22 @@ function atualizar(dt) {
   P.tAnim += dt;
 
   if (segurado) {
-    P.x = cursor.x - segurado.dx;
-    P.y = cursor.y - segurado.dy;
+    const ponta = window.Hornet?.ativo() && boca();
+    if (ponta) {
+      // a Hornet fica pendurada pela ponta da agulha: leva a ponta até o cursor (rápido, mas sem tranco)
+      const k = Math.min(1, dt * 18);
+      P.x += (cursor.x - ponta.x) * k;
+      P.y += (cursor.y - ponta.y) * k;
+    } else {
+      P.x = cursor.x - segurado.dx;
+      P.y = cursor.y - segurado.dy;
+    }
     window.Vida?.segurando(dt); // percebe se a pessoa está chacoalhando
     return;
   }
+  window.Hornet?.passo(dt);
   if (window.Vida?.atualizar(dt)) return; // queda, tontura, bravo, comer, brincar, menu
+  if (window.Hornet?.atualizar(dt)) return; // combate, inimigo, pogo, planar, Thread Storm
 
   switch (P.estado) {
     case "andar":
@@ -505,6 +515,7 @@ function atualizar(dt) {
       andarAte(alvo, dt, mult, false);
       const m2 = mao();
       if (Math.hypot(cursor.x - m2.x, cursor.y - m2.y) < RAIO_PEGAR || sobreOPet(cursor)) {
+        if (window.Hornet?.ativo()) return Hornet.acertouMouse(); // ela não pega: luta com o mouse
         console.info(`[mouse] peguei em ${(10 - P.tempo).toFixed(1)}s`);
         falar(escolha(["Peguei! 😈", "É meu agora!", "Hehe"]), 2);
         // o mouse não "pula" para a mão: fica onde foi mordido, e anda junto com ela
@@ -674,7 +685,7 @@ window.addEventListener("mouseup", () => {
   P.x = limitarX(P.x);
   P.y = limitarY(Math.max(P.y, areaDe(P.x).y + alturaPx()));
   P.ancora = { x: P.x, y: P.y };
-  falar(escolha(["Uhul!", "De novo!", "Que passeio!"]), 1.8); // só se irrita no chacoalhão
+  falar(window.Hornet?.ativo() ? Hornet.texto("solta") : escolha(["Uhul!", "De novo!", "Que passeio!"]), 1.8); // só se irrita no chacoalhão
   if (window.Vida?.voltarAoJogo()) return;
   mudar("feliz", 1.2);
 });
@@ -749,6 +760,7 @@ function desenhar(dt) {
 
 function desenharExtras(topo, dt) {
   window.Vida?.desenhar(topo, dt);
+  window.Hornet?.desenhar();
   desenharTeclas(topo);
   if (P.estado === "dormindo") {
     ctx.font = "bold 14px system-ui, sans-serif";
@@ -782,8 +794,9 @@ function desenhar3D(dt) {
     img = window.Pet3D.desenhar({
       desenho: pet.desenho, anim: P.anim, estado: P.estado, t: P.tAnim, relogio, x: P.x, y: P.y,
       olhando: P.olhando, alturaPx: alturaPx(), dpr: window.devicePixelRatio || 1,
-      planando: P.estado === "caindo" && P.aberto && !!window.Vida?.plana(),
+      planando: (P.estado === "caindo" && P.aberto && !!window.Vida?.plana()) || !!window.Hornet?.planando(),
       voando: !!P.voando,
+      acao: window.Hornet?.acao3d() || null,
       deCostas: P.estado === "segurando" || P.estado === "arrastando", // puxando: anda de costas
     });
     if (img?.boca) boca3d = { ...img.boca, em: relogio };
@@ -794,8 +807,11 @@ function desenhar3D(dt) {
   }
   if (!img) return false;
   // sombra macia no chão (encolhe quando ele está no ar)
-  const noAr = P.estado === "caindo" || P.voando ? 0.6 : 1;
-  const ySombra = P.voando ? chaoDe() : P.y; // voando, a sombra fica lá no chão
+  const pulando = P.estado === "pogo" || P.estado === "planar"; // a Hornet no pogo e planando
+  const noAr = P.estado === "caindo" || P.voando || pulando ? 0.6 : 1;
+  // no ar, a sombra fica lá no chão
+  let ySombra = P.voando ? chaoDe() : P.y;
+  if (pulando) ySombra = noChao() ? chaoDe() : (P.chaoAlvo ?? P.pogo?.y0 ?? P.y);
   ctx.save();
   ctx.fillStyle = "rgba(20,22,35,0.18)";
   ctx.beginPath();
@@ -893,14 +909,14 @@ async function trocarPet(novo) {
   pet = novo;
   await prepararSprites();
   P.fala = null;
-  falar(`Oi! Eu sou ${pet.nome} 👋`, 3);
+  falar(pet.desenho === "hornet" ? "Saudações. Eu sou Hornet." : `Oi! Eu sou ${pet.nome} 👋`, 3);
   mudar("acenando", 2);
 }
 
 window.api.ouvir("cursor", (c) => (cursor = c));
 window.api.ouvir("config", (c) => {
   config = c;
-  if (!config.passear && ["andar", "perseguir", "seguir", "segurando", "buscar", "arrastando"].includes(P.estado)) {
+  if (!config.passear && ["andar", "perseguir", "seguir", "segurando", "buscar", "arrastando", "combate", "cacar"].includes(P.estado)) {
     P.bilhete = null;
     mudar("voltar", 20, { alvo: P.ancora || tela.casa });
   }
@@ -925,7 +941,7 @@ window.api.ouvir("tela", (t) => {
   const mudou = Math.hypot(antiga.x - t.casa.x, antiga.y - t.casa.y) > 1;
   const emCasa = P.ancora && Math.hypot(P.ancora.x - antiga.x, P.ancora.y - antiga.y) < 1;
   if (mudou && emCasa) P.ancora = { ...t.casa };
-  const ocupado = segurado || ["perseguir", "segurando", "buscar", "arrastando", "pousando", "travessura"].includes(P.estado);
+  const ocupado = segurado || ["perseguir", "segurando", "buscar", "arrastando", "pousando", "travessura", "combate", "pogo", "planar", "storm"].includes(P.estado);
   const foraDasTelas = !t.areas.some((a) => dentro(P, a));
   if (!segurado && foraDasTelas) chamarDeVolta(8, { ficar: false }); // a tela onde ele estava deixou de ser permitida
   else if (mudou && !ocupado && (Math.hypot(P.x - antiga.x, P.y - antiga.y) < 140 || !config.passear)) chamarDeVolta(8, { ficar: false });
@@ -939,7 +955,7 @@ window.api.ouvir("brinquedos:abrir", (p) => window.Vida?.abrirMenuBrinquedos(p))
 // o Windows não deixou mexer no cursor (janela de administrador na frente): solta e explica
 let avisouMouse = -999;
 window.api.ouvir("mouse:bloqueado", ({ janelaAdmin } = {}) => {
-  if (P.estado !== "segurando" && P.estado !== "perseguir") return;
+  if (!["segurando", "perseguir", "combate"].includes(P.estado)) return;
   if (relogio - avisouMouse > 120) {
     avisouMouse = relogio;
     falar(
@@ -969,7 +985,7 @@ window.api.ouvir("pet:humor", (h) => {
     return;
   }
   P.humor = h === "pensando" || h === "trabalhando" ? h : null;
-  if (["perseguir", "seguir", "segurando", "buscar", "arrastando"].includes(P.estado)) P.bilhete = null;
+  if (["perseguir", "seguir", "segurando", "buscar", "arrastando", "combate"].includes(P.estado)) P.bilhete = null;
   if (P.humor) return proximoEstado();
   if (h === "falando") return mudar("acenando", 1.5);
   if (h === "feliz") return mudar("feliz", 1.5);
