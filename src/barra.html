@@ -5,17 +5,26 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
 <title>Menu do pet</title>
 <style>
-  /* Pop-up que desce do topo da tela quando o mouse encosta lá em cima (no meio). */
+  /* Pop-up de atalhos que sai da borda da tela escolhida em Ajustes (cima, baixo, esquerda ou direita)
+     quando o mouse encosta no meio dela. Nas laterais ele fica em pé, com os botões empilhados. */
   :root { --fundo: #faf9f5; --texto: #1f1e1d; --suave: #73726c; --borda: #e8e6dc; --destaque: #d97757; --destaque-forte: #c6613f; --hover: #f0eee6; }
   @media (prefers-color-scheme: dark) {
     :root { --fundo: #262624; --texto: #f5f4ef; --suave: #a6a39a; --borda: #3d3d3a; --hover: #30302e; }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font: 12px system-ui, sans-serif; color: var(--texto); user-select: none; }
-  #barra { position: absolute; left: 6px; right: 6px; top: 0; display: flex; gap: 2px; padding: 6px; justify-content: center;
-    background: var(--fundo); border: 1px solid var(--borda); border-top: 3px solid var(--destaque); border-radius: 0 0 14px 14px;
-    box-shadow: 0 6px 18px rgba(0,0,0,.22); transform: translateY(-110%); transition: transform .16s ease-out; }
-  body.visivel #barra { transform: translateY(0); }
+  #barra { position: absolute; display: flex; gap: 2px; padding: 6px; justify-content: center; align-items: center;
+    background: var(--fundo); border: 1px solid var(--borda); box-shadow: 0 6px 18px rgba(0,0,0,.22); transition: transform .16s ease-out; }
+  /* de cada borda: encostado nela, com a faixa laranja do lado da borda, e entrando a partir dela */
+  body.cima #barra { left: 6px; right: 6px; top: 0; border-top: 3px solid var(--destaque); border-radius: 0 0 14px 14px; transform: translateY(-110%); }
+  body.baixo #barra { left: 6px; right: 6px; bottom: 0; border-bottom: 3px solid var(--destaque); border-radius: 14px 14px 0 0; transform: translateY(110%); }
+  body.esquerda #barra { top: 6px; bottom: 6px; left: 0; flex-direction: column; border-left: 3px solid var(--destaque); border-radius: 0 14px 14px 0; transform: translateX(-110%); }
+  body.direita #barra { top: 6px; bottom: 6px; right: 0; flex-direction: column; border-right: 3px solid var(--destaque); border-radius: 14px 0 0 14px; transform: translateX(110%); }
+  body.visivel #barra { transform: none; }
+  /* brinquedos: troca os atalhos pelos brinquedos (e um "Voltar") dentro do próprio pop-up */
+  .brinquedo { display: none; }
+  body.brinquedos .atalho { display: none; }
+  body.brinquedos .brinquedo { display: flex; }
   button { font: inherit; color: var(--texto); background: none; border: 0; border-radius: 10px; width: 64px; padding: 6px 2px 5px; cursor: pointer;
     display: flex; flex-direction: column; align-items: center; gap: 4px; }
   button:hover { background: var(--hover); }
@@ -23,17 +32,21 @@
   button.perigo:hover { background: #e5484d; color: #fff; }
   button.perigo:hover .ic { color: #fff; }
   [hidden] { display: none !important; }
+  body.desafiar .so-comida, body:not(.desafiar) .so-desafiar { display: none; }
 </style>
 </head>
-<body>
+<body class="cima">
 <!-- ícones Lucide (ISC, veja icones/LICENSE-lucide.txt) -->
 <nav id="barra">
-  <button data-acao="chat" id="btnChat"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /><path d="M8 12h.01" /><path d="M12 12h.01" /><path d="M16 12h.01" /></svg>Conversar</button>
-  <button data-acao="brinquedos"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="12" x="3" y="8" rx="1" /><path d="M10 8V5c0-.6-.4-1-1-1H6a1 1 0 0 0-1 1v3" /><path d="M19 8V5c0-.6-.4-1-1-1h-3a1 1 0 0 0-1 1v3" /></svg>Brinquedos</button>
-  <button data-acao="voltar"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>Chamar</button>
-  <button data-acao="ajustes"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /><circle cx="12" cy="12" r="3" /></svg>Ajustes</button>
-  <button data-acao="esconder" id="btnEsconder"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /><path d="m2 2 20 20" /></svg>Esconder</button>
-  <button data-acao="sair" class="perigo"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>Fechar</button>
+  <button data-acao="chat" id="btnChat" class="atalho"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /><path d="M8 12h.01" /><path d="M12 12h.01" /><path d="M16 12h.01" /></svg>Conversar</button>
+  <button data-acao="brinquedos" class="atalho"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="12" x="3" y="8" rx="1" /><path d="M10 8V5c0-.6-.4-1-1-1H6a1 1 0 0 0-1 1v3" /><path d="M19 8V5c0-.6-.4-1-1-1h-3a1 1 0 0 0-1 1v3" /></svg>Brinquedos</button>
+  <button data-acao="voltar" class="atalho"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>Chamar</button>
+  <button data-acao="ajustes" class="atalho"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /><circle cx="12" cy="12" r="3" /></svg>Ajustes</button>
+  <button data-acao="esconder" id="btnEsconder" class="atalho"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /><path d="m2 2 20 20" /></svg>Esconder</button>
+  <button data-acao="sair" class="perigo atalho"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>Fechar</button>
+  <button data-acao="comida" class="brinquedo" id="btnComida"><svg class="ic so-comida" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7c-2-1.6-7-1.4-7 4 0 4.5 3 9.5 5 9.5 1 0 1.3-.6 2-.6s1 .6 2 .6c2 0 5-5 5-9.5 0-5.4-5-5.6-7-4z" /><path d="M12 7c0-2 .8-3.5 2.5-4.5" /></svg><svg class="ic so-desafiar" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" /><line x1="13" x2="19" y1="19" y2="13" /><line x1="16" x2="20" y1="16" y2="20" /><line x1="19" x2="21" y1="21" y2="19" /><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" /><line x1="5" x2="9" y1="14" y2="18" /><line x1="7" x2="4" y1="17" y2="20" /><line x1="3" x2="5" y1="19" y2="21" /></svg><span id="txtComida">Comida</span></button>
+  <button data-acao="bola" class="brinquedo"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m12 7 4.3 3.1-1.6 5H9.3l-1.6-5z" /><path d="M12 2v5M21.5 9l-5.2 1.1M18 20l-3.3-4.9M6 20l3.3-4.9M2.5 9l5.2 1.1" /></svg>Bola</button>
+  <button data-acao="menu" class="brinquedo"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>Voltar</button>
 </nav>
 <script src="barra.js"></script>
 </body>

@@ -112,12 +112,13 @@ ao entrar no Mac"; no Linux, "Iniciar com o Linux").
 
 | Ação | Como |
 |---|---|
-| Abrir o menu | Encoste o mouse no alto da tela, no meio, e espere um instante. Ele some quando o mouse sai de perto |
+| Abrir o menu | Encoste o mouse no meio da borda de cima da tela e espere um instante. Ele some quando o mouse sai de perto |
+| Mudar a borda do menu | Ajustes → Mais opções → **Menu de atalhos** (em cima, embaixo, na esquerda ou na direita), ou o ícone da bandeja. Vale em cada monitor; se a borda encosta em outro monitor, pare o mouse rente à divisa um pouco mais |
 | Conversar (versão completa) | Menu do topo → **Conversar**, ou clique no ícone da bandeja |
 | Mudar o painel de lugar | Arraste pelo topo do painel aberto (ele passa a abrir ali) |
 | Escolher em que pasta ele trabalha | Clique na linha da pasta no topo do chat |
 | Carinho | Clique no pet |
-| Dar comida / brincar de bola | Menu do topo → **Brinquedos** (ou botão direito no pet) |
+| Dar comida / brincar de bola | Menu de atalhos → **Brinquedos** → **Comida** ou **Bola** (ou botão direito no pet). Com a Hornet, **Desafiar** chama um inimigo |
 | Chutar a bola | Clique nela: ela vai para o lado oposto de onde você clicou. O pet chuta de volta na direção do seu mouse |
 | Mudar o pet de lugar | Arraste o pet com o mouse |
 | Trocar de pet, ligar passeio ou modo bagunça | Menu do topo → **Ajustes**, ou o ícone na bandeja |

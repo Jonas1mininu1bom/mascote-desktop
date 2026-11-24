@@ -958,6 +958,8 @@ window.api.ouvir("tela", (t) => {
 window.api.ouvir("pet:trocar", trocarPet);
 // "Brinquedos" no pop-up do topo: o menu abre logo acima da cabeça do pet
 window.api.ouvir("brinquedos:abrir", () => window.Vida?.abrirMenuBrinquedos({ x: P.x, y: P.y - alturaPx() + 25 }));
+// brinquedo escolhido direto no menu de atalhos (comida/Desafiar ou bola)
+window.api.ouvir("brinquedos:usar", (id) => window.Vida?.usarBrinquedo(id));
 // o Windows não deixou mexer no cursor (janela de administrador na frente): solta e explica
 let avisouMouse = -999;
 window.api.ouvir("mouse:bloqueado", ({ janelaAdmin } = {}) => {

@@ -86,7 +86,7 @@ function vigiar(nome, w) {
 }
 
 // ---------- configuração ----------
-const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir(), travessuras: {}, telas: "todas", chao: "tela", frequencia: 3 };
+const PADRAO = { pet: "palito", passear: false, bagunca: false, pasta: os.homedir(), travessuras: {}, telas: "todas", chao: "tela", frequencia: 3, barraLado: "cima" };
 let config = { ...PADRAO };
 const arqConfig = () => path.join(app.getPath("userData"), "config.json");
 const pastaPetsUsuario = () => path.join(app.getPath("userData"), "pets");
@@ -353,14 +353,28 @@ function criarChat() {
   });
 }
 
-// ---------- pop-up do topo ----------
-// Encostar o mouse no alto da tela, no meio, e deixar lá um instante faz descer um pop-up com os
-// atalhos (conversar, brinquedos, chamar, ajustes, esconder, fechar). Ele some quando o mouse sai.
-// Só no meio da tela e com uma pequena espera: nos cantos de cima ficam as abas e o X das janelas.
-const BARRA = { botao: 66, alto: 80 };
-const TOPO = { espera: 250, faixa: 0.2, saida: 450, folga: 28 };
+// ---------- pop-up de atalhos ----------
+// Encostar o mouse numa borda da tela (no meio dela) e deixar lá um instante faz aparecer um pop-up
+// com os atalhos (conversar, brinquedos, chamar, ajustes, esconder, fechar). Some quando o mouse sai.
+// A borda é escolhida em Ajustes (cima, baixo, esquerda ou direita) e vale para cada monitor.
+// Só no meio da borda e com uma pequena espera: nos cantos de cima ficam as abas e o X das janelas.
+const LADOS_BARRA = ["cima", "baixo", "esquerda", "direita"];
+const BARRA = { botao: 66, alto: 80, botaoEmPe: 56, larguraEmPe: 92 };
+// entre: a borda escolhida encosta em outro monitor (o mouse passa direto para ele), então vale
+// parar rente à divisa, numa faixa um pouco mais larga e por um pouco mais de tempo
+const TOPO = { espera: 250, esperaEmbaixo: 400, esperaEntre: 550, faixa: 0.2, faixaEntre: 4, saida: 450, folga: 28 };
 const botoesDaBarra = () => 4 + (COM_CHAT ? 1 : 0) + (tray ? 1 : 0);
-const larguraBarra = () => botoesDaBarra() * BARRA.botao + 26;
+const ladoBarra = () => (LADOS_BARRA.includes(config.barraLado) ? config.barraLado : "cima");
+const barraEmPe = () => ladoBarra() === "esquerda" || ladoBarra() === "direita";
+// tamanho da janela: deitada (cima/baixo) ou em pé, com os botões empilhados (esquerda/direita)
+const tamanhoBarra = () =>
+  barraEmPe()
+    ? { width: BARRA.larguraEmPe, height: botoesDaBarra() * BARRA.botaoEmPe + 26 }
+    : { width: botoesDaBarra() * BARRA.botao + 26, height: BARRA.alto };
+const estadoBarra = (visivel) => ({
+  visivel, comChat: COM_CHAT, podeEsconder: Boolean(tray), lado: ladoBarra(),
+  comida: petAtual().desenho === "hornet" ? "desafiar" : "comida", // a Hornet não come: enfrenta um inimigo
+});
 let barraVisivel = false;
 let topoDesde = 0;
 let saiuDesde = 0;
@@ -368,8 +382,7 @@ let saiuDesde = 0;
 function criarBarra() {
   barra = new BrowserWindow({
     icon: ICONE_APP,
-    width: larguraBarra(),
-    height: BARRA.alto,
+    ...tamanhoBarra(),
     show: false,
     transparent: true,
     frame: false,
@@ -388,14 +401,24 @@ function criarBarra() {
   barra.webContents.on("render-process-gone", () => setTimeout(() => barra && !barra.isDestroyed() && barra.webContents.reload(), 1000));
 }
 
+// Encostado na borda escolhida da área útil do monitor (no Mac, abaixo da barra de menus; embaixo,
+// acima da barra de tarefas), no meio dela.
 function mostrarBarra(d) {
   if (!barra || barra.isDestroyed()) return;
-  const largura = larguraBarra();
-  // no alto da área útil: no Mac, logo abaixo da barra de menus
-  barra.setBounds({ x: Math.round(d.bounds.x + (d.bounds.width - largura) / 2), y: d.workArea.y, width: largura, height: BARRA.alto });
+  const { width, height } = tamanhoBarra();
+  const a = d.workArea, b = d.bounds;
+  const meioX = Math.round(Math.min(a.x + a.width - width, Math.max(a.x, b.x + (b.width - width) / 2)));
+  const meioY = Math.round(Math.min(a.y + a.height - height, Math.max(a.y, b.y + (b.height - height) / 2)));
+  const pos = {
+    cima: { x: meioX, y: a.y },
+    baixo: { x: meioX, y: a.y + a.height - height },
+    esquerda: { x: a.x, y: meioY },
+    direita: { x: a.x + a.width - width, y: meioY },
+  }[ladoBarra()];
+  barra.setBounds({ ...pos, width, height });
   barra.showInactive(); // não rouba o teclado de quem está digitando
   barra.moveTop();
-  barra.webContents.send("barra:estado", { visivel: true, comChat: COM_CHAT, podeEsconder: Boolean(tray) });
+  barra.webContents.send("barra:estado", estadoBarra(true));
   barraVisivel = true;
   saiuDesde = 0;
 }
@@ -405,7 +428,7 @@ function esconderBarra() {
   if (!barraVisivel) return;
   barraVisivel = false;
   if (!barra || barra.isDestroyed()) return;
-  barra.webContents.send("barra:estado", { visivel: false, comChat: COM_CHAT, podeEsconder: Boolean(tray) });
+  barra.webContents.send("barra:estado", estadoBarra(false));
   setTimeout(() => !barraVisivel && barra && !barra.isDestroyed() && barra.hide(), 180); // depois de subir
 }
 
@@ -414,11 +437,10 @@ function vigiarTopoDaTela(p) {
   if (escondido || chatAberto || arrasto) return esconderBarra();
   if (!barraVisivel) {
     const d = screen.getDisplayNearestPoint(p);
-    const b = d.bounds;
-    const noTopo = p.y <= b.y + 1 && Math.abs(p.x - (b.x + b.width / 2)) <= b.width * TOPO.faixa;
-    if (!noTopo) return void (topoDesde = 0);
+    const borda = naBordaDaBarra(p, d);
+    if (!borda) return void (topoDesde = 0);
     if (!topoDesde) topoDesde = Date.now();
-    else if (Date.now() - topoDesde >= TOPO.espera) mostrarBarra(d);
+    else if (Date.now() - topoDesde >= borda.espera) mostrarBarra(d);
     return;
   }
   const r = barra.getBounds();
@@ -429,11 +451,30 @@ function vigiarTopoDaTela(p) {
   else if (Date.now() - saiuDesde >= TOPO.saida) esconderBarra();
 }
 
+// O mouse está encostado na borda escolhida deste monitor, no meio dela? Devolve a espera que vale
+// (ou null). Se a borda encosta em outro monitor, aceita uma faixa rente à divisa e espera mais.
+function naBordaDaBarra(p, d) {
+  const b = d.bounds, lado = ladoBarra();
+  const deitada = lado === "cima" || lado === "baixo";
+  const noMeio = deitada
+    ? Math.abs(p.x - (b.x + b.width / 2)) <= b.width * TOPO.faixa
+    : Math.abs(p.y - (b.y + b.height / 2)) <= b.height * TOPO.faixa;
+  if (!noMeio) return null;
+  // ponto logo além da borda: se cair em outro monitor, a borda é uma divisa entre telas
+  const alem = { cima: { x: p.x, y: b.y - 2 }, baixo: { x: p.x, y: b.y + b.height + 1 }, esquerda: { x: b.x - 2, y: p.y }, direita: { x: b.x + b.width + 1, y: p.y } }[lado];
+  const entre = screen.getAllDisplays().some((o) => o.id !== d.id && alem.x >= o.bounds.x && alem.x < o.bounds.x + o.bounds.width && alem.y >= o.bounds.y && alem.y < o.bounds.y + o.bounds.height);
+  const faixa = entre ? TOPO.faixaEntre : 1;
+  const dist = { cima: p.y - b.y, baixo: b.y + b.height - 1 - p.y, esquerda: p.x - b.x, direita: b.x + b.width - 1 - p.x }[lado];
+  if (dist > faixa) return null;
+  return { espera: entre ? TOPO.esperaEntre : lado === "baixo" ? TOPO.esperaEmbaixo : TOPO.espera };
+}
+
 function acaoDaBarra(acao) {
   esconderBarra();
   if (acao === "chat" && COM_CHAT) abrirChat(true, "chat");
   else if (acao === "ajustes") abrirChat(true, "ajustes");
   else if (acao === "brinquedos") overlay?.webContents.send("brinquedos:abrir");
+  else if (acao === "comida" || acao === "bola") overlay?.webContents.send("brinquedos:usar", acao);
   else if (acao === "voltar") overlay?.webContents.send("pet:voltar");
   else if (acao === "esconder" && tray) esconderMascote(true); // sem ícone na bandeja, não teria como voltar
   else if (acao === "sair") app.quit();
@@ -593,6 +634,12 @@ function montarBandeja() {
     },
     { label: "Passear pela tela", type: "checkbox", checked: config.passear, click: (i) => mudarConfig({ passear: i.checked }) },
     { label: "Modo bagunça", type: "checkbox", checked: config.bagunca, click: (i) => mudarConfig({ bagunca: i.checked }) },
+    {
+      label: "Menu de atalhos aparece em",
+      submenu: [["cima", "Cima"], ["baixo", "Baixo"], ["esquerda", "Esquerda"], ["direita", "Direita"]].map(([id, nome]) => ({
+        label: nome, type: "radio", checked: ladoBarra() === id, click: () => mudarConfig({ barraLado: id }),
+      })),
+    },
     { type: "separator" },
     { label: "Sair", click: () => app.quit() },
   ].filter(Boolean));
@@ -617,6 +664,7 @@ function mudarConfig(parcial) {
   salvarConfig();
   enviarParaTodos("config", config);
   if ("telas" in parcial) overlay?.webContents.send("tela", infoTela());
+  if ("barraLado" in parcial) esconderBarra(); // na próxima vez, aparece já na borda nova
   montarBandeja();
 }
 
@@ -972,6 +1020,8 @@ function filtrarConfigDaPagina(parcial) {
   }
   // chão: tela inteira ou só em cima da barra de tarefas
   if (parcial.chao === "tela" || parcial.chao === "barra") limpo.chao = parcial.chao;
+  // borda da tela em que aparece o menu de atalhos
+  if (LADOS_BARRA.includes(parcial.barraLado)) limpo.barraLado = parcial.barraLado;
   // minutos entre uma bagunça e outra
   if (FREQUENCIAS.includes(parcial.frequencia)) limpo.frequencia = parcial.frequencia;
   // telas: "todas" ou o id de um monitor conectado

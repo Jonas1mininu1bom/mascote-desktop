@@ -14,7 +14,7 @@ const ENVIAR = new Set([
 const OUVIR = new Set([
   "chat:erro", "chat:estado", "chat:ferramenta", "chat:fim", "chat:permissao", "chat:texto",
   "config", "pet:trocar", "bilhete:fechado", "cursor", "pet:humor", "pet:voltar", "tela",
-  "travessura:tecla", "travessura:fim", "brinquedos:abrir", "mouse:bloqueado", "barra:estado",
+  "travessura:tecla", "travessura:fim", "brinquedos:abrir", "brinquedos:usar", "mouse:bloqueado", "barra:estado",
 ]);
 
 function conferir(lista, canal) {

@@ -185,6 +185,13 @@ window.Vida = (() => {
     y = Math.max(j.y + 4, Math.min(j.y + j.h - h - 4, y));
     menu = { x, y, w, h, itens, ate: relogio + 8 };
   }
+  // escolhido no menu de atalhos da borda da tela (sem passar pelo menuzinho do pet)
+  function usarBrinquedo(id) {
+    if (segurado || P.estado === "caindo" || P.estado === "tonto") return;
+    fecharMenu();
+    if (id === "comida") darComida();
+    else if (id === "bola") brincar();
+  }
   function fecharMenu() {
     menu = null;
   }
@@ -549,6 +556,6 @@ window.Vida = (() => {
 
   return {
     precisaCair, cair, pegou, segurando, soltou, carinhoRecusado, deslocar, voltarAoJogo,
-    abrirMenu, abrirMenuBrinquedos, sobreMenu, cliqueNoMenu, sobreBola, cliqueNaBola, atualizar, desenhar, plana,
+    abrirMenu, abrirMenuBrinquedos, usarBrinquedo, sobreMenu, cliqueNoMenu, sobreBola, cliqueNaBola, atualizar, desenhar, plana,
   };
 })();
