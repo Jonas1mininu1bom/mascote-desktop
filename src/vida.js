@@ -16,8 +16,8 @@ window.Vida = (() => {
   let bola = null; // { x, y, vx, vy, chao, giro }
 
   const ESTADOS = ["caindo", "tonto", "bravo", "comendo", "brincando"];
-  // o Pato não usa paraquedas: abre as asas e plana, indo para a frente
-  const plana = () => pet.desenho === "pato";
+  // o Pato não usa paraquedas: abre as asas e plana. A Hornet abre a capa.
+  const plana = () => pet.desenho === "pato" || pet.desenho === "hornet";
   const ocioso = () => ["parado", "andar", "acenando", "dormindo", "feliz", "dancando"].includes(P.estado);
   const chao = () => chaoDe(P.x);
   const coracao = (n = 5) => {
@@ -48,7 +48,10 @@ window.Vida = (() => {
     if (!P.aberto) {
       P.vy += GRAVIDADE * dt;
       // abre o paraquedas se ainda tem bastante chão pela frente
-      if (P.y - P.quedaInicio > 40 && c - P.y > ALTURA_PARAQUEDAS * 0.6) P.aberto = true;
+      if (P.y - P.quedaInicio > 40 && c - P.y > ALTURA_PARAQUEDAS * 0.6) {
+        P.aberto = true;
+        if (window.Hornet?.ativo()) Hornet.som("glide"); // a capa abre com uma lufada
+      }
     } else {
       P.paraquedas = Math.min(1, P.paraquedas + dt * 3);
       P.vy += (VEL_PARAQUEDAS - P.vy) * Math.min(1, dt * 4);
@@ -70,6 +73,7 @@ window.Vida = (() => {
       return ficarTonto();
     }
     if (voltarAoJogo()) return;
+    if (window.Hornet?.ativo()) return Hornet.pousou();
     if (P.aberto) falar(escolha(plana() ? ["Quá! Pouso de pato!", "Voei!", "Quem precisa de paraquedas?"] : ["Ufa! 🪂", "Pouso perfeito!", "Que vista!"]), 2);
     mudar(P.aberto ? "feliz" : "parado", P.aberto ? 1.4 : 0.6);
   }
@@ -92,6 +96,10 @@ window.Vida = (() => {
       chacoalho.sinal[eixo] = s;
     }
     chacoalho.viradas = chacoalho.viradas.filter((t) => relogio - t < 1.5);
+    if (!chacoalho.tonto && chacoalho.viradas.length >= 5 && window.Hornet?.ativo()) {
+      chacoalho.ultimo = null;
+      return Hornet.chacoalhada(); // escapa da mão com o Thread Storm
+    }
     if (!chacoalho.tonto && chacoalho.viradas.length >= 5) {
       chacoalho.tonto = true;
       falar(escolha(["Aaaaah!", "Para, para, paraaa!", "Tô ficando tonto!"]), 1.5);
@@ -117,18 +125,26 @@ window.Vida = (() => {
     return false;
   }
   function ficarTonto() {
+    if (window.Hornet?.ativo()) {
+      falar(Hornet.texto("pancada"), 2.5);
+      return mudar("parado", 1.5);
+    }
     falar(escolha(["Tudo girando... 😵‍💫", "Ui... onde eu tô?", "Vejo estrelinhas..."]), 2.5);
     mudar("tonto", 3);
   }
   function ficarBravo() {
     bravoAte = relogio + 25;
     P.olhando = cursor.x >= P.x ? 1 : -1;
+    if (window.Hornet?.ativo()) {
+      falar(Hornet.texto("brava"), 3);
+      return mudar("bravo", 5);
+    }
     falar(escolha(["Para de me chacoalhar! 😠", "Hmph! Não gostei!", "Tô bravo com você! 😤"]), 3);
     mudar("bravo", 5);
   }
   function carinhoRecusado() {
     if (relogio >= bravoAte) return false;
-    falar(escolha(["Hmph! 😤", "Não quero carinho agora.", "Ainda tô bravo..."]), 1.8);
+    falar(window.Hornet?.ativo() ? Hornet.texto("recusa") : escolha(["Hmph! 😤", "Não quero carinho agora.", "Ainda tô bravo..."]), 1.8);
     mudar("bravo", 1.5);
     return true;
   }
@@ -137,9 +153,9 @@ window.Vida = (() => {
   function abrirMenu() {
     if (ESTADOS.includes(P.estado) && P.estado !== "bravo") return;
     const itens = [
-      { id: "comida", rotulo: `${COMIDAS[pet.id] || "🍎"}  Dar comida` },
-      { id: "brincar", rotulo: "⚽  Brincar" },
-      { id: "carinho", rotulo: "💗  Carinho" },
+      { id: "comida", rotulo: window.Hornet?.ativo() ? "Desafiar" : "Dar comida" },
+      { id: "brincar", rotulo: "Brincar" },
+      { id: "carinho", rotulo: "Carinho" },
     ];
     const w = 138;
     const { min, max } = limites();
@@ -152,8 +168,8 @@ window.Vida = (() => {
   function abrirMenuBrinquedos(ponto) {
     if (P.estado === "caindo" || P.estado === "tonto") return;
     const itens = [
-      { id: "comida", rotulo: `${COMIDAS[pet.id] || "🍎"}  Comida` },
-      { id: "brincar", rotulo: "⚽  Bola de futebol" },
+      { id: "comida", rotulo: window.Hornet?.ativo() ? "Desafiar" : "Comida" },
+      { id: "brincar", rotulo: "Bola de futebol" },
     ];
     const w = 150;
     montarMenu(itens, ponto.x - w / 2, ponto.y - 17 - 8 - (itens.length * 28 + 10), w);
@@ -168,6 +184,13 @@ window.Vida = (() => {
     x = Math.max(j.x + 4, Math.min(j.x + j.w - w - 4, x));
     y = Math.max(j.y + 4, Math.min(j.y + j.h - h - 4, y));
     menu = { x, y, w, h, itens, ate: relogio + 8 };
+  }
+  // escolhido no menu de atalhos da borda da tela (sem passar pelo menuzinho do pet)
+  function usarBrinquedo(id) {
+    if (segurado || P.estado === "caindo" || P.estado === "tonto") return;
+    fecharMenu();
+    if (id === "comida") darComida();
+    else if (id === "bola") brincar();
   }
   function fecharMenu() {
     menu = null;
@@ -194,6 +217,7 @@ window.Vida = (() => {
 
   // ---------- comida ----------
   function darComida() {
+    if (window.Hornet?.ativo()) return Hornet.invocarInimigo(); // ela não come: enfrenta um inimigo
     const lado = P.olhando || 1;
     const x = limitarX(P.x + lado * (larguraPx() / 2 + 34));
     comida = { x, y: P.y - alturaPx() - 80, vy: 0, chao: noChao() ? chaoDe(x) : P.y, mordidas: 0, emoji: COMIDAS[pet.id] || "🍎" };
@@ -370,7 +394,7 @@ window.Vida = (() => {
       if (relogio > menu.ate || (longe && !menu.esperaChegar)) fecharMenu();
     }
     fome = Math.min(100, fome + dt / 20); // ~1 ponto a cada 20 s
-    if (fome > 70 && ocioso() && relogio - ultimaQueixa > 90) {
+    if (fome > 70 && ocioso() && relogio - ultimaQueixa > 90 && !window.Hornet?.ativo()) {
       ultimaQueixa = relogio;
       falar(escolha(["Tô com fome... 🍽️", "Minha barriga roncou...", "Me dá comida?"]), 3);
     }
@@ -532,6 +556,6 @@ window.Vida = (() => {
 
   return {
     precisaCair, cair, pegou, segurando, soltou, carinhoRecusado, deslocar, voltarAoJogo,
-    abrirMenu, abrirMenuBrinquedos, sobreMenu, cliqueNoMenu, sobreBola, cliqueNaBola, atualizar, desenhar, plana,
+    abrirMenu, abrirMenuBrinquedos, usarBrinquedo, sobreMenu, cliqueNoMenu, sobreBola, cliqueNaBola, atualizar, desenhar, plana,
   };
 })();

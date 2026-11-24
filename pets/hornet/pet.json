@@ -1,0 +1,98 @@
+{
+  "nome": "Hornet",
+  "descricao": "A protetora de Hallownest e Pharloom. Ágil, educada e mortal com sua agulha.",
+  "autor": "Comunidade",
+  "tipo": "pixel",
+  "desenho": "hornet",
+  "escala": 9,
+  "velocidade": 2.4,
+  "personalidade": "Hornet: guerreira elegante, reservada e muito educada. Protege quem está com ela e não tolera desrespeito, mas nunca perde a compostura.",
+  "jeitoDeFalar": "Fala de forma formal e gentil, com frases curtas: 'por favor', 'com licença', 'obrigada'. Em combate solta um grito curto: 'SHAW!'.",
+  "saudacao": "Saudações. Eu sou Hornet. Em que posso ajudar?",
+  "falas": [
+    "Saudações.",
+    "Que dia tranquilo, não acha?",
+    "Estou à sua disposição.",
+    "Mantenha-se atento, viajante.",
+    "A seda está calma hoje.",
+    "Com licença, apenas observando."
+  ],
+  "paleta": {
+    "k": "#1c1b25",
+    "w": "#f6f2e9",
+    "r": "#c0232d",
+    "s": "#dfe3ea"
+  },
+  "animacoes": {
+    "parado": {
+      "fps": 3,
+      "quadros": [
+        [
+          ".w......w...",
+          ".w......w...",
+          "..w....w....",
+          "..ww..ww....",
+          "..wwwwww....",
+          ".wwwwwwww...",
+          ".wkkwwkkw...",
+          ".wkkwwkkw...",
+          ".wwkwwkww...",
+          "..wwwwww....",
+          "...wwww.....",
+          "...rrrr.....",
+          "..rrrrrrk...",
+          "..rrrrrr.k..",
+          ".rrrrrrrr.s.",
+          ".rrrrrrrr.s.",
+          "r.rr.rr.r.s.",
+          "...k..k...s."
+        ]
+      ]
+    },
+    "andando": {
+      "fps": 8,
+      "quadros": [
+        [
+          ".w......w...",
+          ".w......w...",
+          "..w....w....",
+          "..ww..ww....",
+          "..wwwwww....",
+          ".wwwwwwww...",
+          ".wkkwwkkw...",
+          ".wkkwwkkw...",
+          ".wwkwwkww...",
+          "..wwwwww....",
+          "...wwww.....",
+          "...rrrr.....",
+          "..rrrrrrk...",
+          "..rrrrrr.k..",
+          ".rrrrrrrr.s.",
+          ".rrrrrrrr.s.",
+          "r.rr.rr.r.s.",
+          "..k....k..s."
+        ],
+        [
+          ".w......w...",
+          ".w......w...",
+          "..w....w....",
+          "..ww..ww....",
+          "..wwwwww....",
+          ".wwwwwwww...",
+          ".wkkwwkkw...",
+          ".wkkwwkkw...",
+          ".wwkwwkww...",
+          "..wwwwww....",
+          "...wwww.....",
+          "...rrrr.....",
+          "..rrrrrrk...",
+          "..rrrrrr.k..",
+          ".rrrrrrrr.s.",
+          ".rrrrrrrr.s.",
+          "r.rr.rr.r.s.",
+          "....kk....s."
+        ]
+      ]
+    }
+  }
+}

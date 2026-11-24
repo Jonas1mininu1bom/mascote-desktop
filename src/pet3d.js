@@ -219,7 +219,128 @@ window.Pet3D = (() => {
     return { raiz, corpo, cabecaP, cabeca, olhos, boca, patas, rabo, tipo: "tartaruga", altura: 1.25 };
   }
 
-  const MONTAR = { pato: montarPato, palito: montarPalito, tartaruga: montarTartaruga };
+  // ---------- Hornet: máscara branca com chifres, corpo preto, capa vermelha e agulha ----------
+  // peça fina (perna, braço, chifre, agulha) de a até b, com contorno de espessura fixa
+  // (a casca escalada do parte() some em peças finas e alongaria as pontas)
+  // lados: 10 = redondo; 4 = seção quadrada (lâmina facetada)
+  function tubo(pai, a, b, ra, rb, cor, contorno = 0.012, lados = 10) {
+    const A = new T.Vector3(...a), B = new T.Vector3(...b);
+    const dir = B.clone().sub(A);
+    const comp = dir.length();
+    const g = new T.Group();
+    g.position.copy(A).add(B).multiplyScalar(0.5);
+    g.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir.normalize());
+    let geo = new T.CylinderGeometry(rb, ra, comp, lados);
+    if (lados <= 6) {
+      // faces chapadas: sem vértices compartilhados nas quinas, cada face tem a própria normal
+      geo = geo.toNonIndexed();
+      geo.computeVertexNormals();
+    }
+    g.add(new T.Mesh(geo, typeof cor === "number" ? toon(cor) : cor));
+    if (contorno) g.add(new T.Mesh(new T.CylinderGeometry(rb + contorno, ra + contorno, comp + contorno, lados), matContorno));
+    pai.add(g);
+    return g;
+  }
+
+  function montarHornet() {
+    const raiz = new T.Group();
+    raiz.rotation.order = "YXZ"; // inclinar (x) no eixo dela, depois de virar (y)
+    const MASCARA = 0xf6f2e9, PRETO = 0x1c1b25, VERMELHO = 0xc0232d, PRATA = 0xdfe3ea, LINHA = 0xf4f0e6;
+    // articulação fininha (bolinha preta da grossura do membro, para a dobra não abrir buraco)
+    const junta = (pai, r) => parte(esfera(10), PRETO, { pai, esc: [r, r, r], contorno: 0.01 / r });
+    // pernas pretas finíssimas que terminam em ponta: coxa (pivô no quadril) e canela (pivô no joelho)
+    const joelhos = [];
+    const pernas = [-1, 1].map((l) => {
+      const p = pivo(raiz, [0.045 * l, 0.44, 0]);
+      tubo(p, [0, 0, 0], [0, -0.22, 0], 0.024, 0.017, PRETO, 0.01);
+      const j = pivo(p, [0, -0.22, 0]);
+      junta(j, 0.017);
+      tubo(j, [0, 0, 0], [0, -0.22, 0.01], 0.017, 0.002, PRETO, 0.01);
+      joelhos.push(j);
+      return p;
+    });
+    const corpo = pivo(raiz, [0, 0.44, 0]); // pivô no quadril: o tronco inclina para correr
+    parte(capsula(0.06, 0.3), PRETO, { pai: corpo, pos: [0, 0.27, 0], esc: [1, 1, 0.85] });
+    tubo(corpo, [0, 0.5, 0], [0, 0.64, 0], 0.03, 0.026, PRETO, 0.01);
+
+    // capinha franzida: curta (termina na cintura), bem aberta, com dobras arredondadas na barra.
+    // Os vértices são mexidos a cada quadro pela animação (tecido).
+    const SAIA_RAD = 56, SAIA_SEG = 8, SAIA_H = 0.31; // 7 pétalas × 8 segmentos
+    const saiaGeo = new T.CylinderGeometry(0.09, 0.42, SAIA_H, SAIA_RAD, SAIA_SEG, true);
+    const saia = pivo(corpo, [0, 0.56, 0]);
+    // cor por vértice: vincos vinho-escuro, meio das pétalas vermelho vivo (pintada a cada quadro)
+    saiaGeo.setAttribute("color", new T.Float32BufferAttribute(new Float32Array(saiaGeo.attributes.position.count * 3), 3));
+    saia.add(new T.Mesh(saiaGeo, new T.MeshToonMaterial({ color: 0xffffff, vertexColors: true, gradientMap: degraus })));
+    // por dentro a capa é magenta escuro (aparece nas dobras e quando ela abre a cúpula)
+    saia.add(new T.Mesh(saiaGeo, new T.MeshToonMaterial({ color: 0x7c1840, gradientMap: degraus, side: T.BackSide })));
+    const contornoSaia = new T.Mesh(saiaGeo, matContorno);
+    contornoSaia.scale.setScalar(1.045);
+    saia.add(contornoSaia);
+    parte(new T.SphereGeometry(1, 18, 8, 0, TAU, 0, Math.PI * 0.5), VERMELHO, { pai: corpo, pos: [0, 0.53, -0.005], esc: [0.13, 0.08, 0.12], contorno: 0.08 });
+
+    // máscara: uma peça só em "U" alto (queixo redondo embaixo, os "chifres" são as duas pontas
+    // da própria máscara, grossas na base, com um entalhe em U entre elas)
+    const cabeca = pivo(corpo, [0, 0.6, 0]);
+    const contornoU = new T.Shape();
+    // (a borda arredondada da extrusão engorda o desenho em 0,03 para todos os lados)
+    contornoU.moveTo(0, 0.03);
+    contornoU.bezierCurveTo(0.11, 0.03, 0.16, 0.12, 0.16, 0.28);
+    contornoU.bezierCurveTo(0.16, 0.5, 0.168, 0.72, 0.145, 0.84);
+    contornoU.quadraticCurveTo(0.125, 0.885, 0.105, 0.84);
+    contornoU.bezierCurveTo(0.095, 0.7, 0.088, 0.53, 0.072, 0.45);
+    contornoU.quadraticCurveTo(0, 0.32, -0.072, 0.45);
+    contornoU.bezierCurveTo(-0.088, 0.53, -0.095, 0.7, -0.105, 0.84);
+    contornoU.quadraticCurveTo(-0.125, 0.885, -0.145, 0.84);
+    contornoU.bezierCurveTo(-0.168, 0.72, -0.16, 0.5, -0.16, 0.28);
+    contornoU.bezierCurveTo(-0.16, 0.12, -0.11, 0.03, 0, 0.03);
+    // pouca espessura e borda bem grossa e arredondada: de lado parece uma pastilha, não um bloco
+    const geoMascara = new T.ExtrudeGeometry(contornoU, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.095, bevelSize: 0.03, bevelSegments: 8, curveSegments: 28 });
+    geoMascara.computeBoundingBox();
+    const centro = geoMascara.boundingBox.getCenter(new T.Vector3());
+    geoMascara.center(); // centralizada, para o contorno (casca escalada) ficar por igual em volta
+    // inclinada para trás, de frente para a câmera (que olha de cima): assim o U aparece aberto
+    const rosto = pivo(cabeca);
+    rosto.rotation.x = -0.42;
+    parte(geoMascara, MASCARA, { pai: rosto, pos: [centro.x, centro.y, 0], contorno: 0.035 });
+    // olhos grandes e ovais perto do queixo, inclinados para fora no alto
+    const olhos = [-1, 1].map((l) =>
+      parte(esfera(14), basico(0x101016), { pai: rosto, pos: [0.07 * l, 0.17, 0.112], esc: [0.05, 0.075, 0.03], rot: [0, 0.2 * l, -0.38 * l], contorno: 0 })
+    );
+
+    // braços pretos finíssimos e compridos (a mão fica para fora da capa), terminando em ponta:
+    // braço (pivô no ombro) e antebraço (pivô no cotovelo)
+    const cotovelos = [];
+    const bracos = [-1, 1].map((l) => {
+      const p = pivo(corpo, [0.09 * l, 0.5, 0]);
+      tubo(p, [0, 0, 0], [0, -0.2, 0], 0.02, 0.014, PRETO, 0.01);
+      const c = pivo(p, [0, -0.2, 0]);
+      junta(c, 0.014);
+      tubo(c, [0, 0, 0], [0, -0.22, 0], 0.014, 0.004, PRETO, 0.01);
+      cotovelos.push(c);
+      return p;
+    });
+    // agulha na mão direita (o eixo +Y aponta para a ponta), toda prateada: lâmina longa de seção
+    // quadrada e facetada, ombro chanfrado, haste fina redonda (onde ela segura) e o olho na ponta de trás
+    const agulha = pivo(cotovelos[1], [0, -0.2, 0]); // na mão (fim do antebraço)
+    tubo(agulha, [0, 0.12, 0], [0, 0.92, 0], 0.042, 0.002, PRATA, 0.012, 4);
+    tubo(agulha, [0, 0.07, 0], [0, 0.12, 0], 0.013, 0.042, PRATA, 0.012, 4);
+    tubo(agulha, [0, -0.25, 0], [0, 0.07, 0], 0.012, 0.012, PRATA);
+    parte(new T.TorusGeometry(0.04, 0.009, 8, 20), PRATA, { pai: agulha, pos: [0, -0.29, 0], contorno: 0.22 });
+    const ponta = pivo(agulha, [0, 0.92, 0]);
+    // linha de seda presa no olho da agulha
+    const linha = pivo(agulha, [0, -0.33, 0]);
+    const curva = new T.CatmullRomCurve3([[0, 0, 0], [0.03, -0.09, -0.02], [-0.01, -0.19, -0.06], [-0.05, -0.28, -0.04]].map((p) => new T.Vector3(...p)));
+    linha.add(new T.Mesh(new T.TubeGeometry(curva, 16, 0.006, 5), basico(LINHA)));
+
+    return {
+      raiz, corpo, cabeca, olhos, bracos, cotovelos, pernas, joelhos, saia, saiaGeo, agulha, ponta, linha,
+      saiaR0: 0.09, saiaR1: 0.42, saiaH: SAIA_H, saiaRad: SAIA_RAD, saiaSeg: SAIA_SEG,
+      abre: 0, arrasto: 0, vento: 0.15,
+      tipo: "hornet", altura: 1.92,
+    };
+  }
+
+  const MONTAR = { pato: montarPato, palito: montarPalito, tartaruga: montarTartaruga, hornet: montarHornet };
 
   // ---------- cena ----------
   let renderer = null, cena = null, camera = null, modelo = null, desenhoAtual = null;
@@ -259,7 +380,294 @@ window.Pet3D = (() => {
   // para abrir as asas do pato (girar em volta de eixos, sem criar objetos a cada quadro)
   const EIXO_Y = T ? new T.Vector3(0, 1, 0) : null, EIXO_Z = T ? new T.Vector3(0, 0, 1) : null;
   const qBate = T ? new T.Quaternion() : null, qAbre = T ? new T.Quaternion() : null, qDeita = T ? new T.Quaternion() : null;
-  const ANDANDO = { andar: 1, voltar: 1, buscar: 1, seguir: 1, perseguir: 1.6, arrastando: 0.8, segurando: 1.6, brincando: 1.6, trabalhando: 1.3 };
+  const ANDANDO = { andar: 1, voltar: 1, buscar: 1, seguir: 1, perseguir: 1.6, arrastando: 0.8, segurando: 1.6, brincando: 1.6, trabalhando: 1.3, combate: 1.6, cacar: 1.6 };
+  // Tecido da saia: cada vértice é recalculado a cada quadro. d = 0 no ombro, 1 na barra.
+  // abre: planando (a capa abre como um paraquedas); arrasto: correndo (a barra vai para trás);
+  // vento: o quanto a barra ondula e tremula.
+  // Vestido: gola franzida em sino. Abre rápido a partir do pescoço e a barra forma 7 pétalas
+  // arredondadas; os vincos entre elas começam lá no pescoço (aparece o magenta de dentro).
+  // d = 0 no pescoço, 1 na barra. abre: planando (cúpula de água-viva); arrasto: correndo
+  // (a barra vai para trás); vento: o quanto o tecido ondula e tremula.
+  const COR_PETALA = T ? new T.Color(0xd02a36) : null, COR_VINCO = T ? new T.Color(0x6e1027) : null;
+  function vestirHornet(m, abre, arrasto, vento, tempo) {
+    const pos = m.saiaGeo.attributes.position, cor = m.saiaGeo.attributes.color;
+    const N = m.saiaRad + 1;
+    const balanco = Math.sin(tempo * 1.3) * 0.25;
+    for (let i = 0; i < pos.count; i++) {
+      const lin = Math.floor(i / N), col = i % N;
+      const d = lin / m.saiaSeg, d2 = d * d;
+      const th = (col / m.saiaRad) * TAU;
+      const petala = 0.5 + 0.5 * Math.sin(th * 7 + balanco); // 1 no meio da pétala, 0 no vinco
+      const franzido = 1 - abre * 0.92; // aberta em cúpula, o tecido fica liso (como no jogo)
+      // perfil: sino fechado ou cúpula aberta
+      // cúpula: topo largo e redondo logo abaixo da cabeça, borda curvando um pouco para dentro
+      const fi = d * Math.PI * 0.58;
+      let r = lerp(m.saiaR0 + (m.saiaR1 - m.saiaR0) * Math.sin(d * Math.PI / 2), 0.08 + 0.34 * Math.sin(fi), abre);
+      let y = lerp(-d * m.saiaH, -0.36 * (1 - Math.cos(fi)), abre);
+      // pétalas: avançam e descem na barra; vincos: entram e sobem
+      r += d ** 0.8 * (0.065 * petala - 0.03) * franzido;
+      y -= d2 * 0.05 * petala * franzido;
+      // tecido no vento (suave, por cima das pétalas)
+      r += d ** 1.5 * vento * (0.022 * Math.sin(th * 3 + tempo * 5.5) + 0.012 * Math.sin(th * 5 - tempo * 9));
+      y += d2 * (arrasto * 0.12 + vento * 0.018 * Math.sin(th * 4 + tempo * 8));
+      pos.setXYZ(i, Math.sin(th) * r, y, Math.cos(th) * r - arrasto * d2 * 0.22);
+      // perto do pescoço quase sem contraste; na barra, vinco bem escuro
+      const k = lerp(1, petala ** 0.7, Math.min(1, d * 1.5) * franzido);
+      cor.setXYZ(i, lerp(COR_VINCO.r, COR_PETALA.r, k), lerp(COR_VINCO.g, COR_PETALA.g, k), lerp(COR_VINCO.b, COR_PETALA.b, k));
+    }
+    pos.needsUpdate = true;
+    cor.needsUpdate = true;
+    m.saiaGeo.computeVertexNormals();
+  }
+
+  // Inclina a Hornet inteira para a frente (ang > 0) ou para trás em volta do centro do corpo
+  // (e não dos pés): usado no mergulho do pogo e no mortal.
+  function girarNoCentro(m, ang, c = 0.75) {
+    m.raiz.rotation.x = ang;
+    const z = -c * Math.sin(ang);
+    m.raiz.position.x += z * Math.sin(estado.yaw);
+    m.raiz.position.y += c - c * Math.cos(ang);
+    m.raiz.position.z += z * Math.cos(estado.yaw);
+  }
+
+  // Aponta a agulha numa direção dada no espaço do corpo (x = direita, y = cima, z = frente),
+  // em vez de um ângulo relativo ao braço: assim ela fica sempre para fora da saia.
+  // pega: onde fica o cabo (no espaço do corpo); sem pega, fica na mão.
+  const _q = T ? new T.Quaternion() : null, _v = T ? new T.Vector3() : null, _Y = T ? new T.Vector3(0, 1, 0) : null, _M = T ? new T.Matrix4() : null;
+  const _q2 = T ? new T.Quaternion() : null;
+  function apontarAgulha(m, x, y, z, pega) {
+    // a agulha está no antebraço: a rotação dele no espaço do corpo é ombro × cotovelo
+    const b = m.bracos[1], c = m.cotovelos[1];
+    b.updateMatrix();
+    c.updateMatrix();
+    _q.setFromUnitVectors(_Y, _v.set(x, y, z).normalize());
+    _q2.copy(b.quaternion).multiply(c.quaternion);
+    m.agulha.quaternion.copy(_q2).invert().multiply(_q);
+    if (pega) m.agulha.position.set(...pega).applyMatrix4(_M.multiplyMatrices(b.matrix, c.matrix).invert());
+    else m.agulha.position.set(0, -0.2, 0);
+  }
+
+  function animarHornet(m, s, dt, anda, t, extraYaw) {
+    const anim = s.anim, rel = s.relogio;
+    const tipo = s.acao?.tipo, ta = s.acao?.t || 0;
+    const correndo = anda && (estado.vel || 0) > 20;
+    const PI = Math.PI;
+    // perna: quadril (para a frente < 0), joelho (dobra para trás > 0), abertura para o lado
+    const perna = (i, quadril, joelho, lado = 0) => {
+      m.pernas[i].rotation.set(quadril, 0, lado);
+      m.joelhos[i].rotation.x = joelho;
+    };
+    // braço: ombro para a frente (< 0), abertura para o lado, cotovelo (dobra para a frente < 0)
+    const braco = (i, frente, lado, cotovelo = 0) => {
+      m.bracos[i].rotation.set(frente, 0, lado);
+      m.cotovelos[i].rotation.x = cotovelo;
+    };
+    // pose base: em pé com os joelhos soltos, agulha cruzando a frente do corpo
+    m.corpo.position.set(0, 0.44 + Math.sin(rel * 2.2) * 0.005, 0);
+    m.cabeca.rotation.set(0, Math.sin(rel * 0.7) * 0.08, 0);
+    perna(0, -0.04, 0.08, -0.03);
+    perna(1, -0.02, 0.06, 0.03);
+    braco(0, 0.1, -0.35, -0.25 - Math.sin(rel * 2.2) * 0.03);
+    braco(1, -0.5, 0.12, -0.15);
+    let agulha = [-0.75, -0.38, 0.32], pega = null;
+    let abre = 0, arrasto = 0, vento = 0.15;
+
+    if (tipo === "storm") {
+      // gira no lugar com a agulha para o alto; os laços de seda são desenhados em 2D pelo overlay
+      extraYaw.v = ta * 24;
+      m.raiz.position.y = 0.06;
+      braco(1, -2.9, 0.15, -0.2);
+      agulha = [0, 1, 0.15];
+      braco(0, 0, -1.3, -0.5);
+      perna(0, -0.5, 0.9);
+      perna(1, 0.2, 0.4);
+      abre = 0.55;
+      vento = 1;
+    } else if (tipo === "golpe") {
+      // estocada: o braço estica de uma vez, avança a perna da frente e a de trás dobra
+      const p = ta < 0.07 ? ta / 0.07 : Math.max(0, 1 - (ta - 0.16) / 0.14);
+      const k = Math.min(1, ta / 0.07);
+      m.corpo.rotation.x = 0.4 * p;
+      braco(1, lerp(0.9, -1.6, k), 0.15, lerp(-1.4, 0, k));
+      agulha = [0.05, lerp(-0.6, 0.05, p), 1];
+      braco(0, 0.9 * p, -0.3, -0.6);
+      perna(0, -0.8 * p, 0.35 * p);
+      perna(1, 0.55 * p, 0.7 * p);
+      m.raiz.position.z = 0.14 * p;
+      arrasto = 0.7;
+      vento = 0.7;
+    } else if (tipo === "pogo") {
+      // mergulho na diagonal (45°): corpo inclinado, joelhos encolhidos, agulha no eixo do corpo
+      girarNoCentro(m, 0.78);
+      perna(0, -0.7, 1.3);
+      perna(1, -0.35, 1.5);
+      braco(1, -0.35, 0.12);
+      agulha = [0, -1, 0.12];
+      pega = [0.03, 0.06, 0.26];
+      braco(0, 0.6, -0.6, -0.9);
+      abre = 0.3;
+      vento = 1;
+    } else if (tipo === "mortal") {
+      // como no jogo: vira rápido de cabeça para baixo, fica pendurada invertida no alto do
+      // quique (a capa abre para cima como pétalas) e só então completa a volta e se endireita
+      let ang;
+      if (ta < 0.15) ang = -PI * Math.sin((ta / 0.15) * PI / 2);
+      else if (ta < 0.6) ang = -PI + Math.sin((ta - 0.15) * 9) * 0.06;
+      else ang = -PI - PI * Math.sin(Math.min(1, (ta - 0.6) / 0.22) * PI / 2);
+      girarNoCentro(m, ang);
+      const encolhe = ta < 0.15 || ta > 0.6 ? 1 : 0.4; // invertida, as pernas soltam um pouco
+      perna(0, -1.3 * encolhe, 2.0 * encolhe);
+      perna(1, -1.1 * encolhe, 2.1 * encolhe);
+      braco(0, -0.8, -0.5, -1.0);
+      braco(1, -0.6, 0.4, -0.6);
+      agulha = [0.6, -0.4, 0.6];
+      abre = ta > 0.15 && ta < 0.6 ? 0.55 : 0.25;
+      vento = 1;
+    } else if (tipo === "salto") {
+      // impulso: pernas dobradas para cima
+      m.corpo.rotation.x = 0.2;
+      perna(0, -1.1, 1.6);
+      perna(1, -0.5, 1.2);
+      braco(0, 0.7, -0.5, -0.6);
+      braco(1, 0.6, 0.6, -0.3);
+      agulha = [0.4, -0.5, -0.6];
+      abre = 0.3;
+      vento = 0.8;
+    } else if (tipo === "dash") {
+      // sprint como no jogo: tronco quase deitado para a frente, cabeça olhando à frente,
+      // passada bem rápida, capa reta para trás e a agulha junto às costas apontando para trás
+      const f = t * 22;
+      for (const i of [0, 1]) {
+        const fase = f + i * PI;
+        perna(i, -Math.sin(fase) * 0.95 - 0.15, 0.3 + Math.max(0, Math.cos(fase)) * 1.7);
+      }
+      m.corpo.rotation.set(0.85, 0, 0);
+      m.cabeca.rotation.set(0.15, 0, 0); // a máscara vai inclinada para a frente, como no jogo
+      m.raiz.position.y = Math.abs(Math.cos(f)) * 0.03 - 0.04;
+      braco(0, 1.2, -0.25, -0.3);
+      braco(1, 1.1, 0.3, -0.2);
+      agulha = [0.1, 0.3, -1];
+      arrasto = 1;
+      vento = 1;
+    } else if (tipo === "pouso") {
+      // agacha ao tocar o chão: joelhos dobram e o corpo desce; a capa assenta
+      const p = Math.sin(Math.min(1, ta / 0.4) * PI);
+      m.corpo.position.y -= 0.14 * p;
+      m.corpo.rotation.x = 0.3 * p;
+      perna(0, -0.9 * p, 1.6 * p, -0.25 * p);
+      perna(1, -0.6 * p, 1.4 * p, 0.25 * p);
+      braco(0, -0.3 * p, -0.6 - 0.4 * p, -0.5);
+      braco(1, -0.2, 0.5 + 0.5 * p, -0.2);
+      agulha = [0.7, -0.55, 0.3];
+      abre = 0.25 * (1 - Math.min(1, ta / 0.4));
+      vento = 0.8;
+    } else if (s.planando) {
+      // como no jogo: cúpula lisa com a cabeça em cima, pernas juntas e retas penduradas,
+      // agulha passando por baixo da cúpula quase na horizontal (ponta um pouco para baixo, à frente)
+      perna(0, 0.04 + Math.sin(rel * 2.1) * 0.03, 0.06, 0.03);
+      perna(1, 0.08 + Math.sin(rel * 2.1 + 1.5) * 0.03, 0.08, -0.03);
+      // as mãos ficam escondidas dentro da cúpula
+      braco(0, 0, 0.15, -1.2);
+      braco(1, 0, -0.15, -1.2);
+      agulha = [0.82, -0.32, 0.42];
+      pega = [-0.24, -0.04, 0.2];
+      m.corpo.rotation.x = 0.05;
+      m.cabeca.rotation.x = 0.06;
+      m.raiz.rotation.z = Math.sin(rel * 1.7) * 0.05;
+      m.raiz.position.y = Math.sin(rel * 2.3) * 0.025;
+      abre = 1;
+      vento = 0.7;
+    } else if (anim === "caindo") {
+      braco(0, 0, -2.4 + Math.sin(rel * 16) * 0.3, -0.4);
+      braco(1, 0, 2.0 + Math.sin(rel * 16 + 2) * 0.3, -0.3);
+      agulha = [0.7, 0.5, 0.3];
+      for (const i of [0, 1]) perna(i, Math.sin(rel * 14 + i * 3) * 0.5, 0.5 + Math.sin(rel * 14 + i * 3 + 1) * 0.5);
+      abre = 0.4;
+      vento = 1;
+    } else if (correndo) {
+      // corrida elegante: braços baixos junto do corpo (a capa cai por cima sem embolar),
+      // passada fluida, tronco firme e cabeça estável; só as pernas fazem o trabalho
+      const f = t * 14;
+      for (const i of [0, 1]) {
+        const fase = f + i * PI;
+        // o quadril é -sen(fase): a perna vai para a frente quando cos(fase) > 0, e é aí que o
+        // joelho dobra (perna recolhida passando por baixo); no chão ela fica esticada e empurra para trás
+        const joelho = 0.2 + Math.max(0, Math.cos(fase)) * 1.4;
+        perna(i, -Math.sin(fase) * 0.75, joelho);
+      }
+      m.corpo.rotation.set(0.32, Math.sin(f) * 0.05, Math.sin(f) * 0.02);
+      m.cabeca.rotation.set(-0.16, -Math.sin(f) * 0.04, 0);
+      m.raiz.position.y = Math.abs(Math.cos(f)) * 0.025;
+      braco(0, 0.25 + Math.sin(f) * 0.12, -0.18, -0.15);
+      braco(1, 0.15 - Math.sin(f) * 0.08, 0.2, -0.1);
+      agulha = [0.15, -0.45, 0.88]; // baixa, apontando para a frente, por baixo da barra da capa
+      arrasto = 0.6;
+      vento = 0.6;
+    } else if (anim === "carregado") {
+      // pendurada pela ponta da agulha, segurada acima da cabeça, balançando as pernas
+      braco(1, 0, 2.55, -0.15);
+      agulha = [0.3, 1, 0.1]; // ao lado da cabeça, sem sumir atrás das pontas da máscara
+      braco(0, 0, -0.5 + Math.sin(rel * 3) * 0.1, -0.5);
+      for (const i of [0, 1]) perna(i, Math.sin(rel * 5 + i * 2) * 0.35, 0.35 + Math.sin(rel * 5 + i * 2 + 1.2) * 0.35);
+      m.raiz.rotation.z = Math.sin(rel * 2.4) * 0.08;
+      m.cabeca.rotation.x = -0.15;
+      abre = 0.2;
+      vento = 0.5;
+    } else if (anim === "bravo" || anim === "travessura") {
+      // guarda: base larga com os joelhos flexionados, agulha apontada para a frente
+      m.corpo.position.y -= 0.05;
+      m.corpo.rotation.x = 0.18;
+      perna(0, -0.45, 0.6, -0.22);
+      perna(1, 0.25, 0.5, 0.22);
+      braco(1, -1.35 + (anim === "travessura" ? Math.sin(t * 14) * 0.15 : 0), 0.3, -0.2);
+      agulha = [0.1, 0.1, 1];
+      braco(0, 0.2, -0.65, -0.9);
+      m.raiz.position.y = Math.abs(Math.sin(t * 8)) * 0.012;
+      m.cabeca.rotation.x = 0.1;
+      vento = 0.3;
+    } else if (anim === "acenando") {
+      // reverência educada: inclina, dobra um pouco os joelhos e leva a mão livre ao peito
+      const p = Math.sin(Math.min(1, t / 1.4) * PI);
+      m.corpo.rotation.x = 0.32 * p;
+      m.cabeca.rotation.x = 0.22 * p;
+      perna(0, -0.15 * p, 0.3 * p);
+      perna(1, 0.2 * p, 0.35 * p);
+      braco(0, -0.7 * p, -0.3 + 0.5 * p, -1.4 * p);
+      agulha = [0.35, -0.9, 0.15];
+    } else if (anim === "feliz") {
+      // pulinhos: os joelhos dobram na hora de tocar o chão
+      const pulo = Math.abs(Math.sin(t * 7));
+      m.raiz.position.y = pulo * 0.07;
+      for (const i of [0, 1]) perna(i, -0.2 * (1 - pulo), 0.5 * (1 - pulo));
+      m.corpo.position.y -= 0.04 * (1 - pulo);
+      m.cabeca.rotation.z = Math.sin(t * 5) * 0.08;
+      vento = 0.4;
+    } else if (anim === "dormindo") {
+      m.corpo.rotation.x = 0.22;
+      m.corpo.position.y -= 0.04;
+      m.cabeca.rotation.set(0.45, 0, 0.1);
+      perna(0, -0.15, 0.3);
+      perna(1, -0.1, 0.3);
+      braco(0, 0, -0.2, -0.3);
+      agulha = [0.3, -0.9, 0.2];
+      vento = 0.05;
+    } else if (anim === "pensando") {
+      m.cabeca.rotation.z = 0.25;
+      braco(0, -1.1, 0.3, -1.6); // mão no queixo
+    } else if (anim === "tonto") {
+      m.raiz.rotation.z = Math.sin(rel * 7) * 0.15;
+      m.cabeca.rotation.y = Math.sin(rel * 9) * 0.5;
+      for (const i of [0, 1]) perna(i, Math.sin(rel * 7 + i) * 0.2, 0.3);
+    }
+
+    apontarAgulha(m, ...agulha, pega);
+    m.abre = lerp(m.abre, abre, Math.min(1, dt * (abre > m.abre ? 16 : 6))); // abre de estalo, fecha devagar
+    m.arrasto = lerp(m.arrasto, arrasto, Math.min(1, dt * 6));
+    m.vento = lerp(m.vento, vento, Math.min(1, dt * 5));
+    vestirHornet(m, m.abre, m.arrasto, m.vento, rel);
+    m.linha.rotation.set(m.arrasto * 0.6, 0, Math.sin(rel * 3) * 0.3);
+  }
+
   function animar(m, s, dt) {
     const anim = s.anim;
     const t = s.t;
@@ -274,7 +682,7 @@ window.Pet3D = (() => {
     // piscar
     const pisca = anim !== "dormindo" && s.relogio % 3.7 > 3.58;
     const fechado = anim === "dormindo" || pisca;
-    for (const o of m.olhos) o.scale.y = (fechado ? 0.15 : 1) * ({ pato: 0.032, tartaruga: 0.07 }[m.tipo] || 0.04);
+    for (const o of m.olhos) o.scale.y = (fechado ? 0.15 : 1) * ({ pato: 0.032, tartaruga: 0.07, hornet: 0.07 }[m.tipo] || 0.04);
     const extraYaw = { v: 0 };
 
     if (m.tipo === "pato") {
@@ -451,6 +859,8 @@ window.Pet3D = (() => {
         if (anim === "acenando") m.patas[0].rotation.z = -1 - Math.sin(t * 12) * 0.3;
         if (anim === "tonto") m.raiz.rotation.y = s.relogio * 4; // casco rodando
       }
+    } else if (m.tipo === "hornet") {
+      animarHornet(m, s, dt, anda, t, extraYaw);
     }
     return extraYaw.v;
   }
@@ -463,6 +873,7 @@ window.Pet3D = (() => {
     if (m.tipo === "pato") return m.bicoCima.localToWorld(new T.Vector3(0, -0.5, 2.2));
     if (m.tipo === "tartaruga") return m.cabeca.localToWorld(new T.Vector3(0.03, -0.07, 0.33));
     if (m.tipo === "palito") return m.bracos[1].localToWorld(new T.Vector3(0, -0.36, 0));
+    if (m.tipo === "hornet") return m.ponta.localToWorld(new T.Vector3(0, 0, 0));
     return null;
   }
 
@@ -477,7 +888,8 @@ window.Pet3D = (() => {
     if (estado.ultX != null && dt > 0) {
       const vx = (s.x - estado.ultX) / dt;
       const vy = (s.y - estado.ultY) / dt;
-      const movendo = ANDANDO[s.estado] && Math.hypot(vx, vy) > 15;
+      estado.vel = Math.hypot(vx, vy);
+      const movendo = ANDANDO[s.estado] && estado.vel > 15;
       // puxando algo (mouse, bilhete), ele anda de costas: olha para o lado contrário do movimento
       if (movendo) estado.alvoYaw = Math.atan2(vx, vy / ELEVACAO) + (s.deCostas ? Math.PI : 0);
       else if (!ANDANDO[s.estado] && s.anim !== "caindo") estado.alvoYaw = s.olhando > 0 ? 0.75 : -0.75;
@@ -529,5 +941,101 @@ window.Pet3D = (() => {
     return { canvas: renderer.domElement, x: x0, y: y0, w: larg, h: alt, topo: s.y - s.alturaPx, boca };
   }
 
-  return { tem: (d) => !!MONTAR[d], desenhar };
+  // ---------- objetos soltos na tela (o Caranid que a Hornet enfrenta) ----------
+  // Têm cena e renderizador próprios: são desenhados depois do pet, cada um no seu lugar.
+  // Caranid: besourinho voador em bola, casca cinza-escura em gomos, espinhos, máscara clara
+  // com duas pontinhas, olhos pretos, dentinhos e asas zumbindo. Fica centrado na origem, olhando para +z.
+  function montarCaranid() {
+    const raiz = new T.Group();
+    const CASCA = 0x34313b, ESCURO = 0x16151b, MASCARA = 0xdcd9e0;
+    const corpo = pivo(raiz);
+    parte(esfera(28), CASCA, { pai: corpo, esc: [0.32, 0.3, 0.32], contorno: 0.05 });
+    // gomos da casca: anéis em volta do corpo, nas costas
+    for (const z of [-0.06, -0.17]) {
+      const r = Math.sqrt(0.32 * 0.32 - z * z) * 0.98;
+      parte(new T.TorusGeometry(r, 0.014, 6, 32), ESCURO, { pai: corpo, pos: [0, 0, z], esc: [1, 0.94, 1], contorno: 0 });
+    }
+    // espinhos curtos apontando para fora
+    for (const [x, y, z] of [[0.9, 0.2, -0.4], [-0.9, 0.2, -0.4], [0.7, -0.6, -0.2], [-0.7, -0.6, -0.2], [0, -0.9, -0.4], [0, 0.6, -0.8], [0.4, -0.2, -0.9], [-0.4, -0.2, -0.9]]) {
+      const d = new T.Vector3(x, y, z).normalize();
+      const e = parte(new T.ConeGeometry(0.045, 0.14, 8), ESCURO, { pai: corpo, contorno: 0.12 });
+      e.position.copy(d).multiplyScalar(0.33);
+      e.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d);
+    }
+    // máscara na frente, com duas pontinhas para cima e para fora
+    const rosto = pivo(corpo, [0, 0.03, 0.24]);
+    parte(esfera(24), MASCARA, { pai: rosto, esc: [0.25, 0.2, 0.12], contorno: 0.06 });
+    for (const l of [-1, 1]) {
+      parte(new T.ConeGeometry(0.06, 0.17, 12), MASCARA, { pai: rosto, pos: [0.15 * l, 0.2, -0.01], rot: [0, 0, -0.45 * l], contorno: 0.08 });
+    }
+    for (const l of [-1, 1]) {
+      parte(esfera(12), basico(0x0f0f13), { pai: rosto, pos: [0.085 * l, 0.03, 0.1], esc: [0.05, 0.065, 0.03], rot: [0, 0, 0.3 * l], contorno: 0 });
+    }
+    // boca com dentinhos
+    parte(new T.BoxGeometry(0.15, 0.028, 0.01), basico(0x0f0f13), { pai: rosto, pos: [0, -0.085, 0.108], contorno: 0 });
+    for (let i = 0; i < 4; i++) {
+      parte(new T.ConeGeometry(0.014, 0.03, 4), basico(0xffffff), { pai: rosto, pos: [-0.052 + i * 0.035, -0.08, 0.112], rot: [Math.PI, 0, 0], contorno: 0 });
+    }
+    // asas translúcidas nas costas (batem muito rápido)
+    const matAsa = new T.MeshBasicMaterial({ color: 0xe8e8f0, transparent: true, opacity: 0.55, side: T.DoubleSide, depthWrite: false });
+    const asas = [-1, 1].map((l) => {
+      const p = pivo(corpo, [0.12 * l, 0.22, -0.12]);
+      const asa = new T.Mesh(new T.CircleGeometry(1, 20), matAsa);
+      asa.scale.set(0.3, 0.13, 1);
+      asa.position.set(0.26 * l, 0.04, 0);
+      asa.rotation.set(-0.5, 0, 0.35 * l);
+      p.add(asa);
+      return p;
+    });
+    return { raiz, corpo, asas };
+  }
+
+  let rObj = null, cenaObj = null, camObj = null;
+  const OBJETOS = { caranid: montarCaranid };
+  const objetos = {};
+  // s = { tipo, x, y (centro na tela), tamPx, dir (1 = olha para a direita), t, vivo, giro, dpr }
+  // Devolve { canvas, x, y, w, h } para o overlay copiar, ou null se não deu.
+  function desenharObjeto(s) {
+    if (!OBJETOS[s.tipo]) return null;
+    if (!rObj) {
+      if (rObj === false) return null;
+      try {
+        rObj = new T.WebGLRenderer({ canvas: document.createElement("canvas"), alpha: true, antialias: true, premultipliedAlpha: false, preserveDrawingBuffer: true });
+        rObj.setClearColor(0x000000, 0);
+        cenaObj = new T.Scene();
+        cenaObj.add(new T.AmbientLight(0xffffff, 1.4));
+        const sol = new T.DirectionalLight(0xffffff, 2.2);
+        sol.position.set(-2, 4, 3);
+        cenaObj.add(sol);
+        const meia = 0.7;
+        camObj = new T.OrthographicCamera(-meia, meia, meia, -meia, 0.1, 50);
+        camObj.position.set(0, Math.sin(ELEVACAO), Math.cos(ELEVACAO)).multiplyScalar(10);
+        camObj.lookAt(0, 0, 0);
+      } catch (e) {
+        console.error("[3d] objetos sem WebGL:", e);
+        rObj = false;
+        return null;
+      }
+    }
+    let m = objetos[s.tipo];
+    if (!m) {
+      m = objetos[s.tipo] = OBJETOS[s.tipo]();
+      cenaObj.add(m.raiz);
+    }
+    for (const [k, o] of Object.entries(objetos)) o.raiz.visible = k === s.tipo;
+    // olha de lado (3/4) para onde está indo; morto, gira caindo
+    m.raiz.rotation.set(0, s.dir > 0 ? 0.95 : -0.95, s.vivo ? Math.sin(s.t * 4) * 0.12 : s.giro);
+    m.corpo.position.y = s.vivo ? Math.sin(s.t * 6) * 0.02 : 0;
+    const bate = s.vivo ? Math.sin(s.t * 70) * 0.6 : 0;
+    m.asas.forEach((a, i) => (a.rotation.z = (i ? -1 : 1) * bate));
+    const px = Math.max(8, Math.round(s.tamPx)), dpr = s.dpr || 1;
+    if (rObj.domElement.width !== Math.round(px * dpr)) {
+      rObj.setPixelRatio(dpr);
+      rObj.setSize(px, px, false);
+    }
+    rObj.render(cenaObj, camObj);
+    return { canvas: rObj.domElement, x: s.x - px / 2, y: s.y - px / 2, w: px, h: px };
+  }
+
+  return { tem: (d) => !!MONTAR[d], desenhar, desenharObjeto };
 })();
