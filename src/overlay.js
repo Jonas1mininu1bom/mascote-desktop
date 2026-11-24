@@ -175,11 +175,12 @@ function areaDe(x, y = P.y) {
 }
 // Com monitores de tamanhos diferentes (ou um em pé, na vertical), o retângulo que junta todos tem
 // "buracos" sem monitor nenhum. Isto prende um ponto no monitor mais próximo, com uma folga para os
-// pés poderem ir até a borda de baixo (pegando o mouse lá embaixo, por exemplo).
+// pés poderem ir até a borda de baixo (pegando o mouse lá embaixo, por exemplo) e uma margem no
+// topo (pés pelo menos tanto abaixo do alto da tela, senão o corpo fica todo para fora, acima).
 const monitores = () => (tela.monitores?.length ? tela.monitores : areas());
-function prenderNaTela(p, folgaX = 0, folgaBaixo = 0) {
+function prenderNaTela(p, folgaX = 0, folgaBaixo = 0, margemCima = 0) {
   const lista = monitores();
-  const caixa = (a) => ({ x0: a.x - folgaX, x1: a.x + a.w + folgaX, y0: a.y, y1: a.y + a.h + folgaBaixo });
+  const caixa = (a) => ({ x0: a.x - folgaX, x1: a.x + a.w + folgaX, y0: a.y + margemCima, y1: a.y + a.h + folgaBaixo });
   const dist = (a) => {
     const c = caixa(a);
     return Math.hypot(Math.max(c.x0 - p.x, 0, p.x - c.x1), Math.max(c.y0 - p.y, 0, p.y - c.y1));
@@ -372,8 +373,12 @@ function andarAte(alvo, dt, mult = 1, virar = true) {
     P.y = alvo.y;
     return true;
   }
-  // não entra nos "buracos" entre monitores: se o passo cair fora de todos, desliza pela borda
-  const q = prenderNaTela({ x: P.x + (dx / d) * passo, y: P.y + (dy / d) * passo }, larguraPx() / 2, alturaPx());
+  // não entra nos "buracos" entre monitores: se o passo cair fora de todos, desliza pela borda.
+  // Atrás do mouse ele pode encostar nas bordas (a mão alcança o cursor lá); andando, o corpo fica
+  // inteiro na tela: atravessando para um monitor em pé mais alto, ele subia com os pés no topo
+  // do outro monitor e sumia (corpo todo acima da tela).
+  const atrasDoMouse = ["perseguir", "seguir", "segurando"].includes(P.estado);
+  const q = prenderNaTela({ x: P.x + (dx / d) * passo, y: P.y + (dy / d) * passo }, larguraPx() / 2, atrasDoMouse ? alturaPx() : 0, atrasDoMouse ? 0 : alturaPx());
   P.x = q.x;
   P.y = q.y;
   return false;
