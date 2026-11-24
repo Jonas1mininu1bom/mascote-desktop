@@ -122,8 +122,8 @@ const RESERVA = {
 // Pets que sabem dançar: o desenho vetorial tem a dancinha (Pato) ou o pet.json tem "dancando".
 const sabeDancar = () => pet.desenho === "pato" || !!pet.animacoes?.dancando;
 const VEL_VOO = 110; // px/s subindo ou descendo, quando o pato voa com o bilhete
-// Na barra de tarefas, o pato vai buscar o bilhete voando: assim o papel no bico fica acima do chat.
-const vaiVoar = () => noChao() && pet.desenho === "pato";
+// Na barra de tarefas, o pato e a joaninha vão buscar o bilhete voando: assim o papel fica acima do chat.
+const vaiVoar = () => noChao() && (pet.desenho === "pato" || pet.desenho === "joaninha");
 function voarNaAlturaDoBilhete(dt, altura = 150) {
   if (!P.voando) Object.assign(P, { voando: true, tVoo: 0 });
   P.tVoo += dt;

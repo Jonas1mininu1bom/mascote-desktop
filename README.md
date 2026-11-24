@@ -1,7 +1,7 @@
 # Mascote Desktop
 
 Um bichinho que mora na **sua tela** e conversa com você usando o **Claude Code** por trás.
-Vêm três pets em **3D de verdade**: o **Palito** (padrão), o **Pato** e a **Tartaruga** (troque em
+Vêm quatro pets em **3D de verdade**: o **Palito** (padrão), o **Pato**, a **Tartaruga** e a **Joaninha** (troque em
 Configurações → Pet). Eles giram para a direção em que andam, e cada um conversa com uma personalidade própria.
 
 ![Pato, Palito e Tartaruga](docs/pets.png)
@@ -14,7 +14,9 @@ Configurações → Pet). Eles giram para a direção em que andam, e cada um co
   depois bravo com você), e **solte ele lá do alto** para ver o paraquedas.
 - **3D de verdade:** modelos feitos com three.js, vistos de cima na diagonal. O Pato (branco, de pescoço
   comprido) anda gingando, dança de vez em quando e plana com as asas abertas em vez de usar paraquedas;
-  a Tartaruga se esconde no casco dormindo, caindo ou sendo chacoalhada; o Palito usa cachecol. Se a placa
+  a Tartaruga se esconde no casco dormindo, caindo ou sendo chacoalhada; o Palito usa cachecol; a
+  Joaninha abre o casco de bolinhas e voa com as asinhas transparentes, e quando é chacoalhada se finge
+  de morta, de barriga para cima. Se a placa
   de vídeo não tiver WebGL, ele usa sozinho um desenho com volume parecido.
 - **Chão:** ele anda pela tela inteira ou só em cima da barra de tarefas, em todos os monitores ou
   em um só (inclusive monitores em pé ou de tamanhos diferentes).
@@ -142,8 +144,8 @@ mensagem (PNG, JPG, GIF ou WEBP, até 5 MB cada), e o Claude Code vê a imagem j
 ## Bilhetes da comunidade
 
 No modo bagunça o pet traz bilhetes da borda da tela e deixa onde dá para ler: sempre acima da altura
-do chat, longe da barra de tarefas. No modo barra de tarefas o Pato vai buscar **voando**, batendo as
-asas, e a Tartaruga e o Palito trazem o papel na cabeça. Ele mantém até 50 bilhetes na tela (feche no
+do chat, longe da barra de tarefas. No modo barra de tarefas o Pato e a Joaninha vão buscar **voando**,
+batendo as asas, e a Tartaruga e o Palito trazem o papel na cabeça. Ele mantém até 50 bilhetes na tela (feche no
 X). Já vem com 40 mensagens, e você pode colocar as suas:
 abra **Configurações → Pasta de bilhetes** e edite o `bilhetes.json`:
 

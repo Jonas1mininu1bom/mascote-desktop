@@ -219,7 +219,80 @@ window.Pet3D = (() => {
     return { raiz, corpo, cabecaP, cabeca, olhos, boca, patas, rabo, tipo: "tartaruga", altura: 1.25 };
   }
 
-  const MONTAR = { pato: montarPato, palito: montarPalito, tartaruga: montarTartaruga };
+  // ---------- Joaninha: casco vermelho de bolinhas pretas, cabeça preta e anteninhas ----------
+  // As duas metades do casco (élitros) abrem para cima e para fora, e por baixo aparecem as asas
+  // transparentes: é assim que ela voa e plana.
+  function montarJoaninha() {
+    const raiz = new T.Group();
+    const VERMELHO = 0xe23b2e, PRETO = 0x1f1d24, BRANCO = 0xfaf7f0;
+    const corpo = pivo(raiz, [0, 0.24, 0]);
+    // barriga preta (aparece embaixo do casco e quando ele abre)
+    parte(esfera(), PRETO, { pai: corpo, pos: [0, -0.03, -0.03], esc: [0.3, 0.13, 0.38] });
+    const N = new T.Vector3(), Y = new T.Vector3(0, 1, 0);
+    // élitros: pivô na frente, junto à linha do meio. Cada metade é um domo com bolinhas.
+    const R = [0.16, 0.15, 0.36];
+    const bolinhas = [[0.45, 0.75, 0.45], [0.75, 0.45, -0.1], [0.4, 0.75, -0.55]];
+    const elitros = [-1, 1].map((l) => {
+      const p = pivo(corpo, [0.004 * l, 0.03, 0.26]);
+      const c = [0.158 * l, 0.02, -0.3]; // centro da metade, relativo ao pivô
+      parte(esfera(28), VERMELHO, { pai: p, pos: c, esc: R, contorno: 0.04 });
+      // brilho
+      parte(esfera(10), basico(0xff8a7a), { pai: p, pos: [c[0] - 0.02 * l, c[1] + 0.13, c[2] + 0.12], esc: [0.035, 0.012, 0.07], contorno: 0 });
+      for (const [dx, dy, dz] of bolinhas) {
+        // ponto na superfície do domo e a normal (para a bolinha "deitar" no casco)
+        N.set(dx * l, dy, dz).normalize();
+        const pos = [c[0] + N.x * R[0], c[1] + N.y * R[1], c[2] + N.z * R[2]];
+        const bol = parte(esfera(12), basico(PRETO), { pai: p, pos, esc: [0.05, 0.012, 0.05], contorno: 0 });
+        bol.quaternion.setFromUnitVectors(Y, N.set(N.x / R[0], N.y / R[1], N.z / R[2]).normalize());
+      }
+      return p;
+    });
+    // bolinha do meio, em cima da emenda (a sétima; some quando o casco abre)
+    const pinta = parte(esfera(12), basico(PRETO), { pai: corpo, pos: [0, 0.165, 0.18], esc: [0.05, 0.012, 0.045], contorno: 0 });
+    // asas transparentes por baixo do casco: só aparecem com ele aberto
+    const matAsa = new T.MeshToonMaterial({ color: 0xdfe8f2, gradientMap: degraus, transparent: true, opacity: 0.7, side: T.DoubleSide });
+    const asas = [-1, 1].map((l) => {
+      const p = pivo(corpo, [0.05 * l, 0.08, 0.12]);
+      parte(esfera(16), matAsa, { pai: p, pos: [0.24 * l, 0, -0.18], esc: [0.26, 0.008, 0.16], rot: [0, -0.5 * l, 0], contorno: 0 });
+      return p;
+    });
+    // pronoto (a "capinha" preta atrás da cabeça) com as duas manchas brancas
+    parte(esfera(), PRETO, { pai: corpo, pos: [0, 0.04, 0.27], esc: [0.2, 0.11, 0.11] });
+    for (const l of [-1, 1]) parte(esfera(10), basico(BRANCO), { pai: corpo, pos: [0.12 * l, 0.09, 0.32], esc: [0.05, 0.03, 0.04], contorno: 0 });
+    // cabeça grande e preta, com olhos brancos bem grandes (fofinha)
+    const cabeca = pivo(corpo, [0, 0.03, 0.38]);
+    parte(esfera(24), PRETO, { pai: cabeca, esc: [0.16, 0.14, 0.13] });
+    const olhos = [-1, 1].map((l) => {
+      const fundo = parte(esfera(14), basico(BRANCO), { pai: cabeca, pos: [0.07 * l, 0.03, 0.105], esc: [0.05, 0.06, 0.035], contorno: 0 });
+      const o = parte(esfera(12), basico(0x16161c), { pai: cabeca, pos: [0.072 * l, 0.03, 0.135], esc: [0.03, 0.04, 0.012], contorno: 0 });
+      parte(esfera(8), basico(0xffffff), { pai: o, pos: [0.3, 0.35, 0.6], esc: [0.35, 0.3, 0.35], contorno: 0 });
+      o.fundo = fundo;
+      return o;
+    });
+    for (const l of [-1, 1]) parte(esfera(10), basico(0xff8fa3), { pai: cabeca, pos: [0.115 * l, -0.045, 0.085], esc: [0.03, 0.018, 0.015], contorno: 0 });
+    const boca = parte(new T.TorusGeometry(0.03, 0.007, 6, 14, Math.PI), basico(0xff8fa3), { pai: cabeca, pos: [0, -0.055, 0.12], rot: [0, 0, Math.PI], contorno: 0 });
+    // antenas: pivô no alto da cabeça, fio fino com uma bolinha na ponta
+    const antenas = [-1, 1].map((l) => {
+      const p = pivo(cabeca, [0.05 * l, 0.11, 0.03]);
+      const haste = pivo(p);
+      haste.rotation.set(0.5, 0, -0.45 * l);
+      parte(capsula(0.009, 0.15), PRETO, { pai: haste, pos: [0, 0.08, 0], contorno: 0.15 });
+      parte(esfera(10), PRETO, { pai: haste, pos: [0, 0.17, 0], esc: [0.025, 0.025, 0.025], contorno: 0.1 });
+      return p;
+    });
+    // seis perninhas pretas, três de cada lado (pivô na lateral da barriga)
+    const pernas = [];
+    for (const z of [0.18, 0, -0.18]) {
+      for (const l of [-1, 1]) {
+        const p = pivo(corpo, [0.22 * l, -0.06, z]);
+        parte(capsula(0.02, 0.14), PRETO, { pai: p, pos: [0.06 * l, -0.07, 0], rot: [0, 0, 0.75 * l], contorno: 0.1 });
+        pernas.push(p);
+      }
+    }
+    return { raiz, corpo, elitros, asas, pinta, cabeca, olhos, boca, antenas, pernas, tipo: "joaninha", altura: 0.7 };
+  }
+
+  const MONTAR = { pato: montarPato, palito: montarPalito, tartaruga: montarTartaruga, joaninha: montarJoaninha };
 
   // ---------- cena ----------
   let renderer = null, cena = null, camera = null, modelo = null, desenhoAtual = null;
@@ -275,6 +348,8 @@ window.Pet3D = (() => {
     const pisca = anim !== "dormindo" && s.relogio % 3.7 > 3.58;
     const fechado = anim === "dormindo" || pisca;
     for (const o of m.olhos) o.scale.y = (fechado ? 0.15 : 1) * ({ pato: 0.032, tartaruga: 0.07 }[m.tipo] || 0.04);
+    // joaninha: o branco do olho também fecha (senão a pálpebra "some" no meio do branco)
+    for (const o of m.olhos) if (o.fundo) o.fundo.scale.y = fechado ? 0.008 : 0.06;
     const extraYaw = { v: 0 };
 
     if (m.tipo === "pato") {
@@ -451,6 +526,66 @@ window.Pet3D = (() => {
         if (anim === "acenando") m.patas[0].rotation.z = -1 - Math.sin(t * 12) * 0.3;
         if (anim === "tonto") m.raiz.rotation.y = s.relogio * 4; // casco rodando
       }
+    } else if (m.tipo === "joaninha") {
+      // casco aberto (0..1): voando, caindo/planando e sendo carregada; um pouquinho quando está feliz
+      const querAsa = s.voando || anim === "caindo" || anim === "carregado" ? 1 : anim === "feliz" || anim === "dancando" ? 0.3 : 0;
+      estado.asa = lerp(estado.asa || 0, querAsa, Math.min(1, dt * 10));
+      // chacoalhada (tonta), ela se finge de morta: vira de barriga para cima com as perninhas para o ar
+      estado.vira = lerp(estado.vira || 0, anim === "tonto" ? 1 : 0, Math.min(1, dt * 6));
+      const a = estado.asa;
+      m.corpo.position.y = 0.24 + respira * 0.5;
+      m.cabeca.rotation.set(0, 0, 0);
+      m.boca.rotation.z = anim === "bravo" ? 0 : Math.PI;
+      m.elitros.forEach((e, i) => e.rotation.set(-0.35 * a, 0, (i ? 1 : -1) * 1.05 * a));
+      m.pinta.visible = a < 0.15;
+      const bate = Math.sin(s.relogio * (s.planando ? 6 : 42));
+      m.asas.forEach((w, i) => {
+        w.scale.setScalar(Math.max(0.001, a));
+        w.rotation.set(0, 0, (i ? 1 : -1) * (0.15 + bate * (s.planando ? 0.08 : 0.4)) * a);
+      });
+      // antenas balançando devagar
+      const ant = Math.sin(s.relogio * 3) * 0.12;
+      m.antenas.forEach((p, i) => p.rotation.set(ant * (i ? 1 : -1), 0, 0));
+      m.pernas.forEach((p) => p.rotation.set(0, 0, 0));
+      if (s.voando || (anim === "caindo" && s.planando)) {
+        m.pernas.forEach((p) => (p.rotation.x = -0.5)); // perninhas recolhidas no voo
+        m.corpo.rotation.x = -0.15;
+        if (s.voando) m.corpo.position.y += Math.sin(s.relogio * 10) * 0.02;
+      } else if (anda) {
+        // passo em tripé, como os insetos: frente e trás de um lado com o meio do outro
+        m.pernas.forEach((p, i) => (p.rotation.x = passo * ([0, 3, 4].includes(i) ? 1 : -1) * 0.5));
+        m.corpo.position.y += Math.abs(passo) * 0.012;
+        m.antenas.forEach((p, i) => (p.rotation.x += Math.sin(f + i) * 0.15));
+      } else if (anim === "caindo") {
+        m.pernas.forEach((p, i) => (p.rotation.x = Math.sin(s.relogio * 18 + i * 2) * 0.5));
+      } else if (anim === "dormindo") {
+        m.antenas.forEach((p) => (p.rotation.x = 0.9)); // antenas caídas para a frente
+        m.cabeca.rotation.x = 0.25;
+        m.corpo.position.y = 0.21 + respira;
+      } else if (anim === "comendo") {
+        m.cabeca.rotation.x = 0.25 + Math.max(0, Math.sin(t * 11)) * 0.25;
+      } else if (anim === "acenando" || anim === "travessura") {
+        m.pernas[1].rotation.z = 1.3 + Math.sin(t * 12) * 0.35; // perninha da frente dando tchau
+      } else if (anim === "feliz") {
+        m.raiz.position.y = Math.abs(Math.sin(t * 7)) * 0.08;
+      } else if (anim === "dancando") {
+        m.raiz.rotation.z = Math.sin(t * 6) * 0.15;
+        m.raiz.position.y = Math.abs(Math.sin(t * 6)) * 0.05;
+        m.antenas.forEach((p, i) => (p.rotation.z = Math.sin(t * 12 + i * Math.PI) * 0.3));
+        extraYaw.v = Math.sin(t * 1.5) * 0.6;
+      } else if (anim === "bravo") {
+        m.raiz.position.y = Math.abs(Math.sin(t * 12)) * 0.02;
+        m.antenas.forEach((p) => (p.rotation.x = -0.6)); // antenas em pé
+      } else if (anim === "pensando") {
+        m.cabeca.rotation.z = 0.25;
+        m.antenas[1].rotation.x = -0.4 + Math.sin(s.relogio * 5) * 0.15;
+      }
+      if (estado.vira > 0.01) {
+        const v = estado.vira;
+        m.raiz.rotation.z = Math.PI * v;
+        m.raiz.position.y += 0.4 * v; // de costas no chão
+        if (anim === "tonto") m.pernas.forEach((p, i) => (p.rotation.x = Math.sin(s.relogio * 16 + i * 1.7) * 0.45));
+      }
     }
     return extraYaw.v;
   }
@@ -463,6 +598,7 @@ window.Pet3D = (() => {
     if (m.tipo === "pato") return m.bicoCima.localToWorld(new T.Vector3(0, -0.5, 2.2));
     if (m.tipo === "tartaruga") return m.cabeca.localToWorld(new T.Vector3(0.03, -0.07, 0.33));
     if (m.tipo === "palito") return m.bracos[1].localToWorld(new T.Vector3(0, -0.36, 0));
+    if (m.tipo === "joaninha") return m.cabeca.localToWorld(new T.Vector3(0, -0.06, 0.2));
     return null;
   }
 

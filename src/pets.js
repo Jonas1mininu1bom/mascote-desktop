@@ -21,7 +21,7 @@ function lerPet(pasta) {
   pet.velocidade = Number(pet.velocidade) || 1.6;
   pet.falas = Array.isArray(pet.falas) ? pet.falas : [];
   // desenho vetorial "fofinho" (só os modelos que vêm no app; a pixel art continua de reserva)
-  pet.desenho = ["pato", "palito", "tartaruga"].includes(pet.desenho) ? pet.desenho : null;
+  pet.desenho = ["pato", "palito", "tartaruga", "joaninha"].includes(pet.desenho) ? pet.desenho : null;
   // persona do chat (textos curtos; vão para o prompt do Claude)
   const texto = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
   pet.descricao = texto(pet.descricao, 300);

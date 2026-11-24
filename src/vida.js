@@ -4,7 +4,7 @@ window.Vida = (() => {
   const GRAVIDADE = 1500; // px/s²
   const VEL_PARAQUEDAS = 85; // px/s descendo com o paraquedas aberto
   const ALTURA_PARAQUEDAS = 90; // de quantos px de altura ele já abre o paraquedas
-  const COMIDAS = { pato: "🍞", palito: "🍕", tartaruga: "🥬" };
+  const COMIDAS = { pato: "🍞", palito: "🍕", tartaruga: "🥬", joaninha: "🍃" };
 
   let bravoAte = 0; // até quando ele fica emburrado (recusa carinho)
   let depoisDeCair = null; // "tonto" se caiu depois de ser chacoalhado
@@ -17,7 +17,8 @@ window.Vida = (() => {
 
   const ESTADOS = ["caindo", "tonto", "bravo", "comendo", "brincando"];
   // o Pato não usa paraquedas: abre as asas e plana, indo para a frente
-  const plana = () => pet.desenho === "pato";
+  // quem tem asas plana em vez de abrir o paraquedas: o Pato e a Joaninha
+  const plana = () => pet.desenho === "pato" || pet.desenho === "joaninha";
   const ocioso = () => ["parado", "andar", "acenando", "dormindo", "feliz", "dancando"].includes(P.estado);
   const chao = () => chaoDe(P.x);
   const coracao = (n = 5) => {
