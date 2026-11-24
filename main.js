@@ -45,7 +45,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 // traz o mascote de volta (se estava minimizado) e abre o chat.
 app.on("second-instance", () => {
   if (!chat || chat.isDestroyed()) return;
-  if (escondido) esconderMascote(false);
+  mostrarChat();
   abrirChat(true);
 });
 
@@ -126,7 +126,9 @@ let overlay = null; // tela inteira, transparente, onde o pet vive
 let chat = null; // botão/painel de chat fixo no canto
 let tray = null;
 let chatAberto = false;
-let escondido = false; // minimizado para a bandeja: pet, chat e bilhetes somem e o pet não apronta nada
+let escondido = false; // "esconder tudo" na bandeja: pet, chat e bilhetes somem e o pet não apronta nada
+let chatMinimizado = false; // botão – do chat: só o chat e o botão de brinquedos somem, o pet continua na tela
+let painelAntesDeMinimizar = false;
 let avisouBandeja = false;
 const bilhetes = new Map();
 const LIMITE_BILHETES = 50; // passou disso, o mais antigo sai (eles ficam na tela até a pessoa fechar)
@@ -376,9 +378,45 @@ function criarChat() {
   });
 }
 
-// Minimizar: esconde tudo e deixa só o ícone na bandeja (perto do relógio). Clicar nele traz de volta.
+// Minimizar (botão – do chat): some só a janela do chat, que tem o botão do chat e o de brinquedos.
+// O pet continua andando e aprontando. O ícone na bandeja (perto do relógio) traz o chat de volta.
+function minimizarChat(minimizar) {
+  if (minimizar === chatMinimizado) return;
+  chatMinimizado = minimizar;
+  if (chat && !chat.isDestroyed() && !escondido) {
+    if (minimizar) {
+      // fecha o painel enquanto some, para o pet e os balões não desviarem de um painel invisível
+      painelAntesDeMinimizar = chatAberto;
+      chat.hide();
+      if (chatAberto) abrirChat(false);
+    } else {
+      chat.show();
+      abrirChat(painelAntesDeMinimizar); // volta como estava: painel aberto ou só os botões
+    }
+  }
+  montarBandeja();
+  if (minimizar) avisarBandeja("O chat está aqui na bandeja, perto do relógio. Clique no ícone para trazer o chat de volta.");
+  log("main", "info", minimizar ? "chat minimizado para a bandeja (pet continua na tela)" : "chat de volta na tela");
+}
+
+// Traz de volta o que estiver escondido (tudo, ou só o chat).
+function mostrarChat() {
+  if (escondido) esconderMascote(false);
+  if (chatMinimizado) minimizarChat(false);
+}
+
+function avisarBandeja(texto) {
+  if (avisouBandeja || !tray || process.platform !== "win32") return;
+  avisouBandeja = true;
+  try {
+    tray.displayBalloon({ title: "Mascote Desktop", content: texto, noSound: true });
+  } catch {}
+}
+
+// Esconder tudo (menu da bandeja): pet, chat e bilhetes somem e fica só o ícone. Clicar nele traz de volta.
 function esconderMascote(esconder) {
   escondido = esconder;
+  if (!esconder) chatMinimizado = false; // voltou tudo, inclusive o chat
   const janelas = [overlay, chat, ...bilhetes.values()].filter((w) => w && !w.isDestroyed());
   for (const w of janelas) {
     if (esconder) w.hide();
@@ -387,17 +425,8 @@ function esconderMascote(esconder) {
   }
   if (!esconder) overlay?.setIgnoreMouseEvents(true, { forward: true });
   montarBandeja();
-  if (esconder && !avisouBandeja && tray && process.platform === "win32") {
-    avisouBandeja = true;
-    try {
-      tray.displayBalloon({
-        title: "Mascote Desktop",
-        content: "Estou aqui na bandeja, perto do relógio. Clique no ícone para me trazer de volta.",
-        noSound: true,
-      });
-    } catch {}
-  }
-  log("main", "info", esconder ? "mascote minimizado para a bandeja" : "mascote de volta na tela");
+  if (esconder) avisarBandeja("Estou aqui na bandeja, perto do relógio. Clique no ícone para me trazer de volta.");
+  log("main", "info", esconder ? "mascote escondido na bandeja" : "mascote de volta na tela");
 }
 
 function abrirChat(aberto) {
@@ -508,9 +537,14 @@ function montarBandeja() {
     { label: petAtual().nome, enabled: false },
     escondido
       ? { label: "Mostrar o mascote", click: () => esconderMascote(false) }
-      : { label: plataforma.MAC ? "Minimizar para a barra de menus" : "Minimizar para a bandeja", click: () => esconderMascote(true) },
-    { label: "Abrir o chat", click: () => (escondido && esconderMascote(false), abrirChat(true)) },
+      : chatMinimizado
+        ? { label: "Mostrar o chat e os brinquedos", click: () => minimizarChat(false) }
+        : { label: "Minimizar o chat (o pet fica na tela)", click: () => minimizarChat(true) },
+    { label: "Abrir o chat", click: () => (mostrarChat(), abrirChat(true)) },
     { label: "Chamar o pet de volta", click: () => overlay.webContents.send("pet:voltar") },
+    escondido
+      ? null
+      : { label: plataforma.MAC ? "Esconder tudo na barra de menus" : "Esconder tudo na bandeja (pet também)", click: () => esconderMascote(true) },
     { label: "Chat de volta para o canto", click: () => ((config.chatPos = undefined), salvarConfig(), posicionarChat()) },
     { type: "separator" },
     { label: "Passear pela tela", type: "checkbox", checked: config.passear, click: (i) => mudarConfig({ passear: i.checked }) },
@@ -526,12 +560,13 @@ function montarBandeja() {
     { label: "Recarregar pets", click: () => escolherPet(config.pet) },
     { type: "separator" },
     { label: "Sair", click: () => app.quit() },
-  ]);
+  ].filter(Boolean));
   try {
     if (!tray) {
       tray = new Tray(iconeBandeja());
-      // clique no ícone: mostra o mascote se estiver minimizado (no Windows; no macOS o clique abre o menu)
-      tray.on("click", () => escondido && esconderMascote(false));
+      // clique no ícone: traz de volta o chat (e o pet, se estava tudo escondido).
+      // No Windows e no Linux; no macOS o clique abre o menu, que tem "Mostrar o chat".
+      tray.on("click", mostrarChat);
     } else tray.setImage(iconeBandeja());
     tray.setToolTip("Mascote Desktop");
     tray.setContextMenu(menu);
@@ -800,7 +835,7 @@ function registrarIpc() {
     overlay.webContents.send("brinquedos:abrir", { x: b.x + 4 + 17 - o.x, y: b.y + BOTAO - 6 - 17 - o.y });
   });
   on("app:sair", () => app.quit());
-  on("app:minimizar", () => esconderMascote(true));
+  on("app:minimizar", () => minimizarChat(true));
 
   on("chat:abrir", (_e, aberto) => (process.env.MASCOTE_DEBUG && log("main", "info", "[debug] chat:abrir", aberto), abrirChat(aberto === true)));
   handle("chat:arrastar", (_e, ativo) => arrastarChat(ativo === true));
@@ -877,7 +912,7 @@ function registrarIpc() {
             const id = proxPermissao++;
             pedidosPermissao.set(id, resolve);
             // minimizado na bandeja: volta para a tela, senão o pedido fica invisível e o Claude espera para sempre
-            if (escondido) esconderMascote(false);
+            mostrarChat();
             if (!chatAberto) abrirChat(true);
             chat.webContents.send("chat:permissao", { id, ...dados });
             humor("pensando");

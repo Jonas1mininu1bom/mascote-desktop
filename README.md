@@ -108,9 +108,10 @@ ao entrar no Mac"; no Linux, "Iniciar com o Linux").
 | Escolher os bilhetes que ele traz | Configurações → Pasta de bilhetes |
 | Ligar travessuras (pegar o mouse, Alt+Tab, navegador) / criar novas | Configurações → Travessuras / Pasta de travessuras |
 | Fazer o pet voltar para o canto | Configurações → Chamar de volta |
-| Minimizar | Botão **–** no topo do chat: pet, chat e bilhetes somem e fica só o ícone na bandeja (perto do relógio). Clique nele para trazer de volta |
+| Minimizar | Botão **–** no topo do chat: somem o chat e o botão de brinquedos, mas o pet continua na tela (e os bilhetes também). Clique no ícone da bandeja (perto do relógio) para trazer o chat de volta. No Mac, use o menu do ícone: **Mostrar o chat e os brinquedos** |
+| Esconder tudo | Ícone da bandeja → **Esconder tudo na bandeja**: pet, chat e bilhetes somem. Clique no ícone para trazer de volta |
 | Fechar | Botão **X** no topo do chat, Configurações → Fechar o app, a bandeja, ou **Ctrl+Alt+Shift+Q** (no Mac, **Cmd+Option+Shift+Q**) |
-| Abrir de novo | Atalho **Mascote Desktop** (se já estiver aberto, ele volta da bandeja e abre o chat) |
+| Abrir de novo | Atalho **Mascote Desktop** (se já estiver aberto ou minimizado, ele abre o chat) |
 
 Quando o pet rouba o seu mouse no modo bagunça, não adianta puxar: ele segura até cansar (alguns segundos).
 
