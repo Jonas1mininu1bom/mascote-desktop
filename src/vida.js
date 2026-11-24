@@ -160,8 +160,10 @@ window.Vida = (() => {
   }
   function montarMenu(itens, x, y, w = 138) {
     const h = itens.length * 28 + 10;
-    x = Math.max(4, Math.min(tela.largura - w - 4, x));
-    y = Math.max(4, Math.min(tela.altura - h - 4, y));
+    // dentro do monitor que a janela mostra (senão o menu abre num pedaço invisível)
+    const j = tela.janela || { x: 0, y: 0, w: tela.largura, h: tela.altura };
+    x = Math.max(j.x + 4, Math.min(j.x + j.w - w - 4, x));
+    y = Math.max(j.y + 4, Math.min(j.y + j.h - h - 4, y));
     menu = { x, y, w, h, itens, ate: relogio + 8 };
   }
   function fecharMenu() {

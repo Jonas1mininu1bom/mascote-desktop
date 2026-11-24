@@ -1,5 +1,5 @@
 // Mascote Desktop: processo principal do Electron.
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, dialog, globalShortcut, session, safeStorage } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, shell, dialog, globalShortcut, session, safeStorage, powerMonitor } = require("electron");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -138,6 +138,9 @@ const BOTAO = 64;
 // O botão de brinquedos fica à esquerda do botão do chat, na mesma janela (assim os dois se movem juntos).
 const EXTRA_BRINQUEDOS = 42;
 const PAINEL = { w: 360, h: 520 };
+const TAM_BILHETE = { width: 240, height: 150 };
+// Telas pequenas (ex.: notebook 1366x768 com escala de 125%): o painel encolhe para caber.
+const painelEm = (wa) => ({ w: Math.min(PAINEL.w, wa.width), h: Math.max(240, Math.min(PAINEL.h, wa.height)) });
 
 const tela = () => screen.getPrimaryDisplay();
 
@@ -149,7 +152,11 @@ function telasDoOverlay() {
   return todas;
 }
 
-// O overlay cobre todos os monitores juntos; as coordenadas do pet são relativas a este retângulo.
+// As coordenadas do pet são relativas a este retângulo (todos os monitores juntos).
+// A JANELA do overlay, porém, cobre um monitor só (o monitor em que o pet está; veja telaDaJanela):
+// no Windows, uma janela que atravessa monitores com escalas diferentes (100% num, 125% no outro)
+// fica com as coordenadas desencontradas. O clique não acerta o pet, ele aparece fora do lugar e
+// a janela pode até ficar "piscando" de tamanho sem parar.
 function areaTotal() {
   const ds = telasDoOverlay().map((d) => d.bounds);
   const x = Math.min(...ds.map((b) => b.x));
@@ -160,6 +167,38 @@ function areaTotal() {
     width: Math.max(...ds.map((b) => b.x + b.width)) - x,
     height: Math.max(...ds.map((b) => b.y + b.height)) - y,
   };
+}
+
+// Monitor em que a janela do overlay está agora (muda quando o pet anda para outro monitor).
+let idTelaJanela = null;
+function telaDaJanela() {
+  const ds = telasDoOverlay();
+  return ds.find((d) => d.id === idTelaJanela) || ds.find((d) => d.id === telaDoChat().id) || ds[0];
+}
+const mesmoRet = (a, b) => a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+// Põe a janela do overlay no monitor certo. No Windows, mudar de um monitor para outro com escala
+// diferente às vezes deixa a janela com o tamanho errado na primeira tentativa: confere e reaplica.
+function aplicarJanelaOverlay() {
+  if (!overlay || overlay.isDestroyed()) return;
+  const alvo = telaDaJanela().bounds;
+  if (!mesmoRet(overlay.getBounds(), alvo)) overlay.setBounds(alvo);
+  setTimeout(() => {
+    if (!overlay || overlay.isDestroyed()) return;
+    const b = telaDaJanela().bounds;
+    if (!mesmoRet(overlay.getBounds(), b)) overlay.setBounds(b);
+  }, 120);
+}
+// O overlay avisa onde o pet está; se ele foi para outro monitor, a janela vai junto.
+// Só para monitores em que ele pode ficar: com só uma tela escolhida em ⚙️, o centro do pet às vezes
+// passa uns pixels da borda; ir junto mandava a tela de novo, o overlay via o pet "fora das telas" e
+// chamava ele de volta para o chat.
+function petEm(x, y) {
+  const o = areaTotal();
+  const d = screen.getDisplayNearestPoint({ x: Math.round(o.x + x), y: Math.round(o.y + y) });
+  if (!telasPermitidas().some((t) => t.id === d.id) || d.id === telaDaJanela().id) return;
+  idTelaJanela = d.id;
+  aplicarJanelaOverlay();
+  overlay?.webContents.send("tela", infoTela());
 }
 
 const limitar = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -185,14 +224,15 @@ function boundsChat(aberto) {
   const b = posBotao();
   if (!aberto) return { x: b.x - EXTRA_BRINQUEDOS, y: b.y, width: BOTAO + EXTRA_BRINQUEDOS, height: BOTAO };
   const wa = telaDoChat().workArea;
+  const pn = painelEm(wa);
   const c = centroBotao(b);
-  const x = c.x < wa.x + wa.width / 2 ? b.x : b.x + BOTAO - PAINEL.w;
-  const y = c.y < wa.y + wa.height / 2 ? b.y : b.y + BOTAO - PAINEL.h;
+  const x = c.x < wa.x + wa.width / 2 ? b.x : b.x + BOTAO - pn.w;
+  const y = c.y < wa.y + wa.height / 2 ? b.y : b.y + BOTAO - pn.h;
   return {
-    x: Math.round(limitar(x, wa.x, wa.x + wa.width - PAINEL.w)),
-    y: Math.round(limitar(y, wa.y, wa.y + wa.height - PAINEL.h)),
-    width: PAINEL.w,
-    height: PAINEL.h,
+    x: Math.round(limitar(x, wa.x, wa.x + wa.width - pn.w)),
+    y: Math.round(limitar(y, wa.y, wa.y + wa.height - pn.h)),
+    width: pn.w,
+    height: pn.h,
   };
 }
 
@@ -236,6 +276,7 @@ function infoTela() {
     largura: o.width,
     altura: o.height,
     area: rel(wa), // tela da casa
+    janela: rel(telaDaJanela().bounds), // pedaço que a janela do overlay mostra (um monitor)
     areas: permitidas.map((d) => rel(d.workArea)), // onde ele pode andar
     monitores: permitidas.map((d) => rel(d.bounds)), // a tela inteira de cada um (com a barra de tarefas)
     casa,
@@ -271,23 +312,24 @@ const naoFocavel = { focusable: false, skipTaskbar: true, hasShadow: false };
 function criarOverlay() {
   overlay = new BrowserWindow({
     icon: ICONE_APP,
-    ...areaTotal(),
+    ...telaDaJanela().bounds,
     ...naoFocavel,
     transparent: true,
     frame: false,
     resizable: false,
     movable: false,
     alwaysOnTop: true,
-    enableLargerThanScreen: true, // no Mac, sem isso a janela não passa do tamanho de um monitor
     backgroundColor: "#00000000",
     webPreferences: prefsSeguras(),
   });
   overlay.setAlwaysOnTop(true, "screen-saver");
+  segurarTopo(overlay);
   overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlay.setIgnoreMouseEvents(true, { forward: true });
-  // o Windows limita janelas novas ao tamanho de um monitor; reaplicar depois de criada cobre todos
-  overlay.setBounds(areaTotal());
-  overlay.once("ready-to-show", () => overlay.setBounds(areaTotal()));
+  // no Windows, uma janela criada num monitor com escala diferente da do principal pode nascer com
+  // o tamanho errado: reaplica depois de criada
+  aplicarJanelaOverlay();
+  overlay.once("ready-to-show", aplicarJanelaOverlay);
   overlay.loadFile(path.join(__dirname, "src/overlay.html"));
   vigiar("overlay", overlay);
   // se a página do pet cair, cria de novo (senão ele some até reiniciar o app)
@@ -314,7 +356,11 @@ function criarChat() {
     webPreferences: prefsSeguras(),
   });
   chat.setAlwaysOnTop(true, "screen-saver");
+  segurarTopo(chat);
   chat.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // mesmo motivo do overlay: num monitor com outra escala, a janela pode nascer do tamanho errado
+  chat.setBounds(boundsChat(false));
+  chat.once("ready-to-show", () => posicionarChat());
   chat.loadFile(path.join(__dirname, "src/chat.html"));
   vigiar("chat", chat);
   // se a página do chat cair, carrega de novo (senão a janela fica vazia e o botão some/não responde).
@@ -396,12 +442,15 @@ function abrirChat(aberto) {
 let posicionando = false;
 function posicionarChat() {
   posicionando = true;
-  chat.setBounds(boundsChat(chatAberto));
-  setTimeout(() => (posicionando = false), 100);
+  const alvo = boundsChat(chatAberto);
+  chat.setBounds(alvo);
+  // Windows com monitores de escalas diferentes: a primeira tentativa pode sair do tamanho errado
+  setTimeout(() => {
+    posicionando = false;
+    if (chat && !chat.isDestroyed() && !arrasto && !mesmoRet(chat.getBounds(), alvo)) chat.setBounds(alvo);
+  }, 100);
   // no Mac com monitores separados, o overlay muda de monitor junto com o chat
-  const a = areaTotal();
-  const b = overlay && !overlay.isDestroyed() ? overlay.getBounds() : a;
-  if (a.x !== b.x || a.y !== b.y || a.width !== b.width || a.height !== b.height) overlay.setBounds(a);
+  aplicarJanelaOverlay();
   // o pet acompanha o chat (e não fica escondido atrás do painel)
   overlay?.webContents.send("tela", infoTela());
 }
@@ -412,25 +461,27 @@ function arrastarChat(ativo) {
   if (process.env.MASCOTE_DEBUG) log("main", "info", "[debug] arrastarChat", ativo, Boolean(arrasto));
   if (ativo && !arrasto) {
     const c = screen.getCursorScreenPoint();
-    const [x, y] = chat.getPosition();
-    arrasto = { dx: c.x - x, dy: c.y - y, inicio: c, moveu: false };
+    const { x, y, width, height } = chat.getBounds();
+    // o tamanho fica guardado: no Windows, setPosition entre monitores com escalas diferentes
+    // muda o tamanho da janela a cada chamada (o chat ia crescendo ou encolhendo no caminho)
+    arrasto = { dx: c.x - x, dy: c.y - y, inicio: c, moveu: false, width, height };
     arrasto.timer = setInterval(() => {
       const p = screen.getCursorScreenPoint();
       if (!arrasto.moveu && Math.hypot(p.x - arrasto.inicio.x, p.y - arrasto.inicio.y) < 5) return;
       arrasto.moveu = true;
-      chat.setPosition(p.x - arrasto.dx, p.y - arrasto.dy);
+      chat.setBounds({ x: p.x - arrasto.dx, y: p.y - arrasto.dy, width: arrasto.width, height: arrasto.height });
     }, 16);
   } else if (!ativo && arrasto) {
     clearInterval(arrasto.timer);
-    const moveu = arrasto.moveu;
+    const { moveu, width: pw, height: ph } = arrasto;
     arrasto = null;
     if (!moveu) return false;
     const [x, y] = chat.getPosition();
     if (chatAberto) {
       // arrastou o painel aberto: o botão fica no canto do painel que corresponde ao lado em que ele abre
-      const wa = screen.getDisplayNearestPoint({ x: x + PAINEL.w / 2, y: y + PAINEL.h / 2 }).workArea;
-      const bx = x + PAINEL.w / 2 < wa.x + wa.width / 2 ? x : x + PAINEL.w - BOTAO;
-      const by = y + PAINEL.h / 2 < wa.y + wa.height / 2 ? y : y + PAINEL.h - BOTAO;
+      const wa = screen.getDisplayNearestPoint({ x: x + pw / 2, y: y + ph / 2 }).workArea;
+      const bx = x + pw / 2 < wa.x + wa.width / 2 ? x : x + pw - BOTAO;
+      const by = y + ph / 2 < wa.y + wa.height / 2 ? y : y + ph - BOTAO;
       config.chatPos = { x: bx, y: by };
     } else config.chatPos = { x: x + EXTRA_BRINQUEDOS, y }; // a janela começa no botão de brinquedos
     salvarConfig();
@@ -555,8 +606,7 @@ function criarBilhete({ x, y }) {
     icon: ICONE_APP,
     x: Math.round(o.x + x),
     y: Math.round(o.y + y),
-    width: 240,
-    height: 150,
+    ...TAM_BILHETE,
     frame: false,
     resizable: false,
     skipTaskbar: true,
@@ -567,11 +617,15 @@ function criarBilhete({ x, y }) {
   w.setAlwaysOnTop(true, "floating");
   w.loadFile(path.join(__dirname, "src/bilhete.html"), { query: { dados: JSON.stringify(conteudo) } });
   w.once("ready-to-show", () => {
+    // nasceu num monitor com escala diferente da do principal: o Windows pode ter mudado o tamanho
+    const [bx, by] = w.getPosition();
+    w.setBounds({ x: bx, y: by, ...TAM_BILHETE });
     w.showInactive();
     // No Windows, o "sempre no topo" se perde quando a janela nasce escondida: reaplica ao mostrar,
     // senão o bilhete fica atrás das janelas maximizadas. Depois o pet e o chat voltam para a frente
     // (o pet é desenhado por cima do papel que ele carrega).
     w.setAlwaysOnTop(true, "screen-saver");
+    segurarTopo(w); // só depois de ligar o topo, senão o "floating" → "screen-saver" contaria como perda
     for (const j of [overlay, chat]) if (j && !j.isDestroyed() && j.isVisible()) j.moveTop();
   });
   w.on("closed", () => {
@@ -579,7 +633,7 @@ function criarBilhete({ x, y }) {
     if (overlay && !overlay.isDestroyed()) overlay.webContents.send("bilhete:fechado", id); // no fechamento do app o overlay já foi
   });
   bilhetes.set(id, w);
-  return { id, largura: 240, altura: 150 };
+  return { id, largura: TAM_BILHETE.width, altura: TAM_BILHETE.height };
 }
 
 // ---------- IPC ----------
@@ -598,6 +652,7 @@ function registrarIpc() {
   const on = (canal, fn) => ipcMain.on(canal, (e, ...a) => origemConfiavel(e) && fn(e, ...a));
   const handle = (canal, fn) => ipcMain.handle(canal, (e, ...a) => (origemConfiavel(e) ? fn(e, ...a) : null));
   handle("inicio", () => ({ pet: petAtual(), config, tela: infoTela(), mouseNativo: require("./src/cursor").disponivel(), debug: process.env.MASCOTE_DEBUG || null }));
+  on("pet:onde", (_e, { x, y } = {}) => num(x) && num(y) && petEm(x, y));
   on("pet:ignorar", (_e, ignorar) => overlay?.setIgnoreMouseEvents(ignorar === true, { forward: true }));
   on("pet:moverCursor", (_e, { x, y } = {}) => {
     if (escondido || !config.bagunca || config.travessuras?.["pegar-mouse"] === false || !num(x) || !num(y)) return;
@@ -639,7 +694,9 @@ function registrarIpc() {
     if (!num(x) || !num(y)) return;
     const w = bilhetes.get(id);
     const o = areaTotal();
-    if (w && !w.isDestroyed()) w.setPosition(Math.round(o.x + x), Math.round(o.y + y));
+    // setBounds com o tamanho fixo, e não setPosition: no Windows, levar a janela para um monitor
+    // com outra escala por setPosition muda o tamanho dela a cada quadro (o bilhete ficava GIGANTE)
+    if (w && !w.isDestroyed()) w.setBounds({ x: Math.round(o.x + x), y: Math.round(o.y + y), ...TAM_BILHETE });
   });
   on("bilhete:fechar", (e) => BrowserWindow.fromWebContents(e.sender)?.close());
 
@@ -900,9 +957,67 @@ function filtrarConfigDaPagina(parcial) {
   return limpo;
 }
 
+// Para o log: posição, tamanho, área útil e escala de cada monitor (ajuda a achar bugs de escala).
+const resumoTelas = () =>
+  screen.getAllDisplays().map((d) => ({ id: d.id, bounds: d.bounds, workArea: d.workArea, escala: d.scaleFactor, principal: d.id === screen.getPrimaryDisplay().id }));
+
+// ---------- sempre no topo ----------
+// Quando o app abre junto com o Windows, ele nasce antes da área de trabalho ficar pronta: a barra
+// de tarefas e os outros programas da inicialização aparecem depois e o Windows tira o "sempre no
+// topo" do pet e do chat (abrindo pela mão isso não acontece). Por isso reaplicamos o topo algumas
+// vezes logo depois de abrir, depois de tempos em tempos, e quando o PC volta da suspensão, é
+// desbloqueado ou os monitores mudam. Desligar e ligar de novo força o Windows a refazer a ordem;
+// moveTop não rouba o foco de quem está digitando.
+let ultimoReforco = 0;
+// leve = só traz para a frente as janelas que ainda estão no topo (sem desliga-liga, não pisca);
+// quem perdeu o topo leva o desliga-liga mesmo no modo leve
+function reforcarTopo(motivo, { leve = false } = {}) {
+  if (escondido) return;
+  ultimoReforco = Date.now();
+  const vivas = (lista) => lista.filter((w) => w && !w.isDestroyed() && w.isVisible());
+  // bilhetes primeiro: o pet (overlay) e o chat ficam por cima do papel
+  for (const w of [...vivas([...bilhetes.values()]), ...vivas([overlay, chat])]) {
+    if (!leve || !w.isAlwaysOnTop()) {
+      w.setAlwaysOnTop(false);
+      w.setAlwaysOnTop(true, "screen-saver");
+    }
+    w.moveTop();
+  }
+  if (motivo) log("main", "info", "topo reaplicado:", motivo);
+}
+
+function vigiarTopo() {
+  // só no Windows: no Mac e no Linux o topo não se perde assim, e o desliga-liga pode piscar
+  if (!plataforma.WIN) return;
+  // logo depois de abrir (a área de trabalho pode levar até um minuto para terminar de carregar)
+  for (const s of [1, 3, 6, 10, 20, 40, 60, 90]) setTimeout(() => reforcarTopo(`início +${s}s`), s * 1000);
+  // de tempos em tempos, para pegar programas que se colocam no topo depois
+  setInterval(() => reforcarTopo(null, { leve: true }), 15000);
+  for (const ev of ["display-metrics-changed", "display-added", "display-removed"]) screen.on(ev, () => setTimeout(() => reforcarTopo(ev), 1000));
+  for (const ev of ["resume", "unlock-screen", "user-did-become-active"]) {
+    try {
+      powerMonitor.on(ev, () => setTimeout(() => reforcarTopo(ev), 1500));
+    } catch {}
+  }
+}
+
+// se o sistema tirar o topo da janela, devolve (ignorando o desliga-liga do próprio reforcarTopo)
+// Só no Windows, como o vigiarTopo. Várias janelas perdendo o topo juntas geram um reforço só.
+let reforcoPendente = null;
+function segurarTopo(w) {
+  if (!plataforma.WIN) return;
+  w.on("always-on-top-changed", (_e, noTopo) => {
+    if (noTopo || escondido || reforcoPendente || Date.now() - ultimoReforco < 2000) return;
+    reforcoPendente = setTimeout(() => {
+      reforcoPendente = null;
+      reforcarTopo("topo perdido");
+    }, 500);
+  });
+}
+
 // ---------- início ----------
 app.whenReady().then(async () => {
-  log("main", "info", `iniciando v${app.getVersion()} (Electron ${process.versions.electron}), telas:`, screen.getAllDisplays().map((d) => d.bounds));
+  log("main", "info", `iniciando v${app.getVersion()} (Electron ${process.versions.electron}, ${process.platform}), telas:`, resumoTelas());
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, ok) => ok(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   carregarConfig();
@@ -926,12 +1041,13 @@ app.whenReady().then(async () => {
   iniciarCursor();
   globalShortcut.register("CommandOrControl+Alt+Shift+Q", () => app.quit());
   const telasMudaram = () => {
-    log("main", "info", "telas mudaram:", screen.getAllDisplays().map((d) => d.bounds));
-    overlay?.setBounds(areaTotal());
+    log("main", "info", "telas mudaram:", resumoTelas());
+    aplicarJanelaOverlay();
     if (chat) posicionarChat();
     else overlay?.webContents.send("tela", infoTela());
   };
   for (const ev of ["display-metrics-changed", "display-added", "display-removed"]) screen.on(ev, telasMudaram);
+  vigiarTopo();
 });
 
 app.on("will-quit", () => globalShortcut.unregisterAll());
