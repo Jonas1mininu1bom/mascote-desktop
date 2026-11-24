@@ -13,6 +13,11 @@ const admin = require("./src/admin");
 const plataforma = require("./src/plataforma");
 const { validarImagens } = require("./src/imagens");
 
+// Duas versões do instalador: a completa (com o chat do Claude Code) e a "só o mascote", sem o chat
+// e sem o SDK do Claude Code embutido (bem menor). O instalador da só-mascote grava edicao: "so-mascote"
+// no package.json do app (veja electron-builder-so-mascote.js). Pelo código: npm run start:mascote.
+const COM_CHAT = require("./package.json").edicao !== "so-mascote" && !process.argv.includes("--so-mascote");
+
 // Mesma pasta de dados rodando pelo código (npm start) ou instalado (o nome do app instalado tem espaço):
 // ajustes, pets e bilhetes da pessoa continuam os mesmos.
 // Quem passar --user-data-dir (testes, desenvolvimento) usa a pasta que escolheu, separada da sua.
@@ -42,10 +47,10 @@ app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
 app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 if (!app.requestSingleInstanceLock()) app.quit();
 // Abriram o app de novo (atalho, Menu Iniciar) com ele já rodando: em vez de não fazer nada,
-// traz o mascote de volta (se estava minimizado) e abre o chat.
+// traz o mascote de volta (se estava escondido) e abre o chat (na só-mascote, os ajustes).
 app.on("second-instance", () => {
   if (!chat || chat.isDestroyed()) return;
-  mostrarChat();
+  mostrarTudo();
   abrirChat(true);
 });
 
@@ -123,32 +128,25 @@ function recarregarPets() {
 
 // ---------- janelas ----------
 let overlay = null; // tela inteira, transparente, onde o pet vive
-let chat = null; // botão/painel de chat fixo no canto
+let chat = null; // painel do chat e dos ajustes (só aparece aberto; não tem mais botão fixo no canto)
+let barra = null; // pop-up do topo: aparece quando o mouse encosta no alto da tela, no meio
 let tray = null;
 let chatAberto = false;
-let escondido = false; // "esconder tudo" na bandeja: pet, chat e bilhetes somem e o pet não apronta nada
-let chatMinimizado = false; // botão – do chat: só o chat e o botão de brinquedos somem, o pet continua na tela
-let painelAntesDeMinimizar = false;
+let escondido = false; // "esconder": pet, chat e bilhetes somem e o pet não apronta nada (a bandeja traz de volta)
 let avisouBandeja = false;
 const bilhetes = new Map();
 const LIMITE_BILHETES = 50; // passou disso, o mais antigo sai (eles ficam na tela até a pessoa fechar)
 let proxIdBilhete = 1;
-const MARGEM = 16;
-const BOTAO = 64;
-// O botão de brinquedos fica à esquerda do botão do chat, na mesma janela (assim os dois se movem juntos).
-const EXTRA_BRINQUEDOS = 42;
 const PAINEL = { w: 360, h: 520 };
 const TAM_BILHETE = { width: 240, height: 150 };
 // Telas pequenas (ex.: notebook 1366x768 com escala de 125%): o painel encolhe para caber.
 const painelEm = (wa) => ({ w: Math.min(PAINEL.w, wa.width), h: Math.max(240, Math.min(PAINEL.h, wa.height)) });
 
-const tela = () => screen.getPrimaryDisplay();
-
 // Monitores que o overlay cobre: todos, menos no Mac com "Monitores têm Spaces separados" (o padrão),
 // em que uma janela só aparece num monitor. Aí é o monitor do chat.
 function telasDoOverlay() {
   const todas = screen.getAllDisplays();
-  if (todas.length > 1 && plataforma.macMonitoresSeparados()) return [telaDoChat()];
+  if (todas.length > 1 && plataforma.macMonitoresSeparados()) return [screen.getPrimaryDisplay()];
   return todas;
 }
 
@@ -173,7 +171,7 @@ function areaTotal() {
 let idTelaJanela = null;
 function telaDaJanela() {
   const ds = telasDoOverlay();
-  return ds.find((d) => d.id === idTelaJanela) || ds.find((d) => d.id === telaDoChat().id) || ds[0];
+  return ds.find((d) => d.id === idTelaJanela) || ds.find((d) => d.id === telaDaCasa().id) || ds[0];
 }
 const mesmoRet = (a, b) => a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 // Põe a janela do overlay no monitor certo. No Windows, mudar de um monitor para outro com escala
@@ -202,32 +200,21 @@ function petEm(x, y) {
 }
 
 const limitar = (v, min, max) => Math.max(min, Math.min(max, v));
-const centroBotao = (b) => ({ x: b.x + BOTAO / 2, y: b.y + BOTAO / 2 });
 
-// Posição do botão do chat (pode ser arrastado; fica salvo em config.chatPos). Sem posição salva: canto inferior direito.
-function posBotao() {
-  const p = config.chatPos;
-  if (p && num(p.x) && num(p.y)) {
-    const wa = screen.getDisplayNearestPoint(centroBotao(p)).workArea; // se o monitor sumiu, cai no mais próximo
-    return {
-      x: Math.round(limitar(p.x, wa.x + EXTRA_BRINQUEDOS, wa.x + wa.width - BOTAO)),
-      y: Math.round(limitar(p.y, wa.y, wa.y + wa.height - BOTAO)),
-    };
-  }
-  const wa = tela().workArea;
-  return { x: wa.x + wa.width - BOTAO - MARGEM, y: wa.y + wa.height - BOTAO - MARGEM };
-}
-const telaDoChat = () => screen.getDisplayNearestPoint(centroBotao(posBotao()));
+// Monitor em que o painel abre: o do mouse na hora de abrir (normalmente o do pop-up do topo).
+let idTelaPainel = null;
+const telaDoPainel = () => screen.getAllDisplays().find((d) => d.id === idTelaPainel) || screen.getPrimaryDisplay();
 
-// O painel abre a partir do botão, crescendo para o lado em que há mais espaço.
-function boundsChat(aberto) {
-  const b = posBotao();
-  if (!aberto) return { x: b.x - EXTRA_BRINQUEDOS, y: b.y, width: BOTAO + EXTRA_BRINQUEDOS, height: BOTAO };
-  const wa = telaDoChat().workArea;
+// O painel abre no alto, no meio do monitor (logo abaixo de onde o pop-up desce). Se a pessoa
+// arrastou o painel pelo topo, abre onde ela deixou (config.painelPos, canto de cima à esquerda).
+function boundsChat() {
+  const p = config.painelPos;
+  const salvo = p && num(p.x) && num(p.y);
+  // se o monitor sumiu, cai no mais próximo
+  const wa = salvo ? screen.getDisplayNearestPoint({ x: p.x + PAINEL.w / 2, y: p.y + 20 }).workArea : telaDoPainel().workArea;
   const pn = painelEm(wa);
-  const c = centroBotao(b);
-  const x = c.x < wa.x + wa.width / 2 ? b.x : b.x + BOTAO - pn.w;
-  const y = c.y < wa.y + wa.height / 2 ? b.y : b.y + BOTAO - pn.h;
+  const x = salvo ? p.x : wa.x + (wa.width - pn.w) / 2;
+  const y = salvo ? p.y : wa.y + 8;
   return {
     x: Math.round(limitar(x, wa.x, wa.x + wa.width - pn.w)),
     y: Math.round(limitar(y, wa.y, wa.y + wa.height - pn.h)),
@@ -236,12 +223,10 @@ function boundsChat(aberto) {
   };
 }
 
-// Onde o pet fica: ao lado do chat (à esquerda; se não couber, à direita), com os pés na base dele.
-function casaPara(r) {
-  const o = areaTotal();
-  const wa = telaDoChat().workArea;
-  const esquerda = r.x - 44 > wa.x + 40;
-  return { x: (esquerda ? r.x - 44 : r.x + r.width + 44) - o.x, y: Math.min(r.y + r.height, wa.y + wa.height) - o.y - 2 };
+// Casa do pet: canto de baixo, à direita, do monitor principal (ou do primeiro em que ele pode ficar).
+function telaDaCasa() {
+  const permitidas = telasPermitidas();
+  return permitidas.find((d) => d.id === screen.getPrimaryDisplay().id) || permitidas[0];
 }
 
 // Telas em que o pet pode ficar: todas, ou só a escolhida em ⚙️ (config.telas = id do monitor).
@@ -263,14 +248,8 @@ function infoTela() {
   const o = areaTotal();
   const rel = (r) => ({ x: r.x - o.x, y: r.y - o.y, w: r.width, h: r.height });
   const permitidas = telasPermitidas();
-  const chatD = telaDoChat();
-  // a casa é ao lado do chat; se o chat estiver numa tela onde o pet não pode ficar, é no canto da tela dele
-  const casaD = permitidas.find((d) => d.id === chatD.id) || permitidas[0];
-  const wa = casaD.workArea;
-  const casa =
-    casaD.id === chatD.id
-      ? casaPara(boundsChat(chatAberto))
-      : { x: wa.x + wa.width - 60 - o.x, y: wa.y + wa.height - 2 - o.y };
+  const wa = telaDaCasa().workArea;
+  const casa = { x: wa.x + wa.width - 60 - o.x, y: wa.y + wa.height - 2 - o.y };
   return {
     origem: { x: o.x, y: o.y }, // canto do overlay na área de trabalho (muda quando um monitor muda)
     largura: o.width,
@@ -280,8 +259,7 @@ function infoTela() {
     areas: permitidas.map((d) => rel(d.workArea)), // onde ele pode andar
     monitores: permitidas.map((d) => rel(d.bounds)), // a tela inteira de cada um (com a barra de tarefas)
     casa,
-    painel: chatAberto ? rel(boundsChat(true)) : null,
-    chat: rel(boundsChat(false)), // os botões do chat (fechado): os bilhetes ficam acima da altura deles
+    painel: chatAberto ? rel(boundsChat()) : null,
   };
 }
 
@@ -345,7 +323,8 @@ function criarOverlay() {
 function criarChat() {
   chat = new BrowserWindow({
     icon: ICONE_APP,
-    ...boundsChat(false),
+    ...boundsChat(),
+    show: false, // só aparece aberto (pelo pop-up do topo ou pela bandeja)
     transparent: true,
     frame: false,
     resizable: false,
@@ -358,51 +337,111 @@ function criarChat() {
   chat.setAlwaysOnTop(true, "screen-saver");
   segurarTopo(chat);
   chat.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  // mesmo motivo do overlay: num monitor com outra escala, a janela pode nascer do tamanho errado
-  chat.setBounds(boundsChat(false));
-  chat.once("ready-to-show", () => posicionarChat());
   chat.loadFile(path.join(__dirname, "src/chat.html"));
   vigiar("chat", chat);
-  // se a página do chat cair, carrega de novo (senão a janela fica vazia e o botão some/não responde).
+  // se a página do chat cair, carrega de novo (senão o painel abre vazio).
   // Pedidos de permissão pendentes são negados: quem ia responder era a página que caiu.
   chat.webContents.on("render-process-gone", () => {
     for (const responder of pedidosPermissao.values()) responder(false);
     pedidosPermissao.clear();
     setTimeout(() => {
       if (!chat || chat.isDestroyed()) return;
-      chatAberto = false;
-      chat.setBounds(boundsChat(false));
+      if (chatAberto) abrirChat(false);
       chat.webContents.reload();
       log("chat", "warning", "chat recarregado depois de cair");
     }, 1000);
   });
 }
 
-// Minimizar (botão – do chat): some só a janela do chat, que tem o botão do chat e o de brinquedos.
-// O pet continua andando e aprontando. O ícone na bandeja (perto do relógio) traz o chat de volta.
-function minimizarChat(minimizar) {
-  if (minimizar === chatMinimizado) return;
-  chatMinimizado = minimizar;
-  if (chat && !chat.isDestroyed() && !escondido) {
-    if (minimizar) {
-      // fecha o painel enquanto some, para o pet e os balões não desviarem de um painel invisível
-      painelAntesDeMinimizar = chatAberto;
-      chat.hide();
-      if (chatAberto) abrirChat(false);
-    } else {
-      chat.show();
-      abrirChat(painelAntesDeMinimizar); // volta como estava: painel aberto ou só os botões
-    }
-  }
-  montarBandeja();
-  if (minimizar) avisarBandeja("O chat está aqui na bandeja, perto do relógio. Clique no ícone para trazer o chat de volta.");
-  log("main", "info", minimizar ? "chat minimizado para a bandeja (pet continua na tela)" : "chat de volta na tela");
+// ---------- pop-up do topo ----------
+// Encostar o mouse no alto da tela, no meio, e deixar lá um instante faz descer um pop-up com os
+// atalhos (conversar, brinquedos, chamar, ajustes, esconder, fechar). Ele some quando o mouse sai.
+// Só no meio da tela e com uma pequena espera: nos cantos de cima ficam as abas e o X das janelas.
+const BARRA = { botao: 66, alto: 80 };
+const TOPO = { espera: 250, faixa: 0.2, saida: 450, folga: 28 };
+const botoesDaBarra = () => 4 + (COM_CHAT ? 1 : 0) + (tray ? 1 : 0);
+const larguraBarra = () => botoesDaBarra() * BARRA.botao + 26;
+let barraVisivel = false;
+let topoDesde = 0;
+let saiuDesde = 0;
+
+function criarBarra() {
+  barra = new BrowserWindow({
+    icon: ICONE_APP,
+    width: larguraBarra(),
+    height: BARRA.alto,
+    show: false,
+    transparent: true,
+    frame: false,
+    resizable: false,
+    movable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    alwaysOnTop: true,
+    backgroundColor: "#00000000",
+    webPreferences: prefsSeguras(),
+  });
+  barra.setAlwaysOnTop(true, "screen-saver");
+  barra.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  barra.loadFile(path.join(__dirname, "src/barra.html"));
+  vigiar("barra", barra);
+  barra.webContents.on("render-process-gone", () => setTimeout(() => barra && !barra.isDestroyed() && barra.webContents.reload(), 1000));
 }
 
-// Traz de volta o que estiver escondido (tudo, ou só o chat).
-function mostrarChat() {
+function mostrarBarra(d) {
+  if (!barra || barra.isDestroyed()) return;
+  const largura = larguraBarra();
+  // no alto da área útil: no Mac, logo abaixo da barra de menus
+  barra.setBounds({ x: Math.round(d.bounds.x + (d.bounds.width - largura) / 2), y: d.workArea.y, width: largura, height: BARRA.alto });
+  barra.showInactive(); // não rouba o teclado de quem está digitando
+  barra.moveTop();
+  barra.webContents.send("barra:estado", { visivel: true, comChat: COM_CHAT, podeEsconder: Boolean(tray) });
+  barraVisivel = true;
+  saiuDesde = 0;
+}
+
+function esconderBarra() {
+  topoDesde = 0;
+  if (!barraVisivel) return;
+  barraVisivel = false;
+  if (!barra || barra.isDestroyed()) return;
+  barra.webContents.send("barra:estado", { visivel: false, comChat: COM_CHAT, podeEsconder: Boolean(tray) });
+  setTimeout(() => !barraVisivel && barra && !barra.isDestroyed() && barra.hide(), 180); // depois de subir
+}
+
+// Chamado junto com a posição do mouse (~60 vezes por segundo).
+function vigiarTopoDaTela(p) {
+  if (escondido || chatAberto || arrasto) return esconderBarra();
+  if (!barraVisivel) {
+    const d = screen.getDisplayNearestPoint(p);
+    const b = d.bounds;
+    const noTopo = p.y <= b.y + 1 && Math.abs(p.x - (b.x + b.width / 2)) <= b.width * TOPO.faixa;
+    if (!noTopo) return void (topoDesde = 0);
+    if (!topoDesde) topoDesde = Date.now();
+    else if (Date.now() - topoDesde >= TOPO.espera) mostrarBarra(d);
+    return;
+  }
+  const r = barra.getBounds();
+  const f = TOPO.folga;
+  const perto = p.x >= r.x - f && p.x <= r.x + r.width + f && p.y >= r.y - f && p.y <= r.y + r.height + f;
+  if (perto) saiuDesde = 0;
+  else if (!saiuDesde) saiuDesde = Date.now();
+  else if (Date.now() - saiuDesde >= TOPO.saida) esconderBarra();
+}
+
+function acaoDaBarra(acao) {
+  esconderBarra();
+  if (acao === "chat" && COM_CHAT) abrirChat(true, "chat");
+  else if (acao === "ajustes") abrirChat(true, "ajustes");
+  else if (acao === "brinquedos") overlay?.webContents.send("brinquedos:abrir");
+  else if (acao === "voltar") overlay?.webContents.send("pet:voltar");
+  else if (acao === "esconder" && tray) esconderMascote(true); // sem ícone na bandeja, não teria como voltar
+  else if (acao === "sair") app.quit();
+}
+
+// Traz de volta o que estiver escondido.
+function mostrarTudo() {
   if (escondido) esconderMascote(false);
-  if (chatMinimizado) minimizarChat(false);
 }
 
 function avisarBandeja(texto) {
@@ -413,15 +452,18 @@ function avisarBandeja(texto) {
   } catch {}
 }
 
-// Esconder tudo (menu da bandeja): pet, chat e bilhetes somem e fica só o ícone. Clicar nele traz de volta.
+// Esconder (pop-up do topo ou bandeja): pet, chat e bilhetes somem e fica só o ícone. Clicar nele traz de volta.
 function esconderMascote(esconder) {
   escondido = esconder;
-  if (!esconder) chatMinimizado = false; // voltou tudo, inclusive o chat
-  const janelas = [overlay, chat, ...bilhetes.values()].filter((w) => w && !w.isDestroyed());
+  if (esconder) esconderBarra();
+  const janelas = [overlay, ...bilhetes.values()].filter((w) => w && !w.isDestroyed());
   for (const w of janelas) {
     if (esconder) w.hide();
-    else if (w === chat) w.show();
     else w.showInactive();
+  }
+  if (chat && !chat.isDestroyed()) {
+    if (esconder) chat.hide();
+    else if (chatAberto) chat.show();
   }
   if (!esconder) overlay?.setIgnoreMouseEvents(true, { forward: true });
   montarBandeja();
@@ -429,41 +471,48 @@ function esconderMascote(esconder) {
   log("main", "info", esconder ? "mascote escondido na bandeja" : "mascote de volta na tela");
 }
 
-function abrirChat(aberto) {
+// Abre ou fecha o painel. modo: "chat" (conversa) ou "ajustes". Na só-mascote é sempre "ajustes".
+function abrirChat(aberto, modo = "chat") {
+  if (!chat || chat.isDestroyed()) return;
+  if (!COM_CHAT) modo = "ajustes";
   chatAberto = aberto;
-  posicionarChat();
-  chat.webContents.send("chat:estado", aberto);
   if (aberto) {
+    // abre no monitor em que o mouse está (o do pop-up), se a pessoa não arrastou o painel antes
+    idTelaPainel = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).id;
+    esconderBarra();
+    posicionarChat();
+    chat.show();
     if (plataforma.MAC) app.focus({ steal: true }); // sem ícone no Dock, o Mac não passa o teclado sozinho
     chat.focus();
+  } else {
+    chat.hide();
+    overlay?.webContents.send("tela", infoTela());
   }
+  chat.webContents.send("chat:estado", { aberto, modo });
 }
 
-let posicionando = false;
 function posicionarChat() {
-  posicionando = true;
-  const alvo = boundsChat(chatAberto);
-  chat.setBounds(alvo);
-  // Windows com monitores de escalas diferentes: a primeira tentativa pode sair do tamanho errado
-  setTimeout(() => {
-    posicionando = false;
-    if (chat && !chat.isDestroyed() && !arrasto && !mesmoRet(chat.getBounds(), alvo)) chat.setBounds(alvo);
-  }, 100);
-  // no Mac com monitores separados, o overlay muda de monitor junto com o chat
+  if (chatAberto && chat && !chat.isDestroyed()) {
+    const alvo = boundsChat();
+    chat.setBounds(alvo);
+    // Windows com monitores de escalas diferentes: a primeira tentativa pode sair do tamanho errado
+    setTimeout(() => {
+      if (chat && !chat.isDestroyed() && !arrasto && !mesmoRet(chat.getBounds(), alvo)) chat.setBounds(alvo);
+    }, 100);
+  }
   aplicarJanelaOverlay();
-  // o pet acompanha o chat (e não fica escondido atrás do painel)
+  // o pet não fica escondido atrás do painel
   overlay?.webContents.send("tela", infoTela());
 }
 
-// Arrastar o botão: a página avisa início/fim; o processo principal segue o mouse.
+// Arrastar o painel pelo topo: a página avisa início/fim; o processo principal segue o mouse.
 let arrasto = null;
 function arrastarChat(ativo) {
-  if (process.env.MASCOTE_DEBUG) log("main", "info", "[debug] arrastarChat", ativo, Boolean(arrasto));
   if (ativo && !arrasto) {
     const c = screen.getCursorScreenPoint();
     const { x, y, width, height } = chat.getBounds();
     // o tamanho fica guardado: no Windows, setPosition entre monitores com escalas diferentes
-    // muda o tamanho da janela a cada chamada (o chat ia crescendo ou encolhendo no caminho)
+    // muda o tamanho da janela a cada chamada (o painel ia crescendo ou encolhendo no caminho)
     arrasto = { dx: c.x - x, dy: c.y - y, inicio: c, moveu: false, width, height };
     arrasto.timer = setInterval(() => {
       const p = screen.getCursorScreenPoint();
@@ -473,17 +522,11 @@ function arrastarChat(ativo) {
     }, 16);
   } else if (!ativo && arrasto) {
     clearInterval(arrasto.timer);
-    const { moveu, width: pw, height: ph } = arrasto;
+    const { moveu } = arrasto;
     arrasto = null;
     if (!moveu) return false;
     const [x, y] = chat.getPosition();
-    if (chatAberto) {
-      // arrastou o painel aberto: o botão fica no canto do painel que corresponde ao lado em que ele abre
-      const wa = screen.getDisplayNearestPoint({ x: x + pw / 2, y: y + ph / 2 }).workArea;
-      const bx = x + pw / 2 < wa.x + wa.width / 2 ? x : x + pw - BOTAO;
-      const by = y + ph / 2 < wa.y + wa.height / 2 ? y : y + ph - BOTAO;
-      config.chatPos = { x: bx, y: by };
-    } else config.chatPos = { x: x + EXTRA_BRINQUEDOS, y }; // a janela começa no botão de brinquedos
+    config.painelPos = { x, y };
     salvarConfig();
     posicionarChat();
     return true;
@@ -502,6 +545,7 @@ function iniciarCursor() {
     const p = screen.getCursorScreenPoint();
     const o = areaTotal();
     overlay.webContents.send("cursor", { x: p.x - o.x, y: p.y - o.y });
+    vigiarTopoDaTela(p);
   }, 16);
 }
 
@@ -533,40 +577,31 @@ function iconeBandeja() {
 }
 
 function montarBandeja() {
+  // Menu simples: o resto (pastas, telas, travessuras...) fica em Ajustes.
   const menu = Menu.buildFromTemplate([
     { label: petAtual().nome, enabled: false },
+    COM_CHAT ? { label: "Conversar", click: () => (mostrarTudo(), abrirChat(true, "chat")) } : null,
+    { label: "Ajustes", click: () => (mostrarTudo(), abrirChat(true, "ajustes")) },
+    { label: "Chamar o pet de volta", click: () => (mostrarTudo(), overlay.webContents.send("pet:voltar")) },
     escondido
       ? { label: "Mostrar o mascote", click: () => esconderMascote(false) }
-      : chatMinimizado
-        ? { label: "Mostrar o chat e os brinquedos", click: () => minimizarChat(false) }
-        : { label: "Minimizar o chat (o pet fica na tela)", click: () => minimizarChat(true) },
-    { label: "Abrir o chat", click: () => (mostrarChat(), abrirChat(true)) },
-    { label: "Chamar o pet de volta", click: () => overlay.webContents.send("pet:voltar") },
-    escondido
-      ? null
-      : { label: plataforma.MAC ? "Esconder tudo na barra de menus" : "Esconder tudo na bandeja (pet também)", click: () => esconderMascote(true) },
-    { label: "Chat de volta para o canto", click: () => ((config.chatPos = undefined), salvarConfig(), posicionarChat()) },
-    { type: "separator" },
-    { label: "Passear pela tela", type: "checkbox", checked: config.passear, click: (i) => mudarConfig({ passear: i.checked }) },
-    { label: "Modo bagunça (pega o mouse, traz bilhetes)", type: "checkbox", checked: config.bagunca, click: (i) => mudarConfig({ bagunca: i.checked }) },
+      : { label: plataforma.MAC ? "Esconder na barra de menus" : "Esconder na bandeja", click: () => esconderMascote(true) },
     { type: "separator" },
     {
       label: "Escolher pet",
       submenu: pets.map((p) => ({ label: p.nome, type: "radio", checked: p.id === petAtual().id, click: () => escolherPet(p.id) })),
     },
-    { label: "Abrir pasta de pets…", click: () => shell.openPath(pastaPetsUsuario()) },
-    { label: "Abrir pasta de bilhetes…", click: abrirPastaBilhetes },
-    { label: "Abrir pasta de travessuras…", click: abrirPastaTravessuras },
-    { label: "Recarregar pets", click: () => escolherPet(config.pet) },
+    { label: "Passear pela tela", type: "checkbox", checked: config.passear, click: (i) => mudarConfig({ passear: i.checked }) },
+    { label: "Modo bagunça", type: "checkbox", checked: config.bagunca, click: (i) => mudarConfig({ bagunca: i.checked }) },
     { type: "separator" },
     { label: "Sair", click: () => app.quit() },
   ].filter(Boolean));
   try {
     if (!tray) {
       tray = new Tray(iconeBandeja());
-      // clique no ícone: traz de volta o chat (e o pet, se estava tudo escondido).
-      // No Windows e no Linux; no macOS o clique abre o menu, que tem "Mostrar o chat".
-      tray.on("click", mostrarChat);
+      // clique no ícone: traz o mascote de volta se estava escondido; senão abre o chat (ou os ajustes).
+      // No Windows e no Linux; no macOS o clique abre o menu.
+      tray.on("click", () => (escondido ? esconderMascote(false) : abrirChat(true, COM_CHAT ? "chat" : "ajustes")));
     } else tray.setImage(iconeBandeja());
     tray.setToolTip("Mascote Desktop");
     tray.setContextMenu(menu);
@@ -651,7 +686,7 @@ let contaMoverCursor = 0;
 function registrarIpc() {
   const on = (canal, fn) => ipcMain.on(canal, (e, ...a) => origemConfiavel(e) && fn(e, ...a));
   const handle = (canal, fn) => ipcMain.handle(canal, (e, ...a) => (origemConfiavel(e) ? fn(e, ...a) : null));
-  handle("inicio", () => ({ pet: petAtual(), config, tela: infoTela(), mouseNativo: require("./src/cursor").disponivel(), debug: process.env.MASCOTE_DEBUG || null }));
+  handle("inicio", () => ({ pet: petAtual(), config, tela: infoTela(), comChat: COM_CHAT, mouseNativo: require("./src/cursor").disponivel(), debug: process.env.MASCOTE_DEBUG || null }));
   on("pet:onde", (_e, { x, y } = {}) => num(x) && num(y) && petEm(x, y));
   on("pet:ignorar", (_e, ignorar) => overlay?.setIgnoreMouseEvents(ignorar === true, { forward: true }));
   on("pet:moverCursor", (_e, { x, y } = {}) => {
@@ -827,23 +862,11 @@ function registrarIpc() {
     overlay?.webContents.send("travessura:fim");
   });
   on("pet:voltar", () => overlay?.webContents.send("pet:voltar"));
-  // botão de brinquedos: o overlay mostra o menu (comida, bola) logo acima dele
-  on("brinquedos:abrir", () => {
-    if (!overlay || overlay.isDestroyed() || chatAberto) return;
-    const b = boundsChat(false);
-    const o = areaTotal();
-    overlay.webContents.send("brinquedos:abrir", { x: b.x + 4 + 17 - o.x, y: b.y + BOTAO - 6 - 17 - o.y });
-  });
+  on("barra:acao", (_e, acao) => typeof acao === "string" && acaoDaBarra(acao));
   on("app:sair", () => app.quit());
-  on("app:minimizar", () => minimizarChat(true));
 
-  on("chat:abrir", (_e, aberto) => (process.env.MASCOTE_DEBUG && log("main", "info", "[debug] chat:abrir", aberto), abrirChat(aberto === true)));
+  on("chat:abrir", (_e, aberto) => abrirChat(aberto === true));
   handle("chat:arrastar", (_e, ativo) => arrastarChat(ativo === true));
-  on("chat:posicaoPadrao", () => {
-    delete config.chatPos;
-    salvarConfig();
-    posicionarChat();
-  });
   handle("chat:escolherPasta", async () => {
     const r = await dialog.showOpenDialog(chat, { properties: ["openDirectory"], defaultPath: config.pasta });
     if (!r.canceled && r.filePaths[0]) {
@@ -882,6 +905,7 @@ function registrarIpc() {
   });
   // A página manda { texto, imagens: [{ dados: base64 }] } (ou só o texto, como antes).
   on("chat:enviar", (_e, pedido) => {
+    if (!COM_CHAT) return; // a só-mascote não tem chat
     const texto = typeof pedido === "string" ? pedido : typeof pedido?.texto === "string" ? pedido.texto : "";
     if (texto.length > 20000) return;
     let imagens;
@@ -911,9 +935,9 @@ function registrarIpc() {
           new Promise((resolve) => {
             const id = proxPermissao++;
             pedidosPermissao.set(id, resolve);
-            // minimizado na bandeja: volta para a tela, senão o pedido fica invisível e o Claude espera para sempre
-            mostrarChat();
-            if (!chatAberto) abrirChat(true);
+            // escondido ou fechado: volta para a tela, senão o pedido fica invisível e o Claude espera para sempre
+            mostrarTudo();
+            if (!chatAberto) abrirChat(true, "chat");
             chat.webContents.send("chat:permissao", { id, ...dados });
             humor("pensando");
           }),
@@ -1033,10 +1057,11 @@ app.whenReady().then(async () => {
   if (plataforma.MAC) app.dock?.hide();
   // Linux: janelas transparentes criadas logo de cara às vezes saem com fundo preto
   if (plataforma.LINUX) await new Promise((r) => setTimeout(r, 300));
-  // teste do "chamar de volta": o overlay põe o pet longe e aqui chamamos pelo mesmo canal do botão
+  // teste do "chamar de volta": o overlay põe o pet longe e aqui chamamos pelo mesmo canal do pop-up
   if (process.env.MASCOTE_DEBUG === "voltar") setTimeout(() => overlay?.webContents.send("pet:voltar"), 4000);
   criarOverlay();
   criarChat();
+  criarBarra();
   montarBandeja();
   iniciarCursor();
   globalShortcut.register("CommandOrControl+Alt+Shift+Q", () => app.quit());

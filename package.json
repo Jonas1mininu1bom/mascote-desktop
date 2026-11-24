@@ -5,12 +5,17 @@
   "main": "main.js",
   "scripts": {
     "start": "electron . --ozone-platform=x11",
+    "start:mascote": "electron . --ozone-platform=x11 --so-mascote",
     "validar-pet": "node tools/validar-pet.js",
     "atalho": "node scripts/criar-atalho.js",
     "dist": "electron-builder --publish never",
     "dist:linux": "electron-builder --linux --publish never",
     "dist:mac": "electron-builder --mac --publish never",
-    "dist:win": "electron-builder --win --publish never"
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mascote": "electron-builder --publish never --config electron-builder-so-mascote.js",
+    "dist:linux:mascote": "electron-builder --linux --publish never --config electron-builder-so-mascote.js",
+    "dist:mac:mascote": "electron-builder --mac --publish never --config electron-builder-so-mascote.js",
+    "dist:win:mascote": "electron-builder --win --publish never --config electron-builder-so-mascote.js"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.329",
@@ -65,7 +70,8 @@
       }
     },
     "dmg": {
-      "title": "Mascote Desktop"
+      "title": "Mascote Desktop",
+      "backgroundColor": "#fff7ef"
     },
     "linux": {
       "target": [

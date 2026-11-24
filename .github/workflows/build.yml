@@ -1,4 +1,5 @@
-# Gera os instaladores do Mascote Desktop para Windows, macOS e Linux.
+# Gera os instaladores do Mascote Desktop para Windows, macOS e Linux, em duas versões:
+# a completa (com o chat do Claude Code) e a "só o mascote" (sem o chat, bem menor).
 # - Em todo PR e push na main: gera e guarda os arquivos na aba "Actions" (por 14 dias).
 # - Numa tag v* (ex.: v0.2.0): também publica uma Release no GitHub com todos eles.
 name: Gerar instaladores
@@ -56,10 +57,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Gerar
+      - name: Gerar a versão completa (com o chat)
         run: npm run ${{ matrix.alvo }}
         env:
           # sem certificado: o Mac recebe assinatura ad-hoc (veja o README) e o Windows vai sem assinatura
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Gerar a versão só o mascote (sem o chat)
+        run: npm run ${{ matrix.alvo }}:mascote
+        env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
       - uses: actions/upload-artifact@v4
         with:
