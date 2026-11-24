@@ -2,11 +2,14 @@
 
 Um bichinho que mora na **sua tela** e conversa com você usando o **Claude Code** por trás.
 Vêm três pets em **3D de verdade**: o **Palito** (padrão), o **Pato** e a **Tartaruga** (troque em
-Configurações → Pet). Eles giram para a direção em que andam, e cada um conversa com uma personalidade própria.
+Ajustes → Pet). Eles giram para a direção em que andam, e cada um conversa com uma personalidade própria.
 
 ![Pato, Palito e Tartaruga](docs/pets.png)
 
-- **Chat com o Claude Code:** clique no botão laranja para conversar. Ele lê arquivos e ajuda com
+- **Menu no topo da tela:** encoste o mouse no alto da tela, no meio, e um menu desce com
+  **Conversar**, **Brinquedos**, **Chamar**, **Ajustes**, **Esconder** e **Fechar**. Nada fica
+  parado no canto atrapalhando.
+- **Chat com o Claude Code** (na versão completa): **Conversar** no menu do topo. Ele lê arquivos e ajuda com
   código na pasta que você escolher, sempre pedindo permissão antes de mexer em algo. Dá para
   **colar imagens** (Ctrl+V, ou Cmd+V no Mac) para ele ver.
 - **Um bichinho de verdade:** ele pisca, acena, cochila e passeia (se você deixar). Clique para dar
@@ -29,10 +32,20 @@ Configurações → Pet). Eles giram para a direção em que andam, e cada um co
 
 Mecânicas inspiradas nos pets de desktop clássicos, com personagens e código originais.
 
+## Duas versões
+
+| Versão | O que tem | Tamanho do instalador |
+|---|---|---|
+| **Completa** | O mascote e o chat com o Claude Code (ou outra IA) | Grande (~250 MB): traz o Claude Code dentro |
+| **Só o mascote** | O mascote, os brinquedos, os bilhetes e as travessuras, sem o chat | Bem menor: sem o Claude Code |
+
+As duas podem ficar instaladas ao mesmo tempo e usam os mesmos ajustes, pets e bilhetes (só uma roda
+por vez). Os arquivos da versão só o mascote têm `so-mascote` no nome.
+
 ## Requisitos
 
 - Node.js 18 ou superior
-- Claude Code instalado e logado, para o chat funcionar:
+- Só para a versão completa: Claude Code instalado e logado, para o chat funcionar:
   ```bash
   npm install -g @anthropic-ai/claude-code
   claude   # faça o login uma vez e saia
@@ -45,7 +58,8 @@ Mecânicas inspiradas nos pets de desktop clássicos, com personagens e código 
 
 ```bash
 npm install
-npm start
+npm start           # versão completa
+npm run start:mascote   # versão só o mascote (sem o chat)
 ```
 
 ### Instalar como aplicativo (Windows, macOS e Linux)
@@ -56,7 +70,8 @@ Para gerar no seu próprio computador:
 
 ```bash
 npm install
-npm run dist        # gera para o sistema em que você está, na pasta dist/
+npm run dist            # versão completa, para o sistema em que você está, na pasta dist/
+npm run dist:mascote    # versão só o mascote
 ```
 
 | Sistema | Arquivo | Como instalar |
@@ -67,13 +82,17 @@ npm run dist        # gera para o sistema em que você está, na pasta dist/
 | Linux (qualquer distro) | `Mascote Desktop-x.y.z.AppImage` | `chmod +x` no arquivo e abra |
 | Ubuntu, Debian, Mint | `mascote-desktop_x.y.z_amd64.deb` | `sudo apt install ./mascote-desktop_x.y.z_amd64.deb` |
 
+Versão só o mascote: `Mascote-Desktop-so-mascote-x.y.z-<sistema>-<processador>` com a mesma extensão
+(`.exe`, `.dmg`, `.AppImage` ou `.deb`), e instala do mesmo jeito.
+
 **Mac, primeira vez:** o app não é assinado por um desenvolvedor Apple (custa US$ 99/ano), então o
 macOS avisa que não pode verificar o app. Clique com o botão direito no Mascote Desktop em Aplicativos
 → **Abrir** → **Abrir**. Se aparecer "está danificado", rode uma vez no Terminal:
 `xattr -cr "/Applications/Mascote Desktop.app"`.
 
-O instalador já traz o Claude Code dentro dele (por isso é grande, ~250 MB). Você só precisa fazer o
-login uma vez (`claude` no terminal) ou definir `ANTHROPIC_API_KEY`.
+O instalador completo já traz o Claude Code dentro dele (por isso é grande, ~250 MB). Você só precisa
+fazer o login uma vez (`claude` no terminal) ou definir `ANTHROPIC_API_KEY`. A versão só o mascote não
+precisa de nada disso.
 
 ### Abrir pelo código como um aplicativo (Windows e Linux)
 
@@ -86,32 +105,27 @@ npm run atalho
 No Windows, isso coloca **Mascote Desktop**, com ícone próprio, no Menu Iniciar e na Área de Trabalho.
 No Linux, coloca no menu de aplicativos. É só clicar para abrir, como qualquer programa, sem janela de
 terminal. (No Mac, use `npm run dist`, acima.) Para tirar os atalhos:
-`npm run atalho -- --remover`. Para ele abrir sozinho junto com o computador, use Configurações → Iniciar com o Windows (no Mac, "Abrir
+`npm run atalho -- --remover`. Para ele abrir sozinho junto com o computador, use Ajustes → Iniciar com o Windows (no Mac, "Abrir
 ao entrar no Mac"; no Linux, "Iniciar com o Linux").
 
 ## Como usar
 
 | Ação | Como |
 |---|---|
-| Conversar | Clique no botão laranja no canto inferior direito |
-| Mudar o chat de lugar | Arraste o botão do chat ou o de brinquedos, que andam juntos (ou o topo do painel aberto). Configurações → Chat no canto desfaz |
-| Escolher em que tela o pet fica | Configurações → Telas (todas, ou uma específica) |
+| Abrir o menu | Encoste o mouse no alto da tela, no meio, e espere um instante. Ele some quando o mouse sai de perto |
+| Conversar (versão completa) | Menu do topo → **Conversar**, ou clique no ícone da bandeja |
+| Mudar o painel de lugar | Arraste pelo topo do painel aberto (ele passa a abrir ali) |
 | Escolher em que pasta ele trabalha | Clique na linha da pasta no topo do chat |
 | Carinho | Clique no pet |
-| Dar comida / brincar de bola | Botão pequeno de brinquedos, ao lado do chat (ou botão direito no pet) |
+| Dar comida / brincar de bola | Menu do topo → **Brinquedos** (ou botão direito no pet) |
 | Chutar a bola | Clique nela: ela vai para o lado oposto de onde você clicou. O pet chuta de volta na direção do seu mouse |
-| Andar só em cima da barra de tarefas | Configurações → Chão |
 | Mudar o pet de lugar | Arraste o pet com o mouse |
-| Ligar passeio / modo bagunça | Configurações do chat, ou o ícone na bandeja do sistema |
-| Mudar de quanto em quanto tempo ele apronta | Configurações → Bagunça (1, 3, 5 ou 10 minutos; o padrão é 3) |
-| Trocar de pet / abrir a pasta de pets | Configurações do chat |
-| Escolher os bilhetes que ele traz | Configurações → Pasta de bilhetes |
-| Ligar travessuras (pegar o mouse, Alt+Tab, navegador) / criar novas | Configurações → Travessuras / Pasta de travessuras |
-| Fazer o pet voltar para o canto | Configurações → Chamar de volta |
-| Minimizar | Botão **–** no topo do chat: somem o chat e o botão de brinquedos, mas o pet continua na tela (e os bilhetes também). Clique no ícone da bandeja (perto do relógio) para trazer o chat de volta. No Mac, use o menu do ícone: **Mostrar o chat e os brinquedos** |
-| Esconder tudo | Ícone da bandeja → **Esconder tudo na bandeja**: pet, chat e bilhetes somem. Clique no ícone para trazer de volta |
-| Fechar | Botão **X** no topo do chat, Configurações → Fechar o app, a bandeja, ou **Ctrl+Alt+Shift+Q** (no Mac, **Cmd+Option+Shift+Q**) |
-| Abrir de novo | Atalho **Mascote Desktop** (se já estiver aberto ou minimizado, ele abre o chat) |
+| Trocar de pet, ligar passeio ou modo bagunça | Menu do topo → **Ajustes**, ou o ícone na bandeja |
+| Telas, chão, frequência da bagunça, travessuras e pastas | Ajustes → **Mais opções** |
+| Fazer o pet voltar para o canto | Menu do topo → **Chamar** |
+| Esconder | Menu do topo → **Esconder**: pet, chat e bilhetes somem. Clique no ícone da bandeja (perto do relógio) para trazer de volta |
+| Fechar | Menu do topo → **Fechar**, a bandeja, ou **Ctrl+Alt+Shift+Q** (no Mac, **Cmd+Option+Shift+Q**) |
+| Abrir de novo | Atalho **Mascote Desktop** (se já estiver aberto ou escondido, ele volta e abre o chat) |
 
 Quando o pet rouba o seu mouse no modo bagunça, não adianta puxar: ele segura até cansar (alguns segundos).
 
@@ -124,14 +138,14 @@ mensagem (PNG, JPG, GIF ou WEBP, até 5 MB cada), e o Claude Code vê a imagem j
 
 ![Pato dançando e andando, Palito bravo e caindo, Tartaruga andando e escondida no casco](docs/estados.png)
 
-- **Chão** (Configurações → Chão): ele pode andar pela **tela inteira** ou **só em cima da barra de tarefas**, como
+- **Chão** (Ajustes → Mais opções → Chão): ele pode andar pela **tela inteira** ou **só em cima da barra de tarefas**, como
   se ela fosse o chão.
 - **Derrubar:** no modo barra de tarefas, arraste o pet lá para cima e solte. Ele cai e abre um
   paraquedas.
 - **Chacoalhar:** segure o pet e sacuda o mouse de um lado para o outro. Ele fica tonto (estrelinhas e
   olhos em espiral) e depois fica bravo com você. Bravo, ele recusa carinho e brincadeira por um tempo.
   Uma comidinha resolve.
-- **Brinquedos** (botão pequeno ao lado do chat, ou botão direito no pet): **Comida** (ele vai até a
+- **Brinquedos** (menu do topo da tela, ou botão direito no pet): **Comida** (ele vai até a
   comida e come) e **Bola de futebol**. Clique na bola para chutar: ela vai para o lado oposto de onde
   você clicou, e o pet corre atrás e chuta de volta na direção do seu mouse. Se você parar de jogar,
   depois de uns 15 s ele cansa. A bola segue o **Chão** escolhido: no modo barra de tarefas ela
@@ -145,7 +159,7 @@ No modo bagunça o pet traz bilhetes da borda da tela e deixa onde dá para ler:
 do chat, longe da barra de tarefas. No modo barra de tarefas o Pato vai buscar **voando**, batendo as
 asas, e a Tartaruga e o Palito trazem o papel na cabeça. Ele mantém até 50 bilhetes na tela (feche no
 X). Já vem com 40 mensagens, e você pode colocar as suas:
-abra **Configurações → Pasta de bilhetes** e edite o `bilhetes.json`:
+abra **Ajustes → Mais opções → Pasta de bilhetes** e edite o `bilhetes.json`:
 
 ```json
 {
@@ -166,11 +180,11 @@ abra **Configurações → Pasta de bilhetes** e edite o `bilhetes.json`:
 
 ## Travessuras
 
-Com o modo bagunça ligado, ative em **Configurações → Travessuras** as que quiser. "Pegar o mouse" vem ligada;
+Com o modo bagunça ligado, ative em **Ajustes → Mais opções → Travessuras** as que quiser. "Pegar o mouse" vem ligada;
 as outras começam desligadas.
 Ele apronta no máximo uma bagunça (pegar o mouse, trazer bilhete ou travessura) a cada intervalo
-escolhido em **Configurações → Bagunça** (3 minutos por padrão), e a primeira vem na metade desse
-tempo depois de abrir o app. A dança fica fora dessa conta: ele dança quando der vontade. Para criar as suas, abra **Configurações → Pasta de travessuras**
+escolhido em **Ajustes → Mais opções → Bagunça** (3 minutos por padrão), e a primeira vem na metade desse
+tempo depois de abrir o app. A dança fica fora dessa conta: ele dança quando der vontade. Para criar as suas, abra **Ajustes → Mais opções → Pasta de travessuras**
 e edite o `travessuras.json`:
 
 ```json
@@ -200,14 +214,14 @@ ele só solta quando cansa.
 
 Nada no mascote precisa de administrador. A diferença é que, sem a permissão, o Windows não deixa um
 programa comum apertar teclas quando a janela da frente é de administrador (Gerenciador de Tarefas,
-terminal admin...). Nesses casos ele pula a travessura. Para liberar, use **Configurações → Pedir permissão ao
+terminal admin...). Nesses casos ele pula a travessura. Para liberar, use **Ajustes → Mais opções → Pedir permissão ao
 Windows**: o app reabre e o Windows pergunta se você permite. Depois disso, a opção "Também em janelas
 de administrador" pode ser ligada.
 
 Cuidado: como administrador, o chat (Claude Code) também roda com essa permissão. Os pedidos de
 Permitir/Negar continuam aparecendo, então leia bem cada um.
 
-**Configurações → Iniciar com o Windows** faz o mascote abrir sozinho quando você liga o PC (não precisa de admin).
+**Ajustes → Iniciar com o Windows** faz o mascote abrir sozinho quando você liga o PC (não precisa de admin).
 
 ## macOS e Linux
 
@@ -227,7 +241,7 @@ Tudo funciona nos três sistemas, com estas diferenças (que vêm dos próprios 
 
 **Mac, permissão de Acessibilidade:** o macOS só deixa um app apertar teclas por você se ele estiver
 em Ajustes do Sistema → Privacidade e Segurança → **Acessibilidade**. As travessuras de teclado
-aparecem com cadeado até você ligar; o botão **Configurações → Abrir os Ajustes do Mac** leva direto para lá.
+aparecem com cadeado até você ligar; o botão **Ajustes → Mais opções → Abrir os Ajustes do Mac** leva direto para lá.
 Pegar o mouse e todo o resto funcionam sem ela. O pet mora na barra de menus, sem ícone no Dock.
 
 **Mac com dois monitores:** com "Monitores têm Spaces separados" ligado (o padrão do macOS), uma janela
@@ -258,7 +272,7 @@ Para depurar: `MASCOTE_DEBUG=perseguir npm start` (persegue o mouse sem parar) o
 
 ## Usar outra IA
 
-O Claude Code é o padrão, mas dá para trocar em Configurações → **IA do chat**:
+O Claude Code é o padrão, mas dá para trocar em Ajustes → **IA do chat** (versão completa):
 
 | IA | O que precisa |
 | --- | --- |
