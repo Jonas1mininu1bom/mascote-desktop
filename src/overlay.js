@@ -695,9 +695,10 @@ function balao(texto, x, y) {
   linhas.push(atual);
   const w = Math.max(...linhas.map((l) => ctx.measureText(l).width)) + 20;
   const h = linhas.length * 17 + 12;
-  const limite = limiteBalao != null && x < limiteBalao ? limiteBalao : tela.largura - 4;
-  let bx = Math.max(4, Math.min(limite - w, x - w / 2));
-  let by = Math.max(4, y - h - 12);
+  const j = janela();
+  const limite = limiteBalao != null && x < limiteBalao ? limiteBalao : j.x + j.w - 4;
+  let bx = Math.max(j.x + 4, Math.min(limite - w, x - w / 2));
+  let by = Math.max(j.y + 4, y - h - 12);
   ctx.fillStyle = "#ffffff";
   ctx.strokeStyle = "#2b2d42";
   ctx.lineWidth = 2;
@@ -717,7 +718,8 @@ function balao(texto, x, y) {
 }
 
 function desenhar(dt) {
-  ctx.clearRect(0, 0, tela.largura, tela.altura);
+  const j = janela();
+  ctx.clearRect(j.x, j.y, j.w, j.h);
   if (!sprites.parado) return;
 
   // Pets do app: modelo 3D de verdade (pet3d.js, three.js). Se o WebGL falhar, usa o desenho
@@ -840,14 +842,36 @@ function desenharVetor(vetor, dt) {
   desenharExtras(Math.round(P.y - h), dt);
 }
 
+// A janela mostra só um monitor (o monitor em que o pet está), mas o pet continua pensando em
+// coordenadas de todos os monitores juntos: o canvas é deslocado para o pedaço que esta janela cobre.
+const janela = () => tela.janela || { x: 0, y: 0, w: tela.largura, h: tela.altura };
 function ajustarCanvas() {
   const r = window.devicePixelRatio || 1;
-  cv.width = tela.largura * r;
-  cv.height = tela.altura * r;
-  cv.style.width = tela.largura + "px";
-  cv.style.height = tela.altura + "px";
-  ctx.setTransform(r, 0, 0, r, 0, 0);
+  const j = janela();
+  cv.width = Math.round(j.w * r);
+  cv.height = Math.round(j.h * r);
+  cv.style.width = j.w + "px";
+  cv.style.height = j.h + "px";
+  ctx.setTransform(r, 0, 0, r, -j.x * r, -j.y * r);
   ctx.imageSmoothingEnabled = false;
+  dprAtual = r;
+}
+let dprAtual = 1;
+
+// Conta ao processo principal onde o pet está, para a janela ir junto quando ele muda de monitor.
+let ondeAvisado = null;
+let ondeTempo = 0;
+function avisarOnde(dt) {
+  ondeTempo -= dt;
+  if (ondeTempo > 0 || !pet) return;
+  ondeTempo = segurado ? 0.05 : 0.15;
+  const p = { x: Math.round(P.x), y: Math.round(P.y - alturaPx() / 2) };
+  if (ondeAvisado && ondeAvisado.x === p.x && ondeAvisado.y === p.y) return;
+  ondeAvisado = p;
+  const j = janela();
+  // só avisa quando o centro do pet saiu do monitor desta janela
+  if (p.x >= j.x && p.x < j.x + j.w && p.y >= j.y && p.y < j.y + j.h) return;
+  window.api.enviar("pet:onde", p);
 }
 
 // ---------- laço principal ----------
@@ -857,6 +881,9 @@ function quadro(agora) {
   ultimo = agora;
   relogio += dt;
   atualizar(dt);
+  avisarOnde(dt);
+  // a janela mudou de monitor (escala diferente): refaz o canvas na nitidez certa
+  if ((window.devicePixelRatio || 1) !== dprAtual) ajustarCanvas();
   atualizarCliques();
   desenhar(dt);
   requestAnimationFrame(quadro);
