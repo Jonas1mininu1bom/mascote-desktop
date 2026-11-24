@@ -164,7 +164,7 @@ window.Vida = (() => {
     montarMenu(itens, Math.max(min + 4, x), P.y - alturaPx() - 6);
     if (ocioso()) mudar("parado", 8);
   }
-  // Menu do botão de brinquedos (ao lado do chat): aparece logo acima do botão.
+  // Menu de "Brinquedos" do pop-up do topo: aparece logo acima do ponto (a cabeça do pet).
   function abrirMenuBrinquedos(ponto) {
     if (P.estado === "caindo" || P.estado === "tonto") return;
     const itens = [
@@ -173,6 +173,9 @@ window.Vida = (() => {
     ];
     const w = 150;
     montarMenu(itens, ponto.x - w / 2, ponto.y - 17 - 8 - (itens.length * 28 + 10), w);
+    // o mouse está lá no topo da tela: o menu espera ele chegar perto (e dura mais) antes de
+    // valer a regra de fechar quando o mouse se afasta
+    Object.assign(menu, { esperaChegar: true, ate: relogio + 12 });
   }
   function montarMenu(itens, x, y, w = 138) {
     const h = itens.length * 28 + 10;
@@ -378,7 +381,11 @@ window.Vida = (() => {
 
   // ---------- laço ----------
   function atualizar(dt) {
-    if (menu && (relogio > menu.ate || Math.hypot(cursor.x - menu.x - menu.w / 2, cursor.y - menu.y - menu.h / 2) > 320)) fecharMenu();
+    if (menu) {
+      const longe = Math.hypot(cursor.x - menu.x - menu.w / 2, cursor.y - menu.y - menu.h / 2) > 320;
+      if (!longe) menu.esperaChegar = false;
+      if (relogio > menu.ate || (longe && !menu.esperaChegar)) fecharMenu();
+    }
     fome = Math.min(100, fome + dt / 20); // ~1 ponto a cada 20 s
     if (fome > 70 && ocioso() && relogio - ultimaQueixa > 90 && !window.Hornet?.ativo()) {
       ultimaQueixa = relogio;

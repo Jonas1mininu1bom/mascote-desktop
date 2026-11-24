@@ -409,12 +409,11 @@ const boca = () => (boca3d && relogio - boca3d.em < 0.3 ? { x: boca3d.x, y: boca
 const mao = () => boca() || ponto("mao", [tamGrade.w - 1, Math.floor(tamGrade.h * 0.6)]);
 const maoTras = () => boca() || ponto("maoTras", [2, Math.floor(tamGrade.h * 0.6)]);
 
-// O bilhete fica sempre acima da altura dos botões do chat (nos dois lados da tela): mais embaixo
-// ele cai em cima da barra de tarefas e não dá para ler. Devolve o y máximo do topo do papel.
+// O bilhete fica sempre um pouco acima do pé da tela: mais embaixo ele cai em cima da barra de
+// tarefas e não dá para ler. Devolve o y máximo do topo do papel.
 function tetoBilhete(x, altura) {
   const a = areaDe(x);
-  const folga = tela.chat ? Math.max(0, tela.area.y + tela.area.h - tela.chat.y) : 80;
-  return a.y + a.h - folga - 10 - altura;
+  return a.y + a.h - 80 - 10 - altura;
 }
 
 function moverBilhete() {
@@ -941,7 +940,8 @@ window.api.ouvir("tela", (t) => {
   const antiga = { x: tela.casa.x + dx, y: tela.casa.y + dy };
   tela = t;
   ajustarCanvas();
-  limiteBalao = t.painel ? t.painel.x - 6 : null;
+  // o painel abre no alto da tela: só limita o balão se ele descer até perto de onde o pet mora
+  limiteBalao = t.painel && t.painel.y + t.painel.h > t.casa.y - 200 ? t.painel.x - 6 : null;
   // a casa mudou (chat arrastado, aberto ou fechado): se ele estava em casa, vai junto
   const mudou = Math.hypot(antiga.x - t.casa.x, antiga.y - t.casa.y) > 1;
   const emCasa = P.ancora && Math.hypot(P.ancora.x - antiga.x, P.ancora.y - antiga.y) < 1;
@@ -956,7 +956,8 @@ window.api.ouvir("tela", (t) => {
   }
 });
 window.api.ouvir("pet:trocar", trocarPet);
-window.api.ouvir("brinquedos:abrir", (p) => window.Vida?.abrirMenuBrinquedos(p));
+// "Brinquedos" no pop-up do topo: o menu abre logo acima da cabeça do pet
+window.api.ouvir("brinquedos:abrir", () => window.Vida?.abrirMenuBrinquedos({ x: P.x, y: P.y - alturaPx() + 25 }));
 // o Windows não deixou mexer no cursor (janela de administrador na frente): solta e explica
 let avisouMouse = -999;
 window.api.ouvir("mouse:bloqueado", ({ janelaAdmin } = {}) => {

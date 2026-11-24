@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+<title>Menu do pet</title>
+<style>
+  /* Pop-up que desce do topo da tela quando o mouse encosta lá em cima (no meio). */
+  :root { --fundo: #faf9f5; --texto: #1f1e1d; --suave: #73726c; --borda: #e8e6dc; --destaque: #d97757; --destaque-forte: #c6613f; --hover: #f0eee6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fundo: #262624; --texto: #f5f4ef; --suave: #a6a39a; --borda: #3d3d3a; --hover: #30302e; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font: 12px system-ui, sans-serif; color: var(--texto); user-select: none; }
+  #barra { position: absolute; left: 6px; right: 6px; top: 0; display: flex; gap: 2px; padding: 6px; justify-content: center;
+    background: var(--fundo); border: 1px solid var(--borda); border-top: 3px solid var(--destaque); border-radius: 0 0 14px 14px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.22); transform: translateY(-110%); transition: transform .16s ease-out; }
+  body.visivel #barra { transform: translateY(0); }
+  button { font: inherit; color: var(--texto); background: none; border: 0; border-radius: 10px; width: 64px; padding: 6px 2px 5px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  button:hover { background: var(--hover); }
+  button .ic { width: 22px; height: 22px; display: block; color: var(--destaque-forte); }
+  button.perigo:hover { background: #e5484d; color: #fff; }
+  button.perigo:hover .ic { color: #fff; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<!-- ícones Lucide (ISC, veja icones/LICENSE-lucide.txt) -->
+<nav id="barra">
+  <button data-acao="chat" id="btnChat"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /><path d="M8 12h.01" /><path d="M12 12h.01" /><path d="M16 12h.01" /></svg>Conversar</button>
+  <button data-acao="brinquedos"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="12" x="3" y="8" rx="1" /><path d="M10 8V5c0-.6-.4-1-1-1H6a1 1 0 0 0-1 1v3" /><path d="M19 8V5c0-.6-.4-1-1-1h-3a1 1 0 0 0-1 1v3" /></svg>Brinquedos</button>
+  <button data-acao="voltar"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>Chamar</button>
+  <button data-acao="ajustes"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /><circle cx="12" cy="12" r="3" /></svg>Ajustes</button>
+  <button data-acao="esconder" id="btnEsconder"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /><path d="m2 2 20 20" /></svg>Esconder</button>
+  <button data-acao="sair" class="perigo"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>Fechar</button>
+</nav>
+<script src="barra.js"></script>
+</body>
+</html>

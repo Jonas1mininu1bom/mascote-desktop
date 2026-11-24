@@ -1,4 +1,4 @@
-// Chat fixo no canto da tela.
+// Painel do chat e dos ajustes. Abre pelo pop-up do topo da tela ou pela bandeja.
 const $ = (id) => document.getElementById(id);
 // cópia de um ícone do <template id="icones">
 const icone = (nome) => $("icones").content.querySelector(`[data-icone="${nome}"] svg`).cloneNode(true);
@@ -56,30 +56,6 @@ async function carregarPets() {
   $("pets").value = config.pet;
 }
 
-// Botões do canto: clique faz a ação; segurar e arrastar muda o lugar dos dois juntos
-// (eles estão na mesma janela, e quem move a janela é o processo principal).
-function botaoArrastavel(id, aoClicar) {
-  const b = $(id);
-  b.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;
-    b.setPointerCapture(e.pointerId);
-    b.classList.add("arrastando");
-    ponte.invocar("chat:arrastar", true);
-  });
-  b.addEventListener("pointerup", async () => {
-    b.classList.remove("arrastando");
-    const arrastou = await ponte.invocar("chat:arrastar", false);
-    if (!arrastou) aoClicar();
-  });
-  b.addEventListener("lostpointercapture", () => {
-    if (b.classList.contains("arrastando")) {
-      b.classList.remove("arrastando");
-      ponte.invocar("chat:arrastar", false);
-    }
-  });
-}
-botaoArrastavel("botao", () => ponte.enviar("chat:abrir", true));
-botaoArrastavel("brinquedos", () => ponte.enviar("brinquedos:abrir"));
 // o cabeçalho do painel aberto também arrasta (sem atrapalhar os botões dele)
 document.querySelector("header").addEventListener("pointerdown", (e) => {
   if (e.button !== 0 || e.target.closest("button")) return;
@@ -88,8 +64,6 @@ document.querySelector("header").addEventListener("pointerdown", (e) => {
 });
 document.querySelector("header").addEventListener("pointerup", () => ponte.invocar("chat:arrastar", false));
 $("fechar").onclick = () => ponte.enviar("chat:abrir", false);
-$("minimizar").onclick = () => ponte.enviar("app:minimizar");
-$("sairApp").onclick = () => ponte.enviar("app:sair");
 async function carregarTelas() {
   const lista = await ponte.invocar("telas:listar");
   const opcoes = [{ id: "todas", nome: "Todas as telas" }, ...lista];
@@ -187,12 +161,15 @@ $("pedirAdmin").onclick = async () => {
   mostrarSistema(e);
 };
 
-$("btnAjustes").onclick = () => {
-  $("ajustes").classList.toggle("visivel");
+function mostrarAjustes(visivel) {
+  $("ajustes").classList.toggle("visivel", visivel || !comChat); // só o mascote: o painel é só de ajustes
+  if (!$("ajustes").classList.contains("visivel")) return;
   carregarPets();
   carregarTelas();
   carregarTravessuras();
-};
+  if (comChat) carregarIa();
+}
+$("btnAjustes").onclick = () => mostrarAjustes(!$("ajustes").classList.contains("visivel"));
 $("nova").onclick = () => {
   ponte.enviar("chat:nova");
   $("mensagens").innerHTML = "";
@@ -206,12 +183,9 @@ $("pasta").onclick = async () => {
 $("passear").onchange = (e) => ponte.enviar("config:mudar", { passear: e.target.checked });
 $("bagunca").onchange = (e) => ponte.enviar("config:mudar", { bagunca: e.target.checked });
 $("pets").onchange = (e) => ponte.enviar("pets:escolher", e.target.value);
-$("voltar").onclick = () => ponte.enviar("pet:voltar");
-$("chatCanto").onclick = () => ponte.enviar("chat:posicaoPadrao");
 $("abrirPets").onclick = () => ponte.enviar("pets:abrirPasta");
 $("abrirBilhetes").onclick = () => ponte.enviar("bilhetes:abrirPasta");
 $("abrirTravessuras").onclick = () => ponte.enviar("travessuras:abrirPasta");
-$("sair").onclick = () => ponte.enviar("app:sair");
 
 // ---------- imagens coladas ou arrastadas ----------
 const MAX_IMAGENS = 4;
@@ -329,9 +303,12 @@ function tirarPensando() {
   bolhaAtual = null;
 }
 
-ponte.ouvir("chat:estado", (aberto) => {
-  document.body.classList.toggle("aberto", aberto);
-  if (aberto) $("entrada").focus();
+// { aberto, modo }: modo "ajustes" abre direto nos ajustes (pelo pop-up do topo ou pela bandeja)
+ponte.ouvir("chat:estado", ({ aberto, modo } = {}) => {
+  document.body.classList.toggle("aberto", Boolean(aberto));
+  if (!aberto) return;
+  mostrarAjustes(modo === "ajustes");
+  if (comChat && modo !== "ajustes") $("entrada").focus();
 });
 ponte.ouvir("chat:texto", (t) => {
   tirarPensando();
@@ -378,20 +355,24 @@ ponte.ouvir("config", mostrarConfig);
 const saudacao = (p) =>
   p.saudacao || `Oi! Eu sou ${p.nome}. Posso conversar, ler arquivos e ajudar com código na pasta aí em cima. Antes de mexer em algo, eu peço permissão.`;
 let petAtualId = null;
+let comChat = true; // false na versão "só o mascote"
+const titulo = (p) => (comChat ? p.nome : `Ajustes de ${p.nome}`);
 ponte.ouvir("pet:trocar", (p) => {
-  $("titulo").textContent = p.nome;
+  $("titulo").textContent = titulo(p);
   if (p.id === petAtualId) return;
   petAtualId = p.id;
   $("mensagens").replaceChildren();
-  adicionar("pet", saudacao(p));
+  if (comChat) adicionar("pet", saudacao(p));
 });
 
 (async () => {
   const d = await ponte.invocar("inicio");
+  comChat = d.comChat !== false;
+  document.body.classList.toggle("so-mascote", !comChat);
   mostrarConfig(d.config);
-  $("titulo").textContent = d.pet.nome;
+  $("titulo").textContent = titulo(d.pet);
   petAtualId = d.pet.id;
-  adicionar("pet", saudacao(d.pet));
+  if (comChat) adicionar("pet", saudacao(d.pet));
 })();
 
 // ---------- IA do chat (Claude Code, Gemini, OpenAI, Ollama...) ----------
@@ -478,4 +459,3 @@ $("iaVerModelos").onclick = async () => {
   $("iaListaModelos").replaceChildren(...r.modelos.map((m) => Object.assign(document.createElement("option"), { value: m })));
   avisoIa(r.modelos.length ? `${r.modelos.length} modelos. Clique no campo Modelo para escolher.` : "A API não listou nenhum modelo.");
 };
-$("btnAjustes").addEventListener("click", carregarIa);

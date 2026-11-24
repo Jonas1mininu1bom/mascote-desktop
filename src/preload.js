@@ -6,15 +6,15 @@ const INVOCAR = new Set(["inicio", "bilhete:criar", "pets:listar", "chat:escolhe
   "sistema:estado", "sistema:iniciarComSistema", "sistema:pedirAdmin", "sistema:pedirAcessibilidade",
   "ia:estado", "ia:salvar", "ia:modelos"]);
 const ENVIAR = new Set([
-  "app:sair", "app:minimizar", "brinquedos:abrir", "chat:abrir", "chat:enviar", "chat:nova", "chat:parar", "chat:responderPermissao",
+  "app:sair", "barra:acao", "chat:abrir", "chat:enviar", "chat:nova", "chat:parar", "chat:responderPermissao",
   "config:mudar", "pet:voltar", "pets:abrirPasta", "bilhetes:abrirPasta", "pets:escolher",
   "bilhete:fechar", "bilhete:mover", "pet:ignorar", "pet:onde", "pet:moverCursor",
-  "travessuras:ligar", "travessuras:abrirPasta", "travessura:executar", "chat:posicaoPadrao", "ia:abrirLink",
+  "travessuras:ligar", "travessuras:abrirPasta", "travessura:executar", "ia:abrirLink",
 ]);
 const OUVIR = new Set([
   "chat:erro", "chat:estado", "chat:ferramenta", "chat:fim", "chat:permissao", "chat:texto",
   "config", "pet:trocar", "bilhete:fechado", "cursor", "pet:humor", "pet:voltar", "tela",
-  "travessura:tecla", "travessura:fim", "brinquedos:abrir", "mouse:bloqueado",
+  "travessura:tecla", "travessura:fim", "brinquedos:abrir", "mouse:bloqueado", "barra:estado",
 ]);
 
 function conferir(lista, canal) {
