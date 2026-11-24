@@ -1,5 +1,5 @@
 // Instalador da versão "só o mascote": o mesmo app, sem o chat e sem o Claude Code embutido
-// (o SDK do Claude Code é a maior parte do tamanho do instalador completo).
+// (os dois instaladores já não trazem o executável do Claude Code; aqui sai também o SDK, que é pequeno).
 // Uso: npm run dist:mascote (ou dist:win:mascote, dist:mac:mascote, dist:linux:mascote).
 // A configuração da versão completa continua no "build" do package.json; aqui só muda o que é diferente.
 const pacote = require("./package.json");
