@@ -153,9 +153,9 @@ window.Vida = (() => {
   function abrirMenu() {
     if (ESTADOS.includes(P.estado) && P.estado !== "bravo") return;
     const itens = [
-      { id: "comida", rotulo: window.Hornet?.ativo() ? "⚔️  Desafiar" : `${COMIDAS[pet.id] || "🍎"}  Dar comida` },
-      { id: "brincar", rotulo: "⚽  Brincar" },
-      { id: "carinho", rotulo: "💗  Carinho" },
+      { id: "comida", rotulo: window.Hornet?.ativo() ? "Desafiar" : "Dar comida" },
+      { id: "brincar", rotulo: "Brincar" },
+      { id: "carinho", rotulo: "Carinho" },
     ];
     const w = 138;
     const { min, max } = limites();
@@ -168,8 +168,8 @@ window.Vida = (() => {
   function abrirMenuBrinquedos(ponto) {
     if (P.estado === "caindo" || P.estado === "tonto") return;
     const itens = [
-      { id: "comida", rotulo: window.Hornet?.ativo() ? "⚔️  Desafiar" : `${COMIDAS[pet.id] || "🍎"}  Comida` },
-      { id: "brincar", rotulo: "⚽  Bola de futebol" },
+      { id: "comida", rotulo: window.Hornet?.ativo() ? "Desafiar" : "Comida" },
+      { id: "brincar", rotulo: "Bola de futebol" },
     ];
     const w = 150;
     montarMenu(itens, ponto.x - w / 2, ponto.y - 17 - 8 - (itens.length * 28 + 10), w);
