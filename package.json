@@ -70,7 +70,8 @@
       }
     },
     "dmg": {
-      "title": "Mascote Desktop"
+      "title": "Mascote Desktop",
+      "backgroundColor": "#fff7ef"
     },
     "linux": {
       "target": [
