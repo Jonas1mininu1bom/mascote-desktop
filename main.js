@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
-const { listarPets, copiarPetsPadrao, quadroParaBitmap } = require("./src/pets");
+const { lerPet, listarPets, copiarPetsPadrao, quadroParaBitmap } = require("./src/pets");
 const provedores = require("./src/provedores");
 const { criarCofre } = require("./src/provedores/chaves");
 const bilhetesMod = require("./src/bilhetes");
@@ -128,8 +128,8 @@ function recarregarPets() {
 
 // ---------- janelas ----------
 let overlay = null; // tela inteira, transparente, onde o pet vive
-let chat = null; // painel do chat e dos ajustes (só aparece aberto; não tem mais botão fixo no canto)
-let barra = null; // pop-up do topo: aparece quando o mouse encosta no alto da tela, no meio
+let chat = null;
+let barra = null; // pop-up de atalhos, ajustes e ações do pet
 let tray = null;
 let chatAberto = false;
 let escondido = false; // "esconder": pet, chat e bilhetes somem e o pet não apronta nada (a bandeja traz de volta)
@@ -256,8 +256,9 @@ function infoTela() {
     altura: o.height,
     area: rel(wa), // tela da casa
     janela: rel(telaDaJanela().bounds), // pedaço que a janela do overlay mostra (um monitor)
-    areas: permitidas.map((d) => rel(d.workArea)), // onde ele pode andar
+    areas: permitidas.map((d) => ({ ...rel(d.workArea), id: d.id })), // onde ele pode andar
     monitores: permitidas.map((d) => rel(d.bounds)), // a tela inteira de cada um (com a barra de tarefas)
+    alturaBilhete: TAM_BILHETE.height,
     casa,
     painel: chatAberto ? rel(boundsChat()) : null,
   };
@@ -360,6 +361,8 @@ function criarChat() {
 // Só no meio da borda e com uma pequena espera: nos cantos de cima ficam as abas e o X das janelas.
 const LADOS_BARRA = ["cima", "baixo", "esquerda", "direita"];
 const BARRA = { botao: 66, alto: 80, botaoEmPe: 56, larguraEmPe: 92 };
+const MENU_PET = { width: 222, height: 78, folga: 8 };
+const TAM_AJUSTES = { width: 412, height: 434 };
 // entre: a borda escolhida encosta em outro monitor (o mouse passa direto para ele), então vale
 // parar rente à divisa, numa faixa um pouco mais larga e por um pouco mais de tempo
 const TOPO = { espera: 250, esperaEmbaixo: 400, esperaEntre: 550, faixa: 0.2, faixaEntre: 4, saida: 450, folga: 28 };
@@ -373,11 +376,19 @@ const tamanhoBarra = () =>
     : { width: botoesDaBarra() * BARRA.botao + 26, height: BARRA.alto };
 const estadoBarra = (visivel) => ({
   visivel, comChat: COM_CHAT, podeEsconder: Boolean(tray), lado: ladoBarra(),
+  noPet: barraOrigem === "pet",
+  ajustes: barraOrigem === "ajustes",
+  voltar: voltarDosAjustes,
+  config: barraOrigem === "ajustes" ? config : undefined,
   comida: petAtual().desenho === "hornet" ? "desafiar" : "comida", // a Hornet não come: enfrenta um inimigo
 });
-let barraVisivel = false;
+let barraOrigem = null;
 let topoDesde = 0;
 let saiuDesde = 0;
+let ocultarBarra = null;
+let telaAjustesId = null;
+let voltarDosAjustes = false;
+let esperarNoMenuAte = 0;
 
 function criarBarra() {
   barra = new BrowserWindow({
@@ -395,7 +406,12 @@ function criarBarra() {
     webPreferences: prefsSeguras(),
   });
   barra.setAlwaysOnTop(true, "screen-saver");
+  segurarTopo(barra);
   barra.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  barra.on("blur", () => { if (barraOrigem === "pet") esconderBarra(); });
+  barra.webContents.on("did-finish-load", () => {
+    if (barraOrigem) barra.webContents.send("barra:estado", estadoBarra(true));
+  });
   barra.loadFile(path.join(__dirname, "src/barra.html"));
   vigiar("barra", barra);
   barra.webContents.on("render-process-gone", () => setTimeout(() => barra && !barra.isDestroyed() && barra.webContents.reload(), 1000));
@@ -403,39 +419,90 @@ function criarBarra() {
 
 // Encostado na borda escolhida da área útil do monitor (no Mac, abaixo da barra de menus; embaixo,
 // acima da barra de tarefas), no meio dela.
-function mostrarBarra(d) {
-  if (!barra || barra.isDestroyed()) return;
-  const { width, height } = tamanhoBarra();
+function boundsNaBorda(d, tamanho) {
   const a = d.workArea, b = d.bounds;
-  const meioX = Math.round(Math.min(a.x + a.width - width, Math.max(a.x, b.x + (b.width - width) / 2)));
-  const meioY = Math.round(Math.min(a.y + a.height - height, Math.max(a.y, b.y + (b.height - height) / 2)));
+  const width = Math.min(tamanho.width, a.width), height = Math.min(tamanho.height, a.height);
+  const meioX = Math.round(limitar(b.x + (b.width - width) / 2, a.x, a.x + a.width - width));
+  const meioY = Math.round(limitar(b.y + (b.height - height) / 2, a.y, a.y + a.height - height));
   const pos = {
     cima: { x: meioX, y: a.y },
     baixo: { x: meioX, y: a.y + a.height - height },
     esquerda: { x: a.x, y: meioY },
     direita: { x: a.x + a.width - width, y: meioY },
   }[ladoBarra()];
-  barra.setBounds({ ...pos, width, height });
-  barra.showInactive(); // não rouba o teclado de quem está digitando
+  return { ...pos, width, height };
+}
+
+function mostrarBarra(d) {
+  apresentarBarra("borda", boundsNaBorda(d, tamanhoBarra()));
+}
+
+function mostrarAjustes(d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()), voltar = false) {
+  telaAjustesId = d.id;
+  voltarDosAjustes = voltar;
+  apresentarBarra("ajustes", boundsNaBorda(d, TAM_AJUSTES));
+}
+
+function telaDosAjustes() {
+  return screen.getAllDisplays().find((d) => d.id === telaAjustesId) || screen.getPrimaryDisplay();
+}
+
+function reposicionarAjustes() {
+  barra.setBounds(boundsNaBorda(telaDosAjustes(), TAM_AJUSTES));
+  barra.webContents.send("barra:estado", estadoBarra(true));
+}
+
+function mostrarBarraNoPet(p) {
+  if (escondido || arrasto || !num(p?.x) || !num(p?.y)) return;
+  const o = areaTotal();
+  const x = Math.round(o.x + p.x), y = Math.round(o.y + p.y);
+  const a = screen.getDisplayNearestPoint({ x, y }).workArea;
+  const width = Math.min(MENU_PET.width, a.width), height = Math.min(MENU_PET.height, a.height);
+  const f = MENU_PET.folga;
+  const esquerda = x + f + width <= a.x + a.width ? x + f : x - f - width;
+  const cima = y + f + height <= a.y + a.height ? y + f : y - f - height;
+  apresentarBarra("pet", {
+    x: limitar(esquerda, a.x, a.x + a.width - width),
+    y: limitar(cima, a.y, a.y + a.height - height),
+    width, height,
+  });
+}
+
+function apresentarBarra(origem, bounds) {
+  if (!barra || barra.isDestroyed()) return;
+  clearTimeout(ocultarBarra);
+  barraOrigem = origem;
+  saiuDesde = 0;
+  esperarNoMenuAte = 0;
+  barra.setBounds(bounds);
+  if (origem === "borda") barra.showInactive(); // passar o mouse mantém o foco no aplicativo atual
+  else {
+    barra.show();
+    if (plataforma.MAC) app.focus({ steal: true });
+    barra.focus();
+  }
   barra.moveTop();
   barra.webContents.send("barra:estado", estadoBarra(true));
-  barraVisivel = true;
-  saiuDesde = 0;
 }
 
 function esconderBarra() {
   topoDesde = 0;
-  if (!barraVisivel) return;
-  barraVisivel = false;
+  if (!barraOrigem) return;
+  const estado = estadoBarra(false);
+  barraOrigem = null;
+  voltarDosAjustes = false;
   if (!barra || barra.isDestroyed()) return;
-  barra.webContents.send("barra:estado", estadoBarra(false));
-  setTimeout(() => !barraVisivel && barra && !barra.isDestroyed() && barra.hide(), 180); // depois de subir
+  barra.webContents.send("barra:estado", estado);
+  ocultarBarra = setTimeout(() => barra && !barra.isDestroyed() && barra.hide(), 180);
 }
 
 // Chamado junto com a posição do mouse (~60 vezes por segundo).
 function vigiarTopoDaTela(p) {
-  if (escondido || chatAberto || arrasto) return esconderBarra();
-  if (!barraVisivel) {
+  if (escondido || arrasto) return esconderBarra();
+  if (barraOrigem === "ajustes") return; // permite editar e abrir os diálogos do sistema
+  if (chatAberto && barraOrigem !== "pet") return esconderBarra();
+  if (Date.now() < esperarNoMenuAte) return;
+  if (!barraOrigem) {
     const d = screen.getDisplayNearestPoint(p);
     const borda = naBordaDaBarra(p, d);
     if (!borda) return void (topoDesde = 0);
@@ -470,11 +537,25 @@ function naBordaDaBarra(p, d) {
 }
 
 function acaoDaBarra(acao) {
+  if (!barraOrigem) return;
+  if (barraOrigem === "ajustes") {
+    if (acao === "atalhos" && voltarDosAjustes) {
+      mostrarBarra(telaDosAjustes());
+      voltarDosAjustes = false;
+      esperarNoMenuAte = Date.now() + 1800;
+    } else if (acao === "dispensar") esconderBarra();
+    return;
+  }
+  if (barraOrigem === "borda" && acao === "ajustes") {
+    return mostrarAjustes(screen.getDisplayMatching(barra.getBounds()), true);
+  }
+  const noPet = barraOrigem === "pet";
   esconderBarra();
-  if (acao === "chat" && COM_CHAT) abrirChat(true, "chat");
-  else if (acao === "ajustes") abrirChat(true, "ajustes");
-  else if (acao === "brinquedos") overlay?.webContents.send("brinquedos:abrir");
-  else if (acao === "comida" || acao === "bola") overlay?.webContents.send("brinquedos:usar", acao);
+  if (acao === "comida" || acao === "bola" || (noPet && acao === "carinho")) {
+    return overlay?.webContents.send("pet:interagir", acao);
+  }
+  if (noPet) return;
+  if (acao === "chat" && COM_CHAT) abrirChat(true);
   else if (acao === "voltar") overlay?.webContents.send("pet:voltar");
   else if (acao === "esconder" && tray) esconderMascote(true); // sem ícone na bandeja, não teria como voltar
   else if (acao === "sair") app.quit();
@@ -497,7 +578,7 @@ function avisarBandeja(texto) {
 function esconderMascote(esconder) {
   escondido = esconder;
   if (esconder) esconderBarra();
-  const janelas = [overlay, ...bilhetes.values()].filter((w) => w && !w.isDestroyed());
+  const janelas = [overlay, ...janelasBilhetes()].filter((w) => w && !w.isDestroyed());
   for (const w of janelas) {
     if (esconder) w.hide();
     else w.showInactive();
@@ -512,10 +593,12 @@ function esconderMascote(esconder) {
   log("main", "info", esconder ? "mascote escondido na bandeja" : "mascote de volta na tela");
 }
 
-// Abre ou fecha o painel. modo: "chat" (conversa) ou "ajustes". Na só-mascote é sempre "ajustes".
-function abrirChat(aberto, modo = "chat") {
+function abrirChat(aberto) {
+  if (!COM_CHAT) {
+    if (aberto) mostrarAjustes();
+    return;
+  }
   if (!chat || chat.isDestroyed()) return;
-  if (!COM_CHAT) modo = "ajustes";
   chatAberto = aberto;
   if (aberto) {
     // abre no monitor em que o mouse está (o do pop-up), se a pessoa não arrastou o painel antes
@@ -529,7 +612,7 @@ function abrirChat(aberto, modo = "chat") {
     chat.hide();
     overlay?.webContents.send("tela", infoTela());
   }
-  chat.webContents.send("chat:estado", { aberto, modo });
+  chat.webContents.send("chat:estado", { aberto });
 }
 
 function posicionarChat() {
@@ -621,8 +704,8 @@ function montarBandeja() {
   // Menu simples: o resto (pastas, telas, travessuras...) fica em Ajustes.
   const menu = Menu.buildFromTemplate([
     { label: petAtual().nome, enabled: false },
-    COM_CHAT ? { label: "Conversar", click: () => (mostrarTudo(), abrirChat(true, "chat")) } : null,
-    { label: "Ajustes", click: () => (mostrarTudo(), abrirChat(true, "ajustes")) },
+    COM_CHAT ? { label: "Conversar", click: () => (mostrarTudo(), abrirChat(true)) } : null,
+    { label: "Ajustes", click: () => (mostrarTudo(), mostrarAjustes()) },
     { label: "Chamar o pet de volta", click: () => (mostrarTudo(), overlay.webContents.send("pet:voltar")) },
     escondido
       ? { label: "Mostrar o mascote", click: () => esconderMascote(false) }
@@ -648,7 +731,7 @@ function montarBandeja() {
       tray = new Tray(iconeBandeja());
       // clique no ícone: traz o mascote de volta se estava escondido; senão abre o chat (ou os ajustes).
       // No Windows e no Linux; no macOS o clique abre o menu.
-      tray.on("click", () => (escondido ? esconderMascote(false) : abrirChat(true, COM_CHAT ? "chat" : "ajustes")));
+      tray.on("click", () => (escondido ? esconderMascote(false) : abrirChat(true)));
     } else tray.setImage(iconeBandeja());
     tray.setToolTip("Mascote Desktop");
     tray.setContextMenu(menu);
@@ -664,12 +747,16 @@ function mudarConfig(parcial) {
   salvarConfig();
   enviarParaTodos("config", config);
   if ("telas" in parcial) overlay?.webContents.send("tela", infoTela());
-  if ("barraLado" in parcial) esconderBarra(); // na próxima vez, aparece já na borda nova
+  if (barraOrigem === "ajustes") {
+    barra.webContents.send("config", config);
+    if ("barraLado" in parcial) reposicionarAjustes();
+  } else if ("barraLado" in parcial) esconderBarra();
   montarBandeja();
 }
 
 function escolherPet(id) {
   const trocou = id !== config.pet;
+  if (barraOrigem === "pet") esconderBarra();
   recarregarPets();
   if (trocou) conversa.novaConversa(); // cada personagem começa a própria conversa
   mudarConfig({ pet: id });
@@ -677,19 +764,49 @@ function escolherPet(id) {
 }
 
 // ---------- bilhetes ----------
-function criarBilhete({ x, y }) {
+const janelasBilhetes = () => Array.from(bilhetes.values(), (b) => b.janela);
+
+function boundsBilhete(b, tela) {
+  const a = tela.workArea;
+  const width = Math.min(TAM_BILHETE.width, a.width);
+  const height = Math.min(TAM_BILHETE.height, a.height);
+  const direita = a.x + a.width;
+  // Durante a entrada, o papel pode passar pela borda de onde veio se não houver barra desse lado.
+  const minX = b.lado < 0 && a.x === tela.bounds.x ? a.x - width : a.x;
+  const maxX = b.lado > 0 && direita === tela.bounds.x + tela.bounds.width ? direita : direita - width;
+  return {
+    x: limitar(Math.round(b.alvo.x), minX, maxX),
+    y: limitar(Math.round(b.alvo.y), a.y, a.y + a.height - height),
+    width,
+    height,
+  };
+}
+
+function posicionarBilhete(b) {
+  let tela = telasDoOverlay().find((d) => d.id === b.telaId);
+  if (!tela) {
+    tela = telaDaCasa();
+    b.telaId = tela.id;
+    b.lado = 0;
+  }
+  // setBounds mantém o tamanho mesmo ao trocar de monitor com outra escala no Windows.
+  b.janela.setBounds(boundsBilhete(b, tela));
+}
+
+function criarBilhete({ y, lado }, tela) {
   const conteudo = bilhetesMod.sortear({
     arqPadrao: path.join(__dirname, "bilhetes", "padrao.json"),
     pastaUsuario: pastaBilhetesUsuario(),
     pet: petAtual(),
   });
   const id = proxIdBilhete++;
-  const o = areaTotal();
+  const a = tela.workArea;
+  const x = lado < 0 ? a.x - TAM_BILHETE.width : a.x + a.width;
+  const b = { telaId: tela.id, lado, alvo: { x, y: areaTotal().y + y } };
+  const bounds = boundsBilhete(b, tela);
   const w = new BrowserWindow({
     icon: ICONE_APP,
-    x: Math.round(o.x + x),
-    y: Math.round(o.y + y),
-    ...TAM_BILHETE,
+    ...bounds,
     frame: false,
     resizable: false,
     skipTaskbar: true,
@@ -697,26 +814,25 @@ function criarBilhete({ x, y }) {
     show: false,
     webPreferences: prefsSeguras(),
   });
+  b.janela = w;
   w.setAlwaysOnTop(true, "floating");
   w.loadFile(path.join(__dirname, "src/bilhete.html"), { query: { dados: JSON.stringify(conteudo) } });
   w.once("ready-to-show", () => {
-    // nasceu num monitor com escala diferente da do principal: o Windows pode ter mudado o tamanho
-    const [bx, by] = w.getPosition();
-    w.setBounds({ x: bx, y: by, ...TAM_BILHETE });
-    w.showInactive();
+    if (!escondido) w.showInactive();
+    // O arrasto pode ter avançado enquanto a página carregava.
+    posicionarBilhete(b);
     // No Windows, o "sempre no topo" se perde quando a janela nasce escondida: reaplica ao mostrar,
-    // senão o bilhete fica atrás das janelas maximizadas. Depois o pet e o chat voltam para a frente
-    // (o pet é desenhado por cima do papel que ele carrega).
+    // senão o bilhete fica atrás das janelas maximizadas. O pet, o chat e o menu ficam acima dele.
     w.setAlwaysOnTop(true, "screen-saver");
     segurarTopo(w); // só depois de ligar o topo, senão o "floating" → "screen-saver" contaria como perda
-    for (const j of [overlay, chat]) if (j && !j.isDestroyed() && j.isVisible()) j.moveTop();
+    for (const j of [overlay, chat, barra]) if (j && !j.isDestroyed() && j.isVisible()) j.moveTop();
   });
   w.on("closed", () => {
     bilhetes.delete(id);
     if (overlay && !overlay.isDestroyed()) overlay.webContents.send("bilhete:fechado", id); // no fechamento do app o overlay já foi
   });
-  bilhetes.set(id, w);
-  return { id, largura: TAM_BILHETE.width, altura: TAM_BILHETE.height };
+  bilhetes.set(id, b);
+  return { id, largura: bounds.width, altura: bounds.height };
 }
 
 // ---------- IPC ----------
@@ -734,7 +850,11 @@ let contaMoverCursor = 0;
 function registrarIpc() {
   const on = (canal, fn) => ipcMain.on(canal, (e, ...a) => origemConfiavel(e) && fn(e, ...a));
   const handle = (canal, fn) => ipcMain.handle(canal, (e, ...a) => (origemConfiavel(e) ? fn(e, ...a) : null));
-  handle("inicio", () => ({ pet: petAtual(), config, tela: infoTela(), comChat: COM_CHAT, mouseNativo: require("./src/cursor").disponivel(), debug: process.env.MASCOTE_DEBUG || null }));
+  handle("inicio", () => {
+    const pet = petAtual();
+    const petReserva = pet.tipo === "imagens" ? lerPet(path.join(__dirname, "pets", "palito")) : null;
+    return { pet, petReserva, config, tela: infoTela(), comChat: COM_CHAT, mouseNativo: require("./src/cursor").disponivel(), debug: process.env.MASCOTE_DEBUG || null };
+  });
   on("pet:onde", (_e, { x, y } = {}) => num(x) && num(y) && petEm(x, y));
   on("pet:ignorar", (_e, ignorar) => overlay?.setIgnoreMouseEvents(ignorar === true, { forward: true }));
   on("pet:moverCursor", (_e, { x, y } = {}) => {
@@ -761,25 +881,27 @@ function registrarIpc() {
     }
   });
   handle("bilhete:criar", (_e, dados) => {
-    if (escondido || !config.bagunca || !dados || !num(dados.x) || !num(dados.y)) return null;
-    // No máximo 5 na tela: o mais antigo sai para dar lugar ao novo (antes ele parava de trazer,
-    // e bilhetes "perdidos", fora da vista, travavam tudo).
+    if (escondido || !config.bagunca || !num(dados?.y) || ![-1, 1].includes(dados.lado)) return null;
+    const tela = telasPermitidas().find((d) => d.id === dados.telaId);
+    if (!tela) return null;
     if (bilhetes.size >= LIMITE_BILHETES) {
-      const [idAntigo, antigo] = bilhetes.entries().next().value;
+      const [idAntigo, { janela: antiga }] = bilhetes.entries().next().value;
       bilhetes.delete(idAntigo);
-      if (!antigo.isDestroyed()) antigo.close();
+      if (!antiga.isDestroyed()) antiga.close();
       log("main", "info", `bilhete: já tinha ${LIMITE_BILHETES}, fechei o mais antigo`);
     }
     log("main", "info", `bilhete: trazendo um novo (${bilhetes.size + 1} na tela)`);
-    return criarBilhete(dados);
+    return criarBilhete(dados, tela);
   });
-  on("bilhete:mover", (_e, { id, x, y } = {}) => {
-    if (!num(x) || !num(y)) return;
-    const w = bilhetes.get(id);
-    const o = areaTotal();
-    // setBounds com o tamanho fixo, e não setPosition: no Windows, levar a janela para um monitor
-    // com outra escala por setPosition muda o tamanho dela a cada quadro (o bilhete ficava GIGANTE)
-    if (w && !w.isDestroyed()) w.setBounds({ x: Math.round(o.x + x), y: Math.round(o.y + y), ...TAM_BILHETE });
+  on("bilhete:mover", (_e, { id, x, y, solto } = {}) => {
+    const b = bilhetes.get(id);
+    if (!b || b.janela.isDestroyed()) return;
+    if (num(x) && num(y)) {
+      const o = areaTotal();
+      b.alvo = { x: o.x + x, y: o.y + y };
+    } else if (solto !== true) return;
+    if (solto === true) b.lado = 0;
+    posicionarBilhete(b);
   });
   on("bilhete:fechar", (e) => BrowserWindow.fromWebContents(e.sender)?.close());
 
@@ -910,7 +1032,14 @@ function registrarIpc() {
     overlay?.webContents.send("travessura:fim");
   });
   on("pet:voltar", () => overlay?.webContents.send("pet:voltar"));
-  on("barra:acao", (_e, acao) => typeof acao === "string" && acaoDaBarra(acao));
+  on("barra:acao", (e, acao) => e.sender === barra?.webContents && typeof acao === "string" && acaoDaBarra(acao));
+  on("barra:ajustes", (e) => {
+    if (e.sender === chat?.webContents && chatAberto) mostrarAjustes(screen.getDisplayMatching(chat.getBounds()));
+  });
+  on("barra:abrirPet", (e, p) => e.sender === overlay?.webContents && mostrarBarraNoPet(p));
+  on("barra:fecharPet", (e) => {
+    if (e.sender === overlay?.webContents && barraOrigem === "pet") esconderBarra();
+  });
   on("app:sair", () => app.quit());
 
   on("chat:abrir", (_e, aberto) => abrirChat(aberto === true));
@@ -928,8 +1057,13 @@ function registrarIpc() {
   handle("ia:estado", () => provedores.estado(config.ia, cofre()));
   handle("ia:salvar", (_e, pedido) => {
     try {
+      const antes = config.ia?.provedor || "claude";
       mudarConfig({ ia: provedores.aplicar(config.ia, pedido, cofre()) });
-      return { ok: true, estado: provedores.estado(config.ia, cofre()) };
+      const estado = provedores.estado(config.ia, cofre());
+      if (COM_CHAT && estado.atual !== antes) {
+        chat?.webContents.send("chat:iaMudou", estado.provedores.find((p) => p.id === estado.atual).nome);
+      }
+      return { ok: true, estado };
     } catch (e) {
       return { ok: false, erro: e.message, estado: provedores.estado(config.ia, cofre()) };
     }
@@ -985,7 +1119,7 @@ function registrarIpc() {
             pedidosPermissao.set(id, resolve);
             // escondido ou fechado: volta para a tela, senão o pedido fica invisível e o Claude espera para sempre
             mostrarTudo();
-            if (!chatAberto) abrirChat(true, "chat");
+            if (!chatAberto || barraOrigem === "ajustes") abrirChat(true);
             chat.webContents.send("chat:permissao", { id, ...dados });
             humor("pensando");
           }),
@@ -1049,8 +1183,8 @@ function reforcarTopo(motivo, { leve = false } = {}) {
   if (escondido) return;
   ultimoReforco = Date.now();
   const vivas = (lista) => lista.filter((w) => w && !w.isDestroyed() && w.isVisible());
-  // bilhetes primeiro: o pet (overlay) e o chat ficam por cima do papel
-  for (const w of [...vivas([...bilhetes.values()]), ...vivas([overlay, chat])]) {
+  // O pet e o chat ficam acima dos bilhetes, e o menu visível fica acima de todos.
+  for (const w of [...vivas(janelasBilhetes()), ...vivas([overlay, chat, barra])]) {
     if (!leve || !w.isAlwaysOnTop()) {
       w.setAlwaysOnTop(false);
       w.setAlwaysOnTop(true, "screen-saver");
@@ -1117,6 +1251,17 @@ app.whenReady().then(async () => {
   globalShortcut.register("CommandOrControl+Alt+Shift+Q", () => app.quit());
   const telasMudaram = () => {
     log("main", "info", "telas mudaram:", resumoTelas());
+    if (barraOrigem === "ajustes") reposicionarAjustes();
+    else esconderBarra();
+    for (const b of bilhetes.values()) {
+      if (b.janela.isDestroyed()) continue;
+      if (!b.lado) {
+        // O usuário pode ter movido o bilhete depois que o pet o soltou.
+        b.alvo = b.janela.getBounds();
+        b.telaId = screen.getDisplayMatching(b.alvo).id;
+      }
+      posicionarBilhete(b);
+    }
     aplicarJanelaOverlay();
     if (chat) posicionarChat();
     else overlay?.webContents.send("tela", infoTela());

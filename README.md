@@ -112,17 +112,17 @@ ao entrar no Mac"; no Linux, "Iniciar com o Linux").
 
 | Ação | Como |
 |---|---|
-| Abrir o menu | Encoste o mouse no meio da borda de cima da tela e espere um instante. Ele some quando o mouse sai de perto |
-| Mudar a borda do menu | Ajustes → Mais opções → **Menu de atalhos** (em cima, embaixo, na esquerda ou na direita), ou o ícone da bandeja. Vale em cada monitor; se a borda encosta em outro monitor, pare o mouse rente à divisa um pouco mais |
+| Abrir o menu | Encoste o mouse no meio da borda escolhida e espere um instante. O menu some quando o mouse sai de perto |
+| Mudar a borda do menu | Ajustes → Tela → **Borda do pop-up** (em cima, embaixo, na esquerda ou na direita), ou o ícone da bandeja. Vale em cada monitor; se a borda encosta em outro monitor, pare o mouse rente à divisa um pouco mais |
 | Conversar (versão completa) | Menu do topo → **Conversar**, ou clique no ícone da bandeja |
 | Mudar o painel de lugar | Arraste pelo topo do painel aberto (ele passa a abrir ali) |
 | Escolher em que pasta ele trabalha | Clique na linha da pasta no topo do chat |
 | Carinho | Clique no pet |
-| Dar comida / brincar de bola | Menu de atalhos → **Brinquedos** → **Comida** ou **Bola** (ou botão direito no pet). Com a Hornet, **Desafiar** chama um inimigo |
+| Dar comida / brincar de bola | Abra **Brinquedos** no menu de atalhos ou clique com o botão direito no pet para abrir o pop-up de interações. Com a Hornet, **Desafiar** chama um inimigo |
 | Chutar a bola | Clique nela: ela vai para o lado oposto de onde você clicou. O pet chuta de volta na direção do seu mouse |
 | Mudar o pet de lugar | Arraste o pet com o mouse |
 | Trocar de pet, ligar passeio ou modo bagunça | Menu do topo → **Ajustes**, ou o ícone na bandeja |
-| Telas, chão, frequência da bagunça, travessuras e pastas | Ajustes → **Mais opções** |
+| Configurar o mascote, a tela, o sistema ou a IA | Pop-up → **Ajustes**. Use **Voltar** para retornar aos atalhos |
 | Fazer o pet voltar para o canto | Menu do topo → **Chamar** |
 | Esconder | Menu do topo → **Esconder**: pet, chat e bilhetes somem. Clique no ícone da bandeja (perto do relógio) para trazer de volta |
 | Fechar | Menu do topo → **Fechar**, a bandeja, ou **Ctrl+Alt+Shift+Q** (no Mac, **Cmd+Option+Shift+Q**) |
@@ -139,7 +139,7 @@ mensagem (PNG, JPG, GIF ou WEBP, até 5 MB cada), e o Claude Code vê a imagem j
 
 ![Pato dançando e andando, Palito bravo e caindo, Tartaruga andando e escondida no casco](docs/estados.png)
 
-- **Chão** (Ajustes → Mais opções → Chão): ele pode andar pela **tela inteira** ou **só em cima da barra de tarefas**, como
+- **Chão** (Ajustes → Tela → Área de passeio): ele pode andar pela **tela inteira** ou **só em cima da barra de tarefas**, como
   se ela fosse o chão.
 - **Derrubar:** no modo barra de tarefas, arraste o pet lá para cima e solte. Ele cai e abre um
   paraquedas.
@@ -160,7 +160,7 @@ No modo bagunça o pet traz bilhetes da borda da tela e deixa onde dá para ler:
 do chat, longe da barra de tarefas. No modo barra de tarefas o Pato vai buscar **voando**, batendo as
 asas, e a Tartaruga e o Palito trazem o papel na cabeça. Ele mantém até 50 bilhetes na tela (feche no
 X). Já vem com 40 mensagens, e você pode colocar as suas:
-abra **Ajustes → Mais opções → Pasta de bilhetes** e edite o `bilhetes.json`:
+abra **Ajustes → Sistema → Pasta de bilhetes** e edite o `bilhetes.json`:
 
 ```json
 {
@@ -181,11 +181,11 @@ abra **Ajustes → Mais opções → Pasta de bilhetes** e edite o `bilhetes.jso
 
 ## Travessuras
 
-Com o modo bagunça ligado, ative em **Ajustes → Mais opções → Travessuras** as que quiser. "Pegar o mouse" vem ligada;
+Com o modo bagunça ligado, ative em **Ajustes → Mascote → Travessuras** as que quiser. "Pegar o mouse" vem ligada;
 as outras começam desligadas.
 Ele apronta no máximo uma bagunça (pegar o mouse, trazer bilhete ou travessura) a cada intervalo
-escolhido em **Ajustes → Mais opções → Bagunça** (3 minutos por padrão), e a primeira vem na metade desse
-tempo depois de abrir o app. A dança fica fora dessa conta: ele dança quando der vontade. Para criar as suas, abra **Ajustes → Mais opções → Pasta de travessuras**
+escolhido em **Ajustes → Mascote → Frequência da bagunça** (3 minutos por padrão), e a primeira vem na metade desse
+tempo depois de abrir o app. A dança fica fora dessa conta: ele dança quando der vontade. Para criar as suas, abra **Ajustes → Sistema → Pasta de travessuras**
 e edite o `travessuras.json`:
 
 ```json
@@ -215,7 +215,7 @@ ele só solta quando cansa.
 
 Nada no mascote precisa de administrador. A diferença é que, sem a permissão, o Windows não deixa um
 programa comum apertar teclas quando a janela da frente é de administrador (Gerenciador de Tarefas,
-terminal admin...). Nesses casos ele pula a travessura. Para liberar, use **Ajustes → Mais opções → Pedir permissão ao
+terminal admin...). Nesses casos ele pula a travessura. Para liberar, use **Ajustes → Sistema → Pedir permissão ao
 Windows**: o app reabre e o Windows pergunta se você permite. Depois disso, a opção "Também em janelas
 de administrador" pode ser ligada.
 
@@ -242,7 +242,7 @@ Tudo funciona nos três sistemas, com estas diferenças (que vêm dos próprios 
 
 **Mac, permissão de Acessibilidade:** o macOS só deixa um app apertar teclas por você se ele estiver
 em Ajustes do Sistema → Privacidade e Segurança → **Acessibilidade**. As travessuras de teclado
-aparecem com cadeado até você ligar; o botão **Ajustes → Mais opções → Abrir os Ajustes do Mac** leva direto para lá.
+aparecem com cadeado até você ligar; o botão **Ajustes → Sistema → Abrir os Ajustes do Mac** leva direto para lá.
 Pegar o mouse e todo o resto funcionam sem ela. O pet mora na barra de menus, sem ícone no Dock.
 
 **Mac com dois monitores:** com "Monitores têm Spaces separados" ligado (o padrão do macOS), uma janela

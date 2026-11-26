@@ -2,7 +2,7 @@
 const cv = document.getElementById("tela");
 const ctx = cv.getContext("2d");
 
-let pet, config, tela, mouseNativo, debug;
+let pet, petReserva, config, tela, mouseNativo, debug;
 let sprites = {}; // nome da animação -> [{normal, espelhado}]
 let tamGrade = { w: 16, h: 24 }; // tamanho do sprite em "pixels do pet"
 
@@ -45,10 +45,10 @@ const seguirMouseLigado = () => config.bagunca && config.travessuras?.["seguir-m
 const pegarMouseLigado = () => config.bagunca && mouseNativo && config.travessuras?.["pegar-mouse"] !== false;
 
 // ---------- sprites ----------
-function quadroPixel(linhas) {
+function quadroPixel(pet, linhas) {
   const c = document.createElement("canvas");
-  c.width = tamGrade.w * pet.escala;
-  c.height = tamGrade.h * pet.escala;
+  c.width = pet.largura * pet.escala;
+  c.height = pet.altura * pet.escala;
   const g = c.getContext("2d");
   linhas.forEach((linha, y) => {
     [...linha].forEach((ch, x) => {
@@ -82,33 +82,43 @@ function carregarImagem(url) {
   });
 }
 
-async function prepararSprites() {
-  sprites = {};
+async function prepararSprites(pet) {
+  const quadrosPorAnimacao = Object.create(null);
   if (pet.tipo === "pixel") {
-    tamGrade = { w: pet.largura, h: pet.altura };
     for (const [nome, a] of Object.entries(pet.animacoes)) {
-      sprites[nome] = a.quadros.map((q) => {
-        const normal = quadroPixel(q);
+      quadrosPorAnimacao[nome] = a.quadros.map((q) => {
+        const normal = quadroPixel(pet, q);
         return { normal, espelhado: espelhar(normal) };
       });
     }
   } else {
     for (const [nome, a] of Object.entries(pet.animacoes)) {
-      sprites[nome] = [];
+      const quadros = [];
       for (const url of a.quadros) {
-        const img = await carregarImagem(url);
+        let img;
+        try {
+          img = await carregarImagem(url);
+        } catch (e) {
+          console.warn("[sprites]", e.message);
+          continue;
+        }
         const c = document.createElement("canvas");
-        c.width = img.naturalWidth * pet.escala;
-        c.height = img.naturalHeight * pet.escala;
+        c.width = Math.max(1, Math.round(img.naturalWidth * pet.escala));
+        c.height = Math.max(1, Math.round(img.naturalHeight * pet.escala));
         const g = c.getContext("2d");
         g.imageSmoothingEnabled = !pet.pixelado;
         g.drawImage(img, 0, 0, c.width, c.height);
-        sprites[nome].push({ normal: c, espelhado: espelhar(c) });
+        quadros.push({ normal: c, espelhado: espelhar(c) });
       }
+      if (quadros.length) quadrosPorAnimacao[nome] = quadros;
     }
-    const primeiro = sprites.parado[0].normal;
-    tamGrade = { w: primeiro.width / pet.escala, h: primeiro.height / pet.escala };
   }
+  const primeiro = quadrosPorAnimacao.parado?.[0].normal || quadrosPorAnimacao.andando?.[0].normal;
+  if (!primeiro) throw new Error("nenhum quadro válido em parado ou andando");
+  return {
+    quadros: quadrosPorAnimacao,
+    grade: { w: primeiro.width / pet.escala, h: primeiro.height / pet.escala },
+  };
 }
 
 const RESERVA = {
@@ -118,18 +128,21 @@ const RESERVA = {
   travessura: ["acenando", "feliz", "parado"],
   caindo: ["carregado", "acenando", "parado"], tonto: ["parado"], bravo: ["parado"],
   comendo: ["feliz", "parado"], brincando: ["correndo", "andando"], dancando: ["feliz", "parado"],
+  combate: ["correndo", "andando"], cacar: ["correndo", "andando"], planar: ["caindo", "carregado"], pogo: ["caindo", "carregado"],
 };
 // Pets que sabem dançar: o desenho vetorial tem a dancinha (Pato) ou o pet.json tem "dancando".
 const sabeDancar = () => pet.desenho === "pato" || !!pet.animacoes?.dancando;
 const VEL_VOO = 110; // px/s subindo ou descendo, quando o pato voa com o bilhete
 // Na barra de tarefas, o pato vai buscar o bilhete voando: assim o papel no bico fica acima do chat.
 const vaiVoar = () => noChao() && pet.desenho === "pato";
-function voarNaAlturaDoBilhete(dt, altura = 150) {
+function voarNaAlturaDoBilhete(dt) {
   if (!P.voando) Object.assign(P, { voando: true, tVoo: 0 });
   P.tVoo += dt;
   const m = maoTras();
+  const a = areaBilhete();
+  const altura = P.bilhete?.altura ?? Math.min(tela.alturaBilhete, a.h);
   // primeiro bate as asas um instante no chão, depois sobe devagar (nada de pulo)
-  const alvoY = P.tVoo < 0.5 ? P.y : tetoBilhete(P.x, altura) + 24 + (P.y - m.y) + Math.sin(relogio * 5) * 6;
+  const alvoY = P.tVoo < 0.5 ? P.y : tetoBilhete(a, altura) + 24 + (P.y - m.y) + Math.sin(relogio * 5) * 6;
   P.y += Math.max(-VEL_VOO, Math.min(VEL_VOO, (alvoY - P.y) * 3)) * dt;
   if (P.alvo) P.alvo.y = P.y;
 }
@@ -137,21 +150,30 @@ const CHANCE_DANCAR = 0.04; // aleatória, fora do intervalo das bagunças
 function animacao(nome) {
   if (sprites[nome]) return nome;
   for (const r of RESERVA[nome] || []) if (sprites[r]) return r;
-  return "parado";
+  return sprites.parado ? "parado" : "andando";
 }
 
 // ---------- estados ----------
+function animarPet(anim) {
+  if (P.anim !== anim) P.tAnim = 0;
+  P.anim = anim;
+}
+
 function mudar(estado, tempo, extra = {}) {
   if (debug && estado !== P.estado) console.warn(`[debug] ${P.estado} -> ${estado} x=${Math.round(P.x)} y=${Math.round(P.y)} cursor=${cursor.x},${cursor.y}`);
+  if (estado !== "arrastando" && P.bilhete) {
+    window.api.enviar("bilhete:mover", { id: P.bilhete.id, solto: true });
+    P.bilhete = null;
+    P.bilheteNaCabeca = false;
+  }
+  if (estado !== "buscar") P.buscandoBilhete = false;
   // voando com o bilhete: decola para buscar, pega (parado no ar), volta puxando e pousa
-  const noVoo = ["buscar", "arrastando", "pousando"].includes(estado) || (estado === "parado" && P.estado === "buscar");
+  const noVoo = ["buscar", "arrastando", "pousando"].includes(estado);
   if (!noVoo) P.voando = false;
   P.estado = estado;
   P.tempo = tempo;
   Object.assign(P, extra);
-  const anim = { andar: "andando", perseguir: "correndo", seguir: "andando", buscar: "andando", voltar: "andando" }[estado] || estado;
-  if (P.anim !== anim) P.tAnim = 0;
-  P.anim = anim;
+  animarPet({ andar: "andando", perseguir: "correndo", seguir: "andando", buscar: "andando", voltar: "andando" }[estado] || estado);
 }
 
 function falar(texto, segundos = 3.5) {
@@ -261,8 +283,10 @@ function proximoEstado() {
     const a = areaDe(x);
     // na tela inteira, nada de buscar lá embaixo: com o papel pendurado no bico, ele ficaria em cima
     // da barra de tarefas. A boca fica a ~70% da altura do pet, e o papel começa 24 px acima dela.
-    const yMax = tetoBilhete(x, 150) + 24 + alturaPx() * 0.7 - 20; // folga: o passo balança a boca
-    return mudar("buscar", 20, { alvo: { x, y: limitarY(Math.min(rand(a.y + 220, a.y + a.h), yMax), x) }, lado });
+    const altura = Math.min(tela.alturaBilhete, a.h);
+    const yMax = tetoBilhete(a, altura) + 24 + alturaPx() * 0.7 - 20; // folga: o passo balança a boca
+    const y = limitarY(Math.min(rand(a.y + 220, a.y + a.h), yMax), x);
+    return mudar("buscar", 20, { alvo: { x, y }, lado, telaBilheteId: a.id });
   }
   if (sabeDancar() && Math.random() < CHANCE_DANCAR) return mudar("dancando", 5.1); // dança quando der vontade
   if (r < 0.45) return mudar("parado", rand(2, 5));
@@ -404,38 +428,58 @@ function ponto(campo, padrao) {
 }
 // Com o modelo 3D, o ponto que segura as coisas é a "boca" que ele informa a cada quadro
 // (bico do Pato, boca da Tartaruga, mão do Palito): ela muda de lugar quando ele gira.
-let boca3d = null; // { x, y, em }
+let boca3d = null;
 const boca = () => (boca3d && relogio - boca3d.em < 0.3 ? { x: boca3d.x, y: boca3d.y } : null);
 const mao = () => boca() || ponto("mao", [tamGrade.w - 1, Math.floor(tamGrade.h * 0.6)]);
-const maoTras = () => boca() || ponto("maoTras", [2, Math.floor(tamGrade.h * 0.6)]);
+function maoTras() {
+  const m = boca();
+  if (m) return { x: P.x + (m.x - boca3d.peX), y: P.y + (m.y - boca3d.peY) };
+  return ponto("maoTras", [2, Math.floor(tamGrade.h * 0.6)]);
+}
 
-// O bilhete fica sempre um pouco acima do pé da tela: mais embaixo ele cai em cima da barra de
-// tarefas e não dá para ler. Devolve o y máximo do topo do papel.
-function tetoBilhete(x, altura) {
-  const a = areaDe(x);
-  return a.y + a.h - 80 - 10 - altura;
+const areaBilhete = () => areas().find((a) => a.id === P.telaBilheteId) || areaDe(P.x);
+const tetoBilhete = (a, altura) => Math.max(a.y, a.y + a.h - altura - 10);
+
+function puxarBilhete(b) {
+  const a = areaBilhete();
+  const lado = P.lado;
+  const naCabeca = !P.voando && maoTras().y - 24 > tetoBilhete(a, b.altura);
+  const metadePet = Math.min(larguraPx(), a.w) / 2;
+  const espacoPapel = naCabeca ? b.largura / 2 : b.largura + metadePet;
+  // O pet anda para dentro pelo menos o suficiente para trazer a outra ponta do papel.
+  const dist = Math.min(a.w - metadePet, Math.max(rand(a.w * 0.12, a.w * 0.3), espacoPapel));
+  const x = lado < 0 ? a.x + dist : a.x + a.w - dist;
+  const tempo = Math.max(20, Math.abs(P.x - x) / (velocidade() * 0.7) + 2);
+  mudar("arrastando", tempo, { alvo: { x, y: P.y }, bilhete: b, bilheteNaCabeca: naCabeca });
 }
 
 function moverBilhete() {
   const b = P.bilhete;
   if (!b) return;
-  const m = maoTras();
-  // o papel fica do lado de fora da boca/mão (o lado oposto ao corpo dele)
-  const ladoEsq = boca() ? m.x < P.x : P.olhando > 0;
-  const x = ladoEsq ? m.x - b.largura + 8 : m.x - 8;
-  // pendurado na boca ele ficaria baixo demais (pet lá embaixo, na barra de tarefas):
-  // aí ele carrega o papel em cima da cabeça, como uma placa (a cabeça fica na altura do chat)
-  const teto = tetoBilhete(x + b.largura / 2, b.altura);
-  if (P.voando) return window.api.enviar("bilhete:mover", { id: b.id, x, y: Math.min(m.y - 24, teto) });
-  // bico ou cabeça: decide uma vez, no começo do arrasto (senão o balanço do passo fazia o papel
-  // pular de um para o outro quando ele estava bem no limite)
-  if (P.bilheteNaCabeca == null) P.bilheteNaCabeca = m.y - 24 > teto;
+  const a = areaBilhete();
+  let x, y;
   if (P.bilheteNaCabeca) {
-    const balanco = Math.sin(relogio * 9) * 3; // sobe e desce um pouquinho com os passos
-    const y = P.y - alturaPx() - b.altura + 12 + balanco;
-    return window.api.enviar("bilhete:mover", { id: b.id, x: P.x - b.largura / 2, y });
+    x = P.x - b.largura / 2;
+    y = P.y - alturaPx() - b.altura + 12 + Math.sin(relogio * 9) * 3;
+  } else {
+    const m = maoTras();
+    x = P.lado < 0 ? m.x - b.largura + 8 : m.x - 8;
+    y = m.y - 24;
   }
-  window.api.enviar("bilhete:mover", { id: b.id, x, y: m.y - 24 });
+  window.api.enviar("bilhete:mover", { id: b.id, x, y: Math.max(a.y, Math.min(y, tetoBilhete(a, b.altura))) });
+  return x;
+}
+
+function faltaPuxarBilhete(x) {
+  const a = areaBilhete();
+  const falta = P.lado < 0 ? a.x - x : x + P.bilhete.largura - (a.x + a.w);
+  if (falta <= 0.5) return false;
+  // A mão ou a agulha do modelo 3D pode ficar mais longe do corpo do que no sprite.
+  const espaco = Math.min(larguraPx(), a.w) / 2;
+  const xNovo = Math.max(a.x + espaco, Math.min(P.x - P.lado * (falta + 8), a.x + a.w - espaco));
+  if ((P.x - xNovo) * P.lado < 1) return false;
+  P.alvo.x = xNovo;
+  return true;
 }
 
 // Resgate: se ele ficar fora de todas as telas (ou a posição virar NaN), volta para casa.
@@ -446,7 +490,7 @@ function resgatar(dt) {
   foraHa = visivel ? 0 : foraHa + dt;
   if (quebrado || foraHa > 3) {
     console.warn(`[resgate] pet sumiu (estado=${P.estado}, x=${P.x}, y=${P.y}); voltando para casa`);
-    Object.assign(P, { x: tela.casa.x, y: tela.casa.y, ancora: { ...tela.casa }, bilhete: null });
+    Object.assign(P, { x: tela.casa.x, y: tela.casa.y, ancora: { ...tela.casa } });
     foraHa = 0;
     mudar("acenando", 2);
   }
@@ -470,6 +514,7 @@ function atualizar(dt) {
   P.tempo -= dt;
   P.tAnim += dt;
 
+  window.Hornet?.passo(dt);
   if (segurado) {
     const ponta = window.Hornet?.ativo() && boca();
     if (ponta) {
@@ -484,7 +529,6 @@ function atualizar(dt) {
     window.Vida?.segurando(dt); // percebe se a pessoa está chacoalhando
     return;
   }
-  window.Hornet?.passo(dt);
   if (window.Vida?.atualizar(dt)) return; // queda, tontura, bravo, comer, brincar, menu
   if (window.Hornet?.atualizar(dt)) return; // combate, inimigo, pogo, planar, Thread Storm
 
@@ -581,39 +625,43 @@ function atualizar(dt) {
       }
       return;
     }
-    case "buscar":
+    case "buscar": {
+      if (P.buscandoBilhete) return;
       if (vaiVoar()) voarNaAlturaDoBilhete(dt); // o pato vai voando buscar o bilhete
       if (andarAte(P.alvo, dt, 1.3)) {
-        mudar("parado", 99);
-        const ladoInicial = P.lado;
-        const lim = limites();
-        const xb = ladoInicial < 0 ? lim.min - 260 : lim.max + 20;
-        window.api.invocar("bilhete:criar", { x: xb, y: Math.min(P.y - 60, tetoBilhete(P.x, 150)) }).then((b) => {
-          if (!b || P.estado !== "parado") return P.voando && P.estado === "parado" ? mudar("pousando", 6) : proximoEstado();
-          P.bilhete = b;
-          P.olhando = -ladoInicial;
-          // puxa só até ~30% da tela do lado de onde veio: no meio da tela o bilhete atrapalha
-          const { min, max } = limites();
-          const a = areaDe(ladoInicial < 0 ? min : max - 1);
-          const x = ladoInicial < 0 ? rand(a.x + a.w * 0.12, a.x + a.w * 0.3) : rand(a.x + a.w * 0.7, a.x + a.w * 0.88);
-          mudar("arrastando", 20, { alvo: { x: limitarX(x), y: P.y }, bilheteNaCabeca: null });
+        P.buscandoBilhete = true;
+        const busca = P.alvo;
+        const a = areaBilhete();
+        const y = Math.min(P.y - 60, tetoBilhete(a, Math.min(tela.alturaBilhete, a.h)));
+        window.api.invocar("bilhete:criar", { telaId: a.id, lado: P.lado, y }).catch((erro) => {
+          console.warn("[bilhete] não consegui abrir o recado:", erro.message);
+          return null;
+        }).then((b) => {
+          if (P.estado !== "buscar" || P.alvo !== busca) {
+            if (b) window.api.enviar("bilhete:mover", { id: b.id, solto: true });
+            return;
+          }
+          P.buscandoBilhete = false;
+          if (!b) return P.voando ? mudar("pousando", 6) : proximoEstado();
+          P.olhando = -P.lado;
+          puxarBilhete(b);
         });
       } else if (P.tempo <= 0) P.voando ? mudar("pousando", 6) : proximoEstado();
       return;
+    }
     case "arrastando": {
       // anda de costas para dentro da tela, puxando o bilhete
       const olhar = P.olhando;
       // na barra de tarefas o pato sai voando, batendo as asas, na altura em que o bilhete
       // pendurado no bico fica acima do chat (os outros pets levam o papel na cabeça)
-      if (vaiVoar() && P.bilhete) voarNaAlturaDoBilhete(dt, P.bilhete.altura);
+      if (vaiVoar() && P.bilhete) voarNaAlturaDoBilhete(dt);
       const chegou = andarAte(P.alvo, dt, 0.7);
       P.olhando = olhar;
-      moverBilhete();
+      const x = moverBilhete();
+      if (chegou && P.tempo > 0 && P.bilhete && faltaPuxarBilhete(x)) return;
       if (chegou || P.tempo <= 0 || !P.bilhete) {
-        P.bilhete = null;
         // com o papel em cima da cabeça, o balão de fala cobriria o texto dele
-        if (!P.bilheteNaCabeca) falar(escolha(["Trouxe pra você!", "Um presente 💌", "Leia isso!"]), 2.5);
-        P.bilheteNaCabeca = null;
+        if (P.bilhete && !P.bilheteNaCabeca) falar(escolha(["Trouxe pra você!", "Um presente 💌", "Leia isso!"]), 2.5);
         if (P.voando) return mudar("pousando", 6); // desce batendo as asas
         mudar("feliz", 1.5);
       }
@@ -643,19 +691,23 @@ function atualizar(dt) {
 
 // ---------- mouse ----------
 function sobreOPet(p) {
+  if (!pet) return false;
   const w = larguraPx();
   const h = alturaPx();
   return p.x > P.x - w / 2 - 4 && p.x < P.x + w / 2 + 4 && p.y > P.y - h - 4 && p.y < P.y + 4;
 }
 
-// botão direito no pet: menuzinho (comida, brincar, carinho)
+// botão direito no pet: abre o pop-up na posição do clique, em coordenadas do overlay.
 window.addEventListener("contextmenu", (e) => {
   e.preventDefault();
-  if (sobreOPet(cursor)) window.Vida?.abrirMenu();
+  if (!pet) return;
+  const j = janela();
+  const ponto = { x: j.x + e.clientX, y: j.y + e.clientY };
+  if (sobreOPet(ponto)) window.Vida?.abrirMenu(ponto);
 });
 
 function atualizarCliques() {
-  const deveIgnorar = !(segurado || sobreOPet(cursor) || window.Vida?.sobreMenu(cursor) || window.Vida?.sobreBola(cursor));
+  const deveIgnorar = !(segurado || sobreOPet(cursor) || window.Vida?.sobreBola(cursor));
   if (deveIgnorar !== ignorando) {
     ignorando = deveIgnorar;
     window.api.enviar("pet:ignorar", ignorando);
@@ -663,12 +715,16 @@ function atualizarCliques() {
 }
 
 window.addEventListener("mousedown", (e) => {
-  if (e.button === 0 && window.Vida?.cliqueNoMenu(cursor)) return;
-  if (e.button === 0 && window.Vida?.cliqueNaBola(cursor)) return; // chutou a bola
-  if (e.button !== 0 || !sobreOPet(cursor)) return;
+  if (e.button !== 0) return;
+  window.api.enviar("barra:fecharPet");
+  if (window.Vida?.cliqueNaBola(cursor)) return; // chutou a bola
+  if (!sobreOPet(cursor)) return;
   window.Vida?.pegou();
   segurado = { dx: cursor.x - P.x, dy: cursor.y - P.y, inicio: { ...cursor } };
-  if (P.bilhete) P.bilhete = null;
+  if (window.Hornet?.ativo()) {
+    P.acao = null;
+    boca3d = null;
+  }
   mudar("carregado", 999);
 });
 
@@ -735,7 +791,7 @@ function balao(texto, x, y) {
 function desenhar(dt) {
   const j = janela();
   ctx.clearRect(j.x, j.y, j.w, j.h);
-  if (!sprites.parado) return;
+  if (!pet) return;
 
   // Pets do app: modelo 3D de verdade (pet3d.js, three.js). Se o WebGL falhar, usa o desenho
   // com volume de vetor.js. Pets da comunidade continuam em pixel art ou imagens.
@@ -803,10 +859,11 @@ function desenhar3D(dt) {
       acao: window.Hornet?.acao3d() || null,
       deCostas: P.estado === "segurando" || P.estado === "arrastando", // puxando: anda de costas
     });
-    if (img?.boca) boca3d = { ...img.boca, em: relogio };
+    boca3d = img?.boca ? { ...img.boca, em: relogio, peX: P.x, peY: P.y } : null;
   } catch (e) {
     console.error("[3d] falhou, voltando para o 2D:", e);
     window.Pet3D = null;
+    boca3d = null;
     return false;
   }
   if (!img) return false;
@@ -899,6 +956,7 @@ let ultimo = performance.now();
 function quadro(agora) {
   const dt = Math.min(0.05, (agora - ultimo) / 1000);
   ultimo = agora;
+  if (!pet) return requestAnimationFrame(quadro);
   relogio += dt;
   atualizar(dt);
   avisarOnde(dt);
@@ -909,10 +967,28 @@ function quadro(agora) {
   requestAnimationFrame(quadro);
 }
 
+let ultimaTroca = 0;
 async function trocarPet(novo) {
+  const troca = ++ultimaTroca;
+  let preparo;
+  try {
+    preparo = await prepararSprites(novo);
+  } catch (e) {
+    if (troca !== ultimaTroca) return;
+    console.warn(`[sprites] não consegui carregar ${novo.nome}: ${e.message}`);
+    if (pet) return falar(`Não consegui carregar ${novo.nome}.`, 3);
+    if (petReserva && novo !== petReserva) return trocarPet(petReserva);
+    return;
+  }
+  // A troca mais recente ganha, mesmo se outro conjunto de imagens terminar depois.
+  if (troca !== ultimaTroca) return;
   pet = novo;
-  await prepararSprites();
-  P.fala = null;
+  sprites = preparo.quadros;
+  tamGrade = preparo.grade;
+  boca3d = null;
+  P.acao = null;
+  P.dashAte = 0;
+  P.tAnim = 0;
   falar(pet.desenho === "hornet" ? "Saudações. Eu sou Hornet." : `Oi! Eu sou ${pet.nome} 👋`, 3);
   mudar("acenando", 2);
 }
@@ -921,13 +997,13 @@ window.api.ouvir("cursor", (c) => (cursor = c));
 window.api.ouvir("config", (c) => {
   config = c;
   if (!config.passear && ["andar", "perseguir", "seguir", "segurando", "buscar", "arrastando", "combate", "cacar"].includes(P.estado)) {
-    P.bilhete = null;
     mudar("voltar", 20, { alvo: P.ancora || tela.casa });
   }
 });
 window.addEventListener("error", (e) => console.error("[overlay]", e.message, e.filename + ":" + e.lineno));
 window.addEventListener("unhandledrejection", (e) => console.error("[overlay] promessa:", e.reason?.message || e.reason));
 window.api.ouvir("tela", (t) => {
+  if (!tela) return;
   // Se um monitor mudou (girou, foi ligado, mudou de resolução), o canto do overlay pode ter mudado.
   // As posições são contadas a partir dele: converte tudo, senão o pet "pula" para outro lugar.
   const dx = (tela.origem?.x ?? t.origem?.x ?? 0) - (t.origem?.x ?? 0);
@@ -942,6 +1018,10 @@ window.api.ouvir("tela", (t) => {
   ajustarCanvas();
   // o painel abre no alto da tela: só limita o balão se ele descer até perto de onde o pet mora
   limiteBalao = t.painel && t.painel.y + t.painel.h > t.casa.y - 200 ? t.painel.x - 6 : null;
+  if (!pet) {
+    Object.assign(P, t.casa, { ancora: { ...t.casa } });
+    return;
+  }
   // a casa mudou (chat arrastado, aberto ou fechado): se ele estava em casa, vai junto
   const mudou = Math.hypot(antiga.x - t.casa.x, antiga.y - t.casa.y) > 1;
   const emCasa = P.ancora && Math.hypot(P.ancora.x - antiga.x, P.ancora.y - antiga.y) < 1;
@@ -956,10 +1036,7 @@ window.api.ouvir("tela", (t) => {
   }
 });
 window.api.ouvir("pet:trocar", trocarPet);
-// "Brinquedos" no pop-up do topo: o menu abre logo acima da cabeça do pet
-window.api.ouvir("brinquedos:abrir", () => window.Vida?.abrirMenuBrinquedos({ x: P.x, y: P.y - alturaPx() + 25 }));
-// brinquedo escolhido direto no menu de atalhos (comida/Desafiar ou bola)
-window.api.ouvir("brinquedos:usar", (id) => window.Vida?.usarBrinquedo(id));
+window.api.ouvir("pet:interagir", (id) => window.Vida?.interagir(id));
 // o Windows não deixou mexer no cursor (janela de administrador na frente): solta e explica
 let avisouMouse = -999;
 window.api.ouvir("mouse:bloqueado", ({ janelaAdmin } = {}) => {
@@ -976,7 +1053,6 @@ window.api.ouvir("mouse:bloqueado", ({ janelaAdmin } = {}) => {
   mudar("parado", 2);
 });
 window.api.ouvir("pet:voltar", () => {
-  P.bilhete = null;
   travessura = null;
   falar(escolha(["Tô indo!", "Voltei!", "Já vou!"]), 2);
   chamarDeVolta(20);
@@ -993,7 +1069,6 @@ window.api.ouvir("pet:humor", (h) => {
     return;
   }
   P.humor = h === "pensando" || h === "trabalhando" ? h : null;
-  if (["perseguir", "seguir", "segurando", "buscar", "arrastando", "combate"].includes(P.estado)) P.bilhete = null;
   if (P.humor) return proximoEstado();
   if (h === "falando") return mudar("acenando", 1.5);
   if (h === "feliz") return mudar("feliz", 1.5);
@@ -1003,6 +1078,7 @@ window.api.ouvir("pet:humor", (h) => {
   const d = await window.api.invocar("inicio");
   config = d.config;
   tela = d.tela;
+  petReserva = d.petReserva;
   mouseNativo = d.mouseNativo;
   debug = d.debug;
   if (debug) console.warn("[debug] modo", debug, "mouseNativo=", mouseNativo, "telas=", JSON.stringify(d.tela.areas));

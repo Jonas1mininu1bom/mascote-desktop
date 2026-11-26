@@ -344,12 +344,16 @@ window.Pet3D = (() => {
 
   // ---------- cena ----------
   let renderer = null, cena = null, camera = null, modelo = null, desenhoAtual = null;
-  const estado = { yaw: 0.5, alvoYaw: 0.5, ultX: null, ultY: null, esconde: 0, ultRelogio: 0, pisca: 0 };
+  const modelos = new Map();
+  const estado = { yaw: 0.5, alvoYaw: 0.5, ultX: null, ultY: null, esconde: 0, ultRelogio: 0, vel: 0 };
   const ELEVACAO = 0.62; // ~35° olhando de cima, como nos pets de desktop clássicos
-  const VISTA = 2.2; // largura da cena em unidades (o pet tem ~1 de altura)
+  const SEN_ELEVACAO = Math.sin(ELEVACAO);
+  const VISTA = { largura: 2.2, altura: 2.2, abaixo: 2.2 * 0.18 };
+  // Folga para a agulha, a capa e o mortal, mantendo a escala e a posição dos pés.
+  const VISTA_HORNET = { largura: 3.3, altura: 3.5, abaixo: 1 };
 
   function iniciar() {
-    if (renderer) return true;
+    if (renderer !== null) return renderer !== false;
     try {
       const canvas = document.createElement("canvas");
       renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true, premultipliedAlpha: false, preserveDrawingBuffer: true });
@@ -360,6 +364,9 @@ window.Pet3D = (() => {
       sol.position.set(-2, 4, 3); // alto, à esquerda, na frente
       cena.add(sol);
       camera = new T.OrthographicCamera(-1, 1, 1, -1, 0.1, 50);
+      camera.position.set(0, SEN_ELEVACAO, Math.cos(ELEVACAO)).multiplyScalar(10);
+      camera.lookAt(0, 0, 0);
+      camera.updateMatrixWorld();
       return true;
     } catch (e) {
       console.error("[3d] WebGL indisponível, voltando para o 2D:", e);
@@ -368,19 +375,29 @@ window.Pet3D = (() => {
     }
   }
 
-  function trocarModelo(desenho) {
+  function trocarModelo(desenho, olhando) {
     if (desenhoAtual === desenho) return;
     if (modelo) cena.remove(modelo.raiz);
-    modelo = MONTAR[desenho]();
+    if (!modelos.has(desenho)) modelos.set(desenho, MONTAR[desenho]());
+    modelo = modelos.get(desenho);
+    const yaw = olhando > 0 ? 0.75 : -0.75;
+    Object.assign(estado, { yaw, alvoYaw: yaw, ultX: null, ultY: null, esconde: 0, vel: 0 });
+    if (desenho === "hornet") Object.assign(modelo, { abre: 0, arrasto: 0, vento: 0.15 });
     desenhoAtual = desenho;
     cena.add(modelo.raiz);
+  }
+
+  function ajustarRenderizador(r, w, h, dpr) {
+    if (r.getPixelRatio() !== dpr || r.domElement.width !== Math.floor(w * dpr) || r.domElement.height !== Math.floor(h * dpr)) {
+      r.setDrawingBufferSize(w, h, dpr);
+    }
   }
 
   // ---------- animação ----------
   // para abrir as asas do pato (girar em volta de eixos, sem criar objetos a cada quadro)
   const EIXO_Y = T ? new T.Vector3(0, 1, 0) : null, EIXO_Z = T ? new T.Vector3(0, 0, 1) : null;
   const qBate = T ? new T.Quaternion() : null, qAbre = T ? new T.Quaternion() : null, qDeita = T ? new T.Quaternion() : null;
-  const ANDANDO = { andar: 1, voltar: 1, buscar: 1, seguir: 1, perseguir: 1.6, arrastando: 0.8, segurando: 1.6, brincando: 1.6, trabalhando: 1.3, combate: 1.6, cacar: 1.6 };
+  const MARCHA = { andando: 9, correndo: 15, arrastando: 9, segurando: 15, trabalhando: 15, combate: 15, cacar: 15 };
   // Tecido da saia: cada vértice é recalculado a cada quadro. d = 0 no ombro, 1 na barra.
   // abre: planando (a capa abre como um paraquedas); arrasto: correndo (a barra vai para trás);
   // vento: o quanto a barra ondula e tremula.
@@ -671,7 +688,7 @@ window.Pet3D = (() => {
   function animar(m, s, dt) {
     const anim = s.anim;
     const t = s.t;
-    const anda = ANDANDO[s.estado] ? (anim === "correndo" || ANDANDO[s.estado] > 1.2 ? 15 : 9) : 0;
+    const anda = MARCHA[anim] || 0;
     const f = t * anda;
     const passo = anda ? Math.sin(f) : 0;
     // valores padrão (tudo parado)
@@ -824,6 +841,9 @@ window.Pet3D = (() => {
       } else if (anim === "dormindo") {
         m.cabeca.rotation.z = 0.35;
         m.corpo.position.y = 0.53 + respira;
+      } else if (anim === "comendo") {
+        m.cabeca.rotation.x = 0.22 + Math.sin(t * 11) * 0.1;
+        m.bracos[1].rotation.set(-0.65, 0, 2.35);
       } else if (anim === "bravo") {
         m.raiz.position.y = Math.abs(Math.sin(t * 12)) * 0.03;
         m.bracos[0].rotation.z = -0.15;
@@ -844,7 +864,10 @@ window.Pet3D = (() => {
       m.cabecaP.position.set(0, 0.1 - 0.05 * (1 - k), 0.05 + 0.27 * k);
       m.cabecaP.scale.setScalar(Math.max(0.001, k));
       m.rabo.scale.setScalar(Math.max(0.001, k));
-      m.patas.forEach((p) => p.scale.setScalar(Math.max(0.001, k)));
+      m.patas.forEach((p) => {
+        p.scale.setScalar(Math.max(0.001, k));
+        p.rotation.set(0, 0, 0);
+      });
       m.cabeca.rotation.set(0, 0, 0);
       m.boca.rotation.z = anim === "bravo" ? 0 : Math.PI;
       m.boca.position.y = anim === "bravo" ? -0.1 : -0.07;
@@ -853,11 +876,10 @@ window.Pet3D = (() => {
         m.cabeca.rotation.y = Math.sin(f * 0.5) * 0.1;
         m.raiz.rotation.z = passo * 0.04;
       } else {
-        m.patas.forEach((p) => (p.rotation.x = 0));
         if (anim === "feliz") m.raiz.position.y = Math.abs(Math.sin(t * 7)) * 0.06;
         if (anim === "comendo") m.cabeca.rotation.x = Math.max(0, Math.sin(t * 11)) * 0.4;
         if (anim === "acenando") m.patas[0].rotation.z = -1 - Math.sin(t * 12) * 0.3;
-        if (anim === "tonto") m.raiz.rotation.y = s.relogio * 4; // casco rodando
+        if (anim === "tonto") extraYaw.v = t * TAU * 2 / 3; // casco rodando sobre a direção base
       }
     } else if (m.tipo === "hornet") {
       animarHornet(m, s, dt, anda, t, extraYaw);
@@ -878,8 +900,8 @@ window.Pet3D = (() => {
   }
 
   function desenhar(s) {
-    if (!MONTAR[s.desenho] || !iniciar()) return null;
-    trocarModelo(s.desenho);
+    if (!Object.hasOwn(MONTAR, s.desenho) || !iniciar() || renderer.getContext().isContextLost()) return null;
+    trocarModelo(s.desenho, s.olhando);
     const dt = Math.min(0.1, Math.max(0, s.relogio - estado.ultRelogio));
     estado.ultRelogio = s.relogio;
 
@@ -889,10 +911,10 @@ window.Pet3D = (() => {
       const vx = (s.x - estado.ultX) / dt;
       const vy = (s.y - estado.ultY) / dt;
       estado.vel = Math.hypot(vx, vy);
-      const movendo = ANDANDO[s.estado] && estado.vel > 15;
+      const movendo = MARCHA[s.anim] && estado.vel > 15;
       // puxando algo (mouse, bilhete), ele anda de costas: olha para o lado contrário do movimento
-      if (movendo) estado.alvoYaw = Math.atan2(vx, vy / ELEVACAO) + (s.deCostas ? Math.PI : 0);
-      else if (!ANDANDO[s.estado] && s.anim !== "caindo") estado.alvoYaw = s.olhando > 0 ? 0.75 : -0.75;
+      if (movendo) estado.alvoYaw = Math.atan2(vx, vy / SEN_ELEVACAO) + (s.deCostas ? Math.PI : 0);
+      else if (!MARCHA[s.anim] && s.anim !== "caindo") estado.alvoYaw = s.olhando > 0 ? 0.75 : -0.75;
     }
     estado.ultX = s.x;
     estado.ultY = s.y;
@@ -903,33 +925,17 @@ window.Pet3D = (() => {
 
     // tamanho: a altura do modelo vira a altura do pet em px
     const pxPorUnidade = s.alturaPx / modelo.altura;
-    const larg = Math.ceil(VISTA * pxPorUnidade);
-    const alt = larg;
-    const dpr = s.dpr || 1;
-    if (renderer.domElement.width !== Math.round(larg * dpr) || renderer.domElement.height !== Math.round(alt * dpr)) {
-      renderer.setPixelRatio(dpr);
-      renderer.setSize(larg, alt, false);
-    }
-    // câmera ortográfica olhando de cima na diagonal; os pés (origem) ficam a 18% do fundo
-    const meia = VISTA / 2;
-    camera.left = -meia;
-    camera.right = meia;
-    camera.top = meia;
-    camera.bottom = -meia;
-    const dir = new T.Vector3(0, Math.sin(ELEVACAO), Math.cos(ELEVACAO));
-    const alvo = new T.Vector3(0, 0, 0);
-    camera.position.copy(dir.clone().multiplyScalar(10));
-    camera.up.set(0, 1, 0);
-    camera.lookAt(alvo);
-    camera.updateMatrixWorld();
-    // desloca a vista para cima, para os pés ficarem perto do fundo da imagem
-    const sobe = meia * 0.64;
-    camera.top = meia + sobe;
-    camera.bottom = -meia + sobe;
+    const vista = s.desenho === "hornet" ? VISTA_HORNET : VISTA;
+    const larg = Math.ceil(vista.largura * pxPorUnidade);
+    const alt = Math.ceil(vista.altura * pxPorUnidade);
+    ajustarRenderizador(renderer, larg, alt, s.dpr || 1);
+    camera.right = larg / pxPorUnidade / 2;
+    camera.left = -camera.right;
+    camera.bottom = -vista.abaixo;
+    camera.top = camera.bottom + alt / pxPorUnidade;
     camera.updateProjectionMatrix();
     renderer.render(cena, camera);
-    // a origem (pés) cai em y = 82% da imagem, no meio da largura
-    const x0 = s.x - larg / 2, y0 = s.y - alt * 0.82;
+    const x0 = s.x - larg / 2, y0 = s.y - alt + vista.abaixo * pxPorUnidade;
     // onde fica a "boca" na tela (bico do Pato, boca da Tartaruga, mão do Palito): é com ela que ele
     // morde/segura o mouse e os bilhetes. Muda com o ângulo, então é calculada a cada quadro.
     const p = pontoDaBoca(modelo);
@@ -1017,6 +1023,7 @@ window.Pet3D = (() => {
         return null;
       }
     }
+    if (rObj.getContext().isContextLost()) return null;
     let m = objetos[s.tipo];
     if (!m) {
       m = objetos[s.tipo] = OBJETOS[s.tipo]();
@@ -1028,14 +1035,11 @@ window.Pet3D = (() => {
     m.corpo.position.y = s.vivo ? Math.sin(s.t * 6) * 0.02 : 0;
     const bate = s.vivo ? Math.sin(s.t * 70) * 0.6 : 0;
     m.asas.forEach((a, i) => (a.rotation.z = (i ? -1 : 1) * bate));
-    const px = Math.max(8, Math.round(s.tamPx)), dpr = s.dpr || 1;
-    if (rObj.domElement.width !== Math.round(px * dpr)) {
-      rObj.setPixelRatio(dpr);
-      rObj.setSize(px, px, false);
-    }
+    const px = Math.max(8, Math.round(s.tamPx));
+    ajustarRenderizador(rObj, px, px, s.dpr || 1);
     rObj.render(cenaObj, camObj);
     return { canvas: rObj.domElement, x: s.x - px / 2, y: s.y - px / 2, w: px, h: px };
   }
 
-  return { tem: (d) => !!MONTAR[d], desenhar, desenharObjeto };
+  return { tem: (d) => Object.hasOwn(MONTAR, d), desenhar, desenharObjeto };
 })();

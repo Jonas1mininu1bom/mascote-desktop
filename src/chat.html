@@ -31,32 +31,11 @@
     cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 6px; align-items: center; }
   #pasta .ic { width: 14px; height: 14px; flex: none; }
   #pasta span { overflow: hidden; text-overflow: ellipsis; }
-  #listaTravessuras .ic { width: 15px; height: 15px; display: inline-block; vertical-align: -3px; margin-right: 4px; color: var(--suave); }
   .info .ic { width: 13px; height: 13px; display: inline-block; vertical-align: -2px; margin-right: 4px; }
-  input[type=checkbox] { accent-color: var(--destaque); }
-  #ajustes select { background: var(--bolha-pet); color: var(--texto); border: 1px solid var(--borda); border-radius: 6px; padding: 2px 4px; }
   #mensagens::-webkit-scrollbar { width: 8px; }
   #mensagens::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 4px; }
   #pasta:hover { color: var(--texto); }
 
-  #listaTravessuras small.aviso { display: block; font-size: 11px; color: var(--destaque-forte); margin-top: 1px; }
-  #listaTravessuras label.bloqueada { opacity: 0.55; cursor: not-allowed; }
-  #listaTravessuras .selo { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; font-size: 11px; color: var(--destaque-forte); }
-  #listaTravessuras .selo .ic { width: 12px; height: 12px; margin: 0; color: inherit; }
-  #acessibilidade, #avisoWayland { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 8px; }
-  #acessibilidade b .ic, #acessibilidade button .ic { width: 15px; height: 15px; display: inline-block; vertical-align: -3px; margin-right: 4px; }
-  #acessibilidade small, #avisoWayland small { margin: 4px 0 6px; }
-  #acessibilidade.ativo b { color: var(--destaque-forte); }
-  #admin { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 8px; }
-  #admin b .ic, #admin button .ic { width: 15px; height: 15px; display: inline-block; vertical-align: -3px; margin-right: 4px; }
-  #admin small { margin: 4px 0 6px; }
-  #admin details.explica { margin: 2px 0 6px; }
-  #admin details.explica summary { cursor: pointer; font-size: 12px; color: var(--destaque-forte); }
-  header button.perigo:hover { background: #e5484d; color: #fff; }
-  #admin.ativo b { color: var(--destaque-forte); }
-  #pedirAdmin { font: inherit; background: var(--destaque); color: #fff; border: 0; border-radius: 8px; padding: 5px 10px; cursor: pointer; }
-  #pedirAdmin:hover { background: var(--destaque-forte); }
-  #pedirAdmin:disabled { opacity: 0.6; cursor: default; }
   #anexos { display: none; gap: 6px; padding: 6px 12px 0; flex-wrap: wrap; }
   #anexos.tem { display: flex; }
   #anexos .anexo { position: relative; }
@@ -65,38 +44,7 @@
   .msg.eu .fotos { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; }
   .msg.eu .fotos img { max-width: 120px; max-height: 120px; border-radius: 8px; display: block; }
   body.soltando #mensagens { outline: 2px dashed var(--destaque); outline-offset: -6px; }
-  #mais { margin-top: 10px; }
-  #mais > summary { cursor: pointer; font-weight: 600; color: var(--destaque-forte); padding: 4px 0; }
-  /* Só o mascote: o painel é só de ajustes (sem conversa, pasta, campo de texto nem IA) */
-  body.so-mascote #pasta, body.so-mascote #mensagens, body.so-mascote #anexos, body.so-mascote form,
-  body.so-mascote #nova, body.so-mascote #btnAjustes, body.so-mascote #ia { display: none !important; }
-  [hidden] { display: none !important; }
-  /* As configurações rolam por dentro: antes elas eram mais altas que o painel e empurravam o
-     topo (título, botões) para fora da janela. Cabeçalho, pasta e campo de texto nunca encolhem. */
-  #ajustes { display: none; padding: 10px 14px; border-bottom: 1px solid var(--borda); font-size: 13px;
-    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-  #ajustes::-webkit-scrollbar { width: 8px; }
-  #ajustes::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 4px; }
   header, #pasta, form, #anexos { flex: none; }
-  /* Com as configurações abertas, elas usam o espaço das mensagens (que voltam ao fechar). */
-  #ajustes.visivel + #mensagens { display: none; }
-  #ajustes.visivel { display: block; }
-  #ajustes label { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; cursor: pointer; }
-  #ajustes small { color: var(--suave); display: block; }
-  #ajustes small.dica { margin: 2px 0 6px; font-size: 11.5px; }
-  #ajustes select, #ajustes .acoes button { font: inherit; margin-top: 4px; }
-  #ajustes .acoes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-  #ajustes .acoes button { background: var(--bolha-pet); color: var(--texto); border: 1px solid var(--borda); border-radius: 8px; padding: 4px 8px; cursor: pointer; }
-  #ia { margin: 10px 0; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 8px; }
-  #ia label.campo { display: block; margin: 6px 0 0; cursor: default; }
-  #ia .linha { display: flex; gap: 6px; }
-  #ia input[type=text], #ia input[type=password] { font: inherit; width: 100%; min-width: 0; margin-top: 3px; color: var(--texto); background: var(--bolha-pet);
-    border: 1px solid var(--borda); border-radius: 6px; padding: 3px 6px; outline: none; }
-  #ia input:focus { border-color: var(--destaque); }
-  #ia .linha button { font: inherit; margin-top: 3px; background: var(--bolha-pet); color: var(--texto); border: 1px solid var(--borda); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
-  #ia #iaSalvar { background: var(--destaque); color: #fff; border-color: transparent; }
-  #ia #iaAviso.falhou { color: #b42318; }
-  #ia [hidden] { display: none !important; }
 
   #mensagens { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
   .msg { max-width: 85%; padding: 8px 11px; border-radius: 14px; white-space: pre-wrap; word-wrap: break-word; line-height: 1.35; }
@@ -129,73 +77,6 @@
     <button id="fechar" title="Fechar o painel (Esc)"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="m6 9 6 6 6-6" /></svg></button>
   </header>
   <div id="pasta" title="Pasta em que o pet trabalha (clique para trocar)"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" /></svg><span id="pastaNome">…</span></div>
-  <div id="ajustes">
-    <label style="display:block">Pet: <select id="pets"></select></label>
-    <label><input type="checkbox" id="passear"><span>Deixar passear pela tela<small>Por padrão ele fica quietinho no canto da tela.</small></span></label>
-    <label><input type="checkbox" id="bagunca"><span>Modo bagunça<small>Pega o seu mouse e traz bilhetes para a tela.</small></span></label>
-    <label id="linhaIniciar" hidden><input type="checkbox" id="iniciarComSistema"><span><span id="iniciarTexto">Iniciar com o sistema</span><small>Abre sozinho quando você liga o computador.</small></span></label>
-    <small class="dica">O menu do mascote desce quando você encosta o mouse no alto da tela, no meio. Botão direito no pet: comida, bola e carinho.</small>
-    <div id="ia"><b>IA do chat</b><small>Quem responde e trabalha por trás do pet.</small>
-      <label style="display:block"><select id="iaProvedor"></select></label>
-      <small id="iaDica" class="dica"></small>
-      <div id="iaCampos">
-        <label class="campo">Modelo <span class="linha"><input id="iaModelo" type="text" list="iaListaModelos" spellcheck="false" autocomplete="off"><button type="button" id="iaVerModelos" title="Buscar os modelos disponíveis">Ver</button></span></label>
-        <datalist id="iaListaModelos"></datalist>
-        <label class="campo" id="iaLinhaEndereco">Endereço da API <input id="iaEndereco" type="text" spellcheck="false" autocomplete="off"></label>
-        <label class="campo" id="iaLinhaChave">Chave de API <span class="linha"><input id="iaChave" type="password" spellcheck="false" autocomplete="off"><button type="button" id="iaApagarChave" title="Apagar a chave salva">Apagar</button></span></label>
-        <div class="acoes"><button type="button" id="iaSalvar">Salvar</button><button type="button" id="iaPegarChave">Onde pego a chave?</button></div>
-      </div>
-      <small id="iaAviso" class="dica"></small>
-    </div>
-    <details id="mais"><summary>Mais opções</summary>
-      <label style="display:block">Telas: <select id="telas"></select></label>
-      <label style="display:block">Chão: <select id="chao">
-        <option value="tela">Anda pela tela inteira</option>
-        <option value="barra" id="opcaoBarra">Só em cima da barra de tarefas</option>
-      </select></label>
-      <label style="display:block">Menu de atalhos: <select id="barraLado" title="Borda da tela em que o menu aparece quando o mouse encosta no meio dela">
-        <option value="cima">Em cima</option>
-        <option value="baixo">Embaixo</option>
-        <option value="esquerda">Na esquerda</option>
-        <option value="direita">Na direita</option>
-      </select></label>
-      <label style="display:block">Bagunça: <select id="frequencia">
-        <option value="1">A cada 1 minuto (agitado)</option>
-        <option value="3">A cada 3 minutos</option>
-        <option value="5">A cada 5 minutos</option>
-        <option value="10">A cada 10 minutos (calmo)</option>
-      </select></label>
-      <div id="travessuras"><b>Travessuras</b><small>De vez em quando, só no modo bagunça.</small><div id="listaTravessuras"></div></div>
-      <div id="acessibilidade" hidden>
-        <b><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>Permissão de Acessibilidade</b>
-        <small id="acessibilidadeTexto"></small>
-        <button id="pedirAcessibilidade" type="button"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>Abrir os Ajustes do Mac</button>
-      </div>
-      <div id="avisoWayland" hidden>
-        <b>Sessão Wayland</b>
-        <small>O Wayland não deixa nenhum app apertar teclas, mover o mouse ou saber onde ele está fora das
-        próprias janelas. Por isso, aqui as travessuras de teclado e o "pegar o mouse" ficam de fora, e o pet
-        pode não perceber o mouse em cima dele. Para ter tudo, entre na sessão "X11" ou "Xorg" na tela de login.</small>
-      </div>
-      <div id="admin" hidden>
-        <b><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>Permissão de administrador</b>
-        <small id="adminTexto"></small>
-        <details class="explica"><summary>O que é uma janela de administrador?</summary>
-          <small>É um programa aberto com "Executar como administrador", que tem mais poder sobre o Windows.
-          Exemplos: o Gerenciador de Tarefas, um terminal de administrador, instaladores e alguns jogos.
-          Por segurança, o Windows não deixa um programa comum (como o mascote) apertar teclas nessas janelas.
-          Então, quando uma delas está na frente, o pet simplesmente pula a travessura. Se você der a permissão
-          abaixo e ligar "Também em janelas de administrador" nas travessuras, ele passa a mexer nelas também.
-          Nada mais no mascote precisa disso.</small></details>
-        <button id="pedirAdmin" type="button"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>Pedir permissão ao Windows</button>
-      </div>
-      <div class="acoes">
-        <button id="abrirPets">Pasta de pets</button>
-        <button id="abrirBilhetes">Pasta de bilhetes</button>
-        <button id="abrirTravessuras">Pasta de travessuras</button>
-      </div>
-    </details>
-  </div>
   <div id="mensagens"></div>
   <div id="anexos"></div>
   <form id="form">
@@ -207,12 +88,6 @@
 <template id="icones">
   <span data-icone="enviar"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z" /><path d="M6 12h16" /></svg></span>
   <span data-icone="parar"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><rect width="18" height="18" x="3" y="3" rx="2" /></svg></span>
-  <span data-icone="globo"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" /></svg></span>
-  <span data-icone="teclado"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M10 8h.01" /><path d="M12 12h.01" /><path d="M14 8h.01" /><path d="M16 12h.01" /><path d="M18 8h.01" /><path d="M6 8h.01" /><path d="M7 16h10" /><path d="M8 12h.01" /><rect width="20" height="16" x="2" y="4" rx="2" /></svg></span>
-  <span data-icone="mouse"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z" /></svg></span>
-  <span data-icone="cadeado"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></span>
-  <span data-icone="escudo"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg></span>
-  <span data-icone="pegadas"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z" /><path d="M20 20v-2.38c0-2.12 1.030-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z" /><path d="M16 17h4" /><path d="M4 13h4" /></svg></span>
   <span data-icone="ferramenta"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></svg></span>
 </template>
 <script src="chat.js"></script>

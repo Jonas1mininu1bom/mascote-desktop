@@ -1,5 +1,5 @@
-// "Vida" do pet: cair de paraquedas, ficar tonto/bravo quando chacoalhado e o menuzinho
-// (botão direito) para dar comida e brincar. Usa o estado e as funções do overlay.js.
+// "Vida" do pet: cair de paraquedas, ficar tonto/bravo quando chacoalhado, comer e brincar.
+// Usa o estado e as funções do overlay.js.
 window.Vida = (() => {
   const GRAVIDADE = 1500; // px/s²
   const VEL_PARAQUEDAS = 85; // px/s descendo com o paraquedas aberto
@@ -11,7 +11,6 @@ window.Vida = (() => {
   let fome = 30;
   let ultimaQueixa = 0;
   const chacoalho = { amostras: [], ultimo: null, viradas: [], tonto: false };
-  let menu = null; // { x, y, itens, ate }
   let comida = null; // { x, y, vy, chao, mordidas, emoji }
   let bola = null; // { x, y, vx, vy, chao, giro }
 
@@ -32,7 +31,6 @@ window.Vida = (() => {
       o.y += dy;
       if (typeof o.chao === "number") o.chao += dy;
     }
-    fecharMenu();
   }
 
   // ---------- queda ----------
@@ -81,7 +79,6 @@ window.Vida = (() => {
   // ---------- chacoalhar ----------
   function pegou() {
     Object.assign(chacoalho, { ultimo: { ...cursor }, viradas: [], sinal: { x: 0, y: 0 }, tonto: false });
-    fecharMenu();
   }
   // Conta "viradas" bruscas de direção enquanto ele está no ar: 5 em ~1,5 s = chacoalhão.
   function segurando(dt) {
@@ -104,7 +101,7 @@ window.Vida = (() => {
       chacoalho.tonto = true;
       falar(escolha(["Aaaaah!", "Para, para, paraaa!", "Tô ficando tonto!"]), 1.5);
     }
-    if (chacoalho.tonto) P.anim = "tonto";
+    if (chacoalho.tonto) animarPet("tonto");
   }
   // Devolve true se cuidou de tudo (queda/tontura); false deixa o overlay seguir como antes.
   function soltou(moveu) {
@@ -149,70 +146,22 @@ window.Vida = (() => {
     return true;
   }
 
-  // ---------- menu ----------
-  function abrirMenu() {
-    if (ESTADOS.includes(P.estado) && P.estado !== "bravo") return;
-    const itens = [
-      { id: "comida", rotulo: window.Hornet?.ativo() ? "Desafiar" : "Dar comida" },
-      { id: "brincar", rotulo: "Brincar" },
-      { id: "carinho", rotulo: "Carinho" },
-    ];
-    const w = 138;
-    const { min, max } = limites();
-    let x = P.x + larguraPx() / 2 + 8;
-    if (x + w > max - 4) x = P.x - larguraPx() / 2 - 8 - w;
-    montarMenu(itens, Math.max(min + 4, x), P.y - alturaPx() - 6);
+  // ---------- ações do pop-up ----------
+  function abrirMenu(ponto) {
+    if (segurado || (ESTADOS.includes(P.estado) && P.estado !== "bravo")) return;
+    window.api.enviar("barra:abrirPet", ponto);
     if (ocioso()) mudar("parado", 8);
   }
-  // Menu de "Brinquedos" do pop-up do topo: aparece logo acima do ponto (a cabeça do pet).
-  function abrirMenuBrinquedos(ponto) {
-    if (P.estado === "caindo" || P.estado === "tonto") return;
-    const itens = [
-      { id: "comida", rotulo: window.Hornet?.ativo() ? "Desafiar" : "Comida" },
-      { id: "brincar", rotulo: "Bola de futebol" },
-    ];
-    const w = 150;
-    montarMenu(itens, ponto.x - w / 2, ponto.y - 17 - 8 - (itens.length * 28 + 10), w);
-    // o mouse está lá no topo da tela: o menu espera ele chegar perto (e dura mais) antes de
-    // valer a regra de fechar quando o mouse se afasta
-    Object.assign(menu, { esperaChegar: true, ate: relogio + 12 });
-  }
-  function montarMenu(itens, x, y, w = 138) {
-    const h = itens.length * 28 + 10;
-    // dentro do monitor que a janela mostra (senão o menu abre num pedaço invisível)
-    const j = tela.janela || { x: 0, y: 0, w: tela.largura, h: tela.altura };
-    x = Math.max(j.x + 4, Math.min(j.x + j.w - w - 4, x));
-    y = Math.max(j.y + 4, Math.min(j.y + j.h - h - 4, y));
-    menu = { x, y, w, h, itens, ate: relogio + 8 };
-  }
-  // escolhido no menu de atalhos da borda da tela (sem passar pelo menuzinho do pet)
-  function usarBrinquedo(id) {
+
+  function interagir(id) {
     if (segurado || P.estado === "caindo" || P.estado === "tonto") return;
-    fecharMenu();
     if (id === "comida") darComida();
     else if (id === "bola") brincar();
-  }
-  function fecharMenu() {
-    menu = null;
-  }
-  function itemSob(p) {
-    if (!menu || p.x < menu.x || p.x > menu.x + menu.w) return null;
-    const i = Math.floor((p.y - menu.y - 5) / 28);
-    return i >= 0 && i < menu.itens.length ? menu.itens[i] : null;
-  }
-  const sobreMenu = (p) => Boolean(menu) && p.x >= menu.x && p.x <= menu.x + menu.w && p.y >= menu.y && p.y <= menu.y + menu.h;
-  function cliqueNoMenu(p) {
-    if (!sobreMenu(p)) return false;
-    const item = itemSob(p);
-    fecharMenu();
-    if (item?.id === "comida") darComida();
-    else if (item?.id === "brincar") brincar();
-    else if (item?.id === "carinho" && !carinhoRecusado()) {
+    else if (id === "carinho" && !carinhoRecusado()) {
       coracao(6);
       falar(escolha(pet.falas.length ? pet.falas : ["Hehe ❤"]), 2);
       mudar("feliz", 1.4);
     }
-    return true;
   }
 
   // ---------- comida ----------
@@ -222,7 +171,8 @@ window.Vida = (() => {
     const x = limitarX(P.x + lado * (larguraPx() / 2 + 34));
     comida = { x, y: P.y - alturaPx() - 80, vy: 0, chao: noChao() ? chaoDe(x) : P.y, mordidas: 0, emoji: COMIDAS[pet.id] || "🍎" };
     falar(escolha(["Oba, comida!", "Hmmm! 😋", "É pra mim?"]), 1.8);
-    mudar("comendo", 12, { fase: "esperando" });
+    mudar("comendo", 12);
+    animarPet("andando");
   }
   function atualizarComida(dt) {
     if (!comida) return mudar("parado", 1);
@@ -233,12 +183,12 @@ window.Vida = (() => {
     const perto = Math.abs(comida.x - P.x) < larguraPx() / 2 + 10;
     if (!perto) {
       andarAte({ x: comida.x - Math.sign(comida.x - P.x) * (larguraPx() / 2 + 6), y: P.y }, dt, 1.4);
-      P.anim = "andando";
+      animarPet("andando");
       return;
     }
-    if (comida.y < comida.chao) return; // espera cair
+    if (comida.y < comida.chao) return animarPet("parado"); // espera cair
     P.olhando = comida.x >= P.x ? 1 : -1;
-    P.anim = "comendo";
+    animarPet("comendo");
     if (P.tAnim > 0.55) {
       P.tAnim = 0;
       comida.mordidas++;
@@ -274,7 +224,7 @@ window.Vida = (() => {
     }
     const x = limitarX(P.x + (P.olhando || 1) * 70);
     const y = noChao() ? P.y - alturaPx() - 60 : P.y - R_BOLA; // na barra ela cai do alto; na tela, aparece nos pés dele
-    bola = { x, y, vx: 0, vy: 0, giro: 0, r: R_BOLA, chutePet: 0, jogou: relogio };
+    bola = { x, y, vx: 0, vy: 0, giro: 0, r: R_BOLA, chutePet: 0, jogou: relogio, felizAte: 0 };
     falar(escolha(["Bola! ⚽", "Vamos jogar!", "Chuta pra mim!"]), 1.8);
     mudar("brincando", 15);
   }
@@ -284,8 +234,8 @@ window.Vida = (() => {
     if (!bola) return false;
     bola.jogou = relogio;
     mudar("brincando", 15);
-    P.anim = "feliz"; // comemora um instante antes de correr atrás dela
-    P.tempoFeliz = relogio + segundos;
+    animarPet("feliz"); // comemora um instante antes de correr atrás dela
+    bola.felizAte = relogio + segundos;
     return true;
   }
   const sobreBola = (p) => Boolean(bola) && Math.hypot(p.x - bola.x, p.y - bola.y) <= bola.r + 8;
@@ -354,7 +304,7 @@ window.Vida = (() => {
   function atualizarBola(dt) {
     if (!bola) return mudar("parado", 1);
     bola.jogou = relogio;
-    if (relogio < (P.tempoFeliz || 0)) return void (P.anim = "feliz");
+    if (relogio < bola.felizAte) return animarPet("feliz");
     const naBarra = noChao();
     // o pet corre atrás e chuta de volta na direção do seu mouse
     const alcance = naBarra
@@ -369,15 +319,16 @@ window.Vida = (() => {
       bola.vx = (dx / d) * forca;
       bola.vy = naBarra ? Math.min((dy / d) * forca, -300) : (dy / d) * forca; // na barra, sempre sobe um pouco
       P.olhando = dx >= 0 ? 1 : -1;
-      P.anim = "feliz";
+      animarPet("feliz");
+      bola.felizAte = relogio + 0.35;
       if (debug) console.warn(`[debug] chute do pet para o mouse: vx=${Math.round(bola.vx)} vy=${Math.round(bola.vy)}`);
       if (Math.random() < 0.3) falar(escolha(["Toma! ⚽", "Pra você!", "Gol!"]), 1.2);
     } else if (!alcance) {
       // na barra ele corre pelo chão; na tela, vai até onde a bola estiver (com os pés na altura dela)
       const alvo = naBarra ? { x: limitarX(bola.x), y: chaoDe(bola.x) } : { x: limitarX(bola.x), y: limitarY(bola.y + bola.r, bola.x) };
       andarAte(alvo, dt, 2.4);
-      P.anim = "correndo";
-    }
+      animarPet("correndo");
+    } else animarPet("parado");
     if (P.tempo <= 0) {
       bola = null;
       falar(escolha(["Cansei, foi divertido!", "Ufa! Valeu! ❤", "De novo depois?"]), 2.2);
@@ -388,11 +339,6 @@ window.Vida = (() => {
 
   // ---------- laço ----------
   function atualizar(dt) {
-    if (menu) {
-      const longe = Math.hypot(cursor.x - menu.x - menu.w / 2, cursor.y - menu.y - menu.h / 2) > 320;
-      if (!longe) menu.esperaChegar = false;
-      if (relogio > menu.ate || (longe && !menu.esperaChegar)) fecharMenu();
-    }
     fome = Math.min(100, fome + dt / 20); // ~1 ponto a cada 20 s
     if (fome > 70 && ocioso() && relogio - ultimaQueixa > 90 && !window.Hornet?.ativo()) {
       ultimaQueixa = relogio;
@@ -502,36 +448,6 @@ window.Vida = (() => {
     ctx.fillText("💢", P.x + larguraPx() * 0.28, topo - 2);
     ctx.restore();
   }
-  function desenharMenu() {
-    if (!menu) return;
-    const sob = itemSob(cursor);
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.25)";
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 3;
-    ctx.fillStyle = "#faf9f5";
-    ctx.beginPath();
-    ctx.roundRect(menu.x, menu.y, menu.w, menu.h, 10);
-    ctx.fill();
-    ctx.shadowColor = "transparent";
-    ctx.strokeStyle = "#e4dfd3";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.font = "13px system-ui, sans-serif";
-    ctx.textBaseline = "middle";
-    menu.itens.forEach((it, i) => {
-      const y = menu.y + 5 + i * 28;
-      if (it === sob) {
-        ctx.fillStyle = "#d97757";
-        ctx.beginPath();
-        ctx.roundRect(menu.x + 4, y, menu.w - 8, 26, 7);
-        ctx.fill();
-      }
-      ctx.fillStyle = it === sob ? "#ffffff" : "#2b2d42";
-      ctx.fillText(it.rotulo, menu.x + 12, y + 13);
-    });
-    ctx.restore();
-  }
   function desenhar(topo) {
     if (P.estado === "caindo" && !plana()) desenharParaquedas(topo);
     if (P.estado === "tonto" || (segurado && chacoalho.tonto)) desenharEstrelas(topo);
@@ -551,11 +467,10 @@ window.Vida = (() => {
       ctx.fillText("⚽", 0, 1);
     }
     ctx.restore();
-    desenharMenu();
   }
 
   return {
     precisaCair, cair, pegou, segurando, soltou, carinhoRecusado, deslocar, voltarAoJogo,
-    abrirMenu, abrirMenuBrinquedos, usarBrinquedo, sobreMenu, cliqueNoMenu, sobreBola, cliqueNaBola, atualizar, desenhar, plana,
+    abrirMenu, interagir, sobreBola, cliqueNaBola, atualizar, desenhar, plana,
   };
 })();
