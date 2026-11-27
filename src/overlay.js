@@ -11,7 +11,7 @@ const P = {
   olhando: -1, // 1 = direita, -1 = esquerda
   estado: "parado", tempo: 2, alvo: null, anim: "parado", tAnim: 0,
   ancora: null, // onde ele fica quando não pode passear
-  fala: null, // { texto, ate }
+  mouse: null, // estado do duelo da Hornet
   humor: null,
   bilhete: null, // { id, largura, altura }
 };
@@ -125,6 +125,7 @@ const RESERVA = {
   correndo: ["andando"], segurando: ["correndo", "andando"], arrastando: ["andando"],
   carregado: ["feliz", "parado"], acenando: ["feliz", "parado"], pensando: ["parado"],
   dormindo: ["parado"], feliz: ["parado"], trabalhando: ["correndo", "andando"],
+  pegandoBilhete: ["parado"],
   travessura: ["acenando", "feliz", "parado"],
   caindo: ["carregado", "acenando", "parado"], tonto: ["parado"], bravo: ["parado"],
   comendo: ["feliz", "parado"], brincando: ["correndo", "andando"], dancando: ["feliz", "parado"],
@@ -167,6 +168,10 @@ function mudar(estado, tempo, extra = {}) {
     P.bilheteNaCabeca = false;
   }
   if (estado !== "buscar") P.buscandoBilhete = false;
+  if (estado !== "combate" && P.estado === "combate") {
+    P.mouse = null;
+    P.acao = null;
+  }
   // voando com o bilhete: decola para buscar, pega (parado no ar), volta puxando e pousa
   const noVoo = ["buscar", "arrastando", "pousando"].includes(estado);
   if (!noVoo) P.voando = false;
@@ -174,10 +179,6 @@ function mudar(estado, tempo, extra = {}) {
   P.tempo = tempo;
   Object.assign(P, extra);
   animarPet({ andar: "andando", perseguir: "correndo", seguir: "andando", buscar: "andando", voltar: "andando" }[estado] || estado);
-}
-
-function falar(texto, segundos = 3.5) {
-  P.fala = { texto, ate: relogio + segundos };
 }
 
 // ---------- onde ele pode andar ----------
@@ -211,6 +212,8 @@ function prenderNaTela(p, folgaX = 0, folgaBaixo = 0, margemCima = 0) {
   return { x: Math.max(c.x0, Math.min(c.x1, p.x)), y: Math.max(c.y0, Math.min(c.y1, p.y)) };
 }
 const dentro = (p, a) => p.x >= a.x && p.x <= a.x + a.w && p.y >= a.y && p.y <= a.y + a.h + 8;
+const petVisivelEm = (a) => P.x + larguraPx() / 2 > a.x && P.x - larguraPx() / 2 < a.x + a.w &&
+  P.y > a.y && P.y - alturaPx() < a.y + a.h;
 
 function limitarX(x) {
   const m = larguraPx() / 2;
@@ -260,7 +263,6 @@ function proximoEstado() {
       return mudar("andar", 6, { alvo: { x, y: noChao() ? limitarY(a.y, x) : a.y } });
     }
     if (r < 0.96) return mudar("dormindo", rand(6, 12));
-    falar(escolha(pet.falas.length ? pet.falas : ["🙂"]));
     return mudar("parado", 3.5);
   }
 
@@ -292,7 +294,6 @@ function proximoEstado() {
   if (r < 0.45) return mudar("parado", rand(2, 5));
   if (r < 0.85) return mudar("andar", 12, { alvo: pontoAleatorio() });
   if (r < 0.92) return mudar("dormindo", rand(6, 12));
-  falar(escolha(pet.falas.length ? pet.falas : ["🙂"]));
   return mudar("parado", 3.5);
 }
 
@@ -306,7 +307,6 @@ async function pedirTravessura() {
   if (!t || travessura || segurado || ["perseguir", "seguir", "segurando", "buscar", "arrastando"].includes(P.estado)) return;
   travessura = { ...t, tocadas: 0, apertadaAte: 0 };
   comecouAtividade();
-  falar(escolha(t.tipo === "abrir" ? ["Olha isso! 😈", "Pesquisei pra você 🌐"] : ["Hehe 😈", "Ops...", "Segura essa!"]), 2.5);
   mudar("travessura", 15);
   // um tempinho para a pessoa ver as teclas antes de ele apertar
   setTimeout(() => travessura && window.api.enviar("travessura:executar", travessura.token), 1300);
@@ -321,7 +321,6 @@ window.api.ouvir("travessura:fim", () => {
   if (!travessura) return;
   travessura = null;
   if (P.estado === "travessura") {
-    falar(escolha(["Hihi 🙃", "Não fui eu!", "Foi sem querer 😇"]), 2);
     mudar("feliz", 1.5);
   }
 });
@@ -373,7 +372,7 @@ function desenharTeclas(topo) {
     ctx.fillText(rotulo, pos[i] + larg[i] / 2, y0 + d + 12);
     ctx.textAlign = "start";
   });
-  // contador em cima da tecla que está sendo tocada (fica longe do balão de fala)
+  // Contador em cima da tecla que está sendo tocada.
   if (travessura.tipo === "teclas" && travessura.vezes > 1) {
     const u = r.length - 1;
     ctx.font = "bold 12px system-ui, sans-serif";
@@ -428,10 +427,16 @@ function ponto(campo, padrao) {
 }
 // Com o modelo 3D, o ponto que segura as coisas é a "boca" que ele informa a cada quadro
 // (bico do Pato, boca da Tartaruga, mão do Palito): ela muda de lugar quando ele gira.
-let boca3d = null;
+let boca3d = null, maoBilhete3d = null;
 const boca = () => (boca3d && relogio - boca3d.em < 0.3 ? { x: boca3d.x, y: boca3d.y } : null);
 const mao = () => boca() || ponto("mao", [tamGrade.w - 1, Math.floor(tamGrade.h * 0.6)]);
 function maoTras() {
+  if (pet.desenho === "hornet") {
+    if (maoBilhete3d && relogio - maoBilhete3d.em < 0.15) {
+      return { x: P.x + maoBilhete3d.dx, y: P.y + maoBilhete3d.dy };
+    }
+    return ponto("maoTras", [1, Math.floor(tamGrade.h * 0.72)]);
+  }
   const m = boca();
   if (m) return { x: P.x + (m.x - boca3d.peX), y: P.y + (m.y - boca3d.peY) };
   return ponto("maoTras", [2, Math.floor(tamGrade.h * 0.6)]);
@@ -439,17 +444,21 @@ function maoTras() {
 
 const areaBilhete = () => areas().find((a) => a.id === P.telaBilheteId) || areaDe(P.x);
 const tetoBilhete = (a, altura) => Math.max(a.y, a.y + a.h - altura - 10);
+const PREPARO_BILHETE_HORNET = 0.28;
+const puxandoBilheteHornet = () => pet.desenho === "hornet" && P.estado === "arrastando";
+const preparandoBilheteHornet = () => puxandoBilheteHornet() && P.tAnim < PREPARO_BILHETE_HORNET;
 
 function puxarBilhete(b) {
   const a = areaBilhete();
   const lado = P.lado;
-  const naCabeca = !P.voando && maoTras().y - 24 > tetoBilhete(a, b.altura);
+  const naCabeca = pet.desenho !== "hornet" && !P.voando && maoTras().y - 24 > tetoBilhete(a, b.altura);
   const metadePet = Math.min(larguraPx(), a.w) / 2;
   const espacoPapel = naCabeca ? b.largura / 2 : b.largura + metadePet;
   // O pet anda para dentro pelo menos o suficiente para trazer a outra ponta do papel.
   const dist = Math.min(a.w - metadePet, Math.max(rand(a.w * 0.12, a.w * 0.3), espacoPapel));
   const x = lado < 0 ? a.x + dist : a.x + a.w - dist;
   const tempo = Math.max(20, Math.abs(P.x - x) / (velocidade() * 0.7) + 2);
+  maoBilhete3d = null;
   mudar("arrastando", tempo, { alvo: { x, y: P.y }, bilhete: b, bilheteNaCabeca: naCabeca });
 }
 
@@ -463,7 +472,8 @@ function moverBilhete() {
     y = P.y - alturaPx() - b.altura + 12 + Math.sin(relogio * 9) * 3;
   } else {
     const m = maoTras();
-    x = P.lado < 0 ? m.x - b.largura + 8 : m.x - 8;
+    const pegada = pet.desenho === "hornet" ? 3 : 8;
+    x = P.lado < 0 ? m.x - b.largura + pegada : m.x - pegada;
     y = m.y - 24;
   }
   window.api.enviar("bilhete:mover", { id: b.id, x, y: Math.max(a.y, Math.min(y, tetoBilhete(a, b.altura))) });
@@ -486,7 +496,7 @@ function faltaPuxarBilhete(x) {
 let foraHa = 0;
 function resgatar(dt) {
   const quebrado = !Number.isFinite(P.x) || !Number.isFinite(P.y);
-  const visivel = !quebrado && tela.areas.some((a) => P.x > a.x - larguraPx() / 2 && P.x < a.x + a.w + larguraPx() / 2 && P.y > a.y && P.y < a.y + a.h + alturaPx());
+  const visivel = !quebrado && (P.estado === "combate" ? monitores() : tela.areas).some(petVisivelEm);
   foraHa = visivel ? 0 : foraHa + dt;
   if (quebrado || foraHa > 3) {
     console.warn(`[resgate] pet sumiu (estado=${P.estado}, x=${P.x}, y=${P.y}); voltando para casa`);
@@ -565,7 +575,6 @@ function atualizar(dt) {
       if (Math.hypot(cursor.x - m2.x, cursor.y - m2.y) < RAIO_PEGAR || sobreOPet(cursor)) {
         if (window.Hornet?.ativo()) return Hornet.acertouMouse(); // ela não pega: luta com o mouse
         console.info(`[mouse] peguei em ${(10 - P.tempo).toFixed(1)}s`);
-        falar(escolha(["Peguei! 😈", "É meu agora!", "Hehe"]), 2);
         // o mouse não "pula" para a mão: fica onde foi mordido, e anda junto com ela
         const offset = { x: cursor.x - m2.x, y: cursor.y - m2.y };
         return mudar("segurando", rand(2.5, 4), { alvo: pontoAleatorio(), offset, bocaRel: null, cursorEsperado: { ...cursor } });
@@ -573,7 +582,6 @@ function atualizar(dt) {
       if (P.tempo <= 0) {
         const m3 = mao();
         console.info(`[mouse] desisti: mão a ${Math.round(Math.hypot(cursor.x - m3.x, cursor.y - m3.y))}px do mouse (pet ${Math.round(P.x)},${Math.round(P.y)} mouse ${cursor.x},${cursor.y})`);
-        falar("Ufa, cansei...", 2);
         proximoEstado();
       }
       return;
@@ -650,7 +658,8 @@ function atualizar(dt) {
       return;
     }
     case "arrastando": {
-      // anda de costas para dentro da tela, puxando o bilhete
+      // O papel começa a se mover quando a mão termina de alcançar a borda.
+      if (P.bilhete && preparandoBilheteHornet()) return;
       const olhar = P.olhando;
       // na barra de tarefas o pato sai voando, batendo as asas, na altura em que o bilhete
       // pendurado no bico fica acima do chat (os outros pets levam o papel na cabeça)
@@ -660,8 +669,6 @@ function atualizar(dt) {
       const x = moverBilhete();
       if (chegou && P.tempo > 0 && P.bilhete && faltaPuxarBilhete(x)) return;
       if (chegou || P.tempo <= 0 || !P.bilhete) {
-        // com o papel em cima da cabeça, o balão de fala cobriria o texto dele
-        if (P.bilhete && !P.bilheteNaCabeca) falar(escolha(["Trouxe pra você!", "Um presente 💌", "Leia isso!"]), 2.5);
         if (P.voando) return mudar("pousando", 6); // desce batendo as asas
         mudar("feliz", 1.5);
       }
@@ -737,7 +744,6 @@ window.addEventListener("mouseup", () => {
     if (window.Vida?.carinhoRecusado()) return; // bravo: nada de carinho
     // clique: carinho!
     for (let i = 0; i < 5; i++) coracoes.push({ x: P.x + rand(-15, 15), y: P.y - alturaPx(), vy: rand(30, 60), vx: rand(-15, 15), vida: 1.4 });
-    if (Math.random() < 0.4 && pet.falas.length) falar(escolha(pet.falas));
     if (P.humor === "pensando" || P.humor === "trabalhando") return mudar(P.humor, 999);
     if (window.Vida?.voltarAoJogo()) return; // estava jogando bola: continua o jogo
     return mudar("feliz", 1.4);
@@ -745,31 +751,56 @@ window.addEventListener("mouseup", () => {
   P.x = limitarX(P.x);
   P.y = limitarY(Math.max(P.y, areaDe(P.x).y + alturaPx()));
   P.ancora = { x: P.x, y: P.y };
-  falar(window.Hornet?.ativo() ? Hornet.texto("solta") : escolha(["Uhul!", "De novo!", "Que passeio!"]), 1.8); // só se irrita no chacoalhão
   if (window.Vida?.voltarAoJogo()) return;
   mudar("feliz", 1.2);
 });
 
 // ---------- desenho ----------
-function balao(texto, x, y) {
-  ctx.font = "13px system-ui, sans-serif";
-  const palavras = String(texto).split(/\s+/);
+const notificacoes = [];
+let avisoAtual = null;
+window.api.ouvir("pet:notificacao", ({ app, titulo }) => {
+  const texto = [app, titulo].filter(Boolean).join(" · ");
+  if (!texto || avisoAtual?.texto === texto || notificacoes.includes(texto)) return;
+  notificacoes.push(texto);
+  if (notificacoes.length > 4) notificacoes.shift();
+});
+
+function organizarNotificacao(texto, larguraTexto) {
   const linhas = [];
   let atual = "";
-  for (const p of palavras) {
-    const t = atual ? atual + " " + p : p;
-    if (ctx.measureText(t).width > 190 && atual) {
+  for (const palavra of texto.split(" ")) {
+    const t = atual ? atual + " " + palavra : palavra;
+    if (atual && ctx.measureText(t).width > larguraTexto) {
       linhas.push(atual);
-      atual = p;
-    } else atual = t;
+      atual = palavra;
+    } else {
+      atual = t;
+    }
+    if (ctx.measureText(atual).width > larguraTexto) {
+      const letras = Array.from(atual);
+      while (ctx.measureText(letras.join("") + "…").width > larguraTexto && letras.length) letras.pop();
+      atual = letras.join("") + "…";
+    }
   }
   linhas.push(atual);
   const w = Math.max(...linhas.map((l) => ctx.measureText(l).width)) + 20;
-  const h = linhas.length * 17 + 12;
+  return { linhas, w, h: linhas.length * 17 + 12, larguraTexto };
+}
+
+function desenharNotificacao(x, y) {
+  if (avisoAtual && relogio >= avisoAtual.ate) avisoAtual = null;
+  if (!avisoAtual && notificacoes.length) avisoAtual = { texto: notificacoes.shift(), ate: relogio + 4.5 };
+  if (!avisoAtual) return;
   const j = janela();
-  const limite = limiteBalao != null && x < limiteBalao ? limiteBalao : j.x + j.w - 4;
-  let bx = Math.max(j.x + 4, Math.min(limite - w, x - w / 2));
-  let by = Math.max(j.y + 4, y - h - 12);
+  const larguraTexto = Math.max(32, Math.min(225, j.w - 32));
+  ctx.save();
+  ctx.font = "13px system-ui, sans-serif";
+  if (avisoAtual.layout?.larguraTexto !== larguraTexto) avisoAtual.layout = organizarNotificacao(avisoAtual.texto, larguraTexto);
+  const { linhas, w, h } = avisoAtual.layout;
+  const direita = limiteBalao != null && x < limiteBalao && limiteBalao - j.x >= w + 8 ? limiteBalao : j.x + j.w - 4;
+  const bx = Math.max(j.x + 4, Math.min(direita - w, x - w / 2));
+  const by = Math.max(j.y + 4, Math.min(y - h - 12, j.y + j.h - h - 14));
+  const ponta = Math.max(bx + 12, Math.min(bx + w - 12, x));
   ctx.fillStyle = "#ffffff";
   ctx.strokeStyle = "#2b2d42";
   ctx.lineWidth = 2;
@@ -778,14 +809,16 @@ function balao(texto, x, y) {
   ctx.fill();
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(x - 6, by + h - 1);
-  ctx.lineTo(x, by + h + 9);
-  ctx.lineTo(x + 6, by + h - 1);
+  ctx.moveTo(ponta - 6, by + h - 1);
+  ctx.lineTo(ponta, by + h + 9);
+  ctx.lineTo(ponta + 6, by + h - 1);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#2b2d42";
+  ctx.textAlign = "start";
   ctx.textBaseline = "top";
   linhas.forEach((l, i) => ctx.fillText(l, bx + 10, by + 7 + i * 17));
+  ctx.restore();
 }
 
 function desenhar(dt) {
@@ -798,10 +831,12 @@ function desenhar(dt) {
   if (window.Pet3D?.tem(pet.desenho) && desenhar3D(dt)) return;
   const vetor = pet.desenho && window.Vetor?.[pet.desenho];
   if (vetor) return desenharVetor(vetor, dt);
-  const nome = animacao(P.anim);
+  const preparando = preparandoBilheteHornet();
+  const nome = animacao(preparando ? "pegandoBilhete" : P.anim);
+  const tempo = puxandoBilheteHornet() && !preparando ? P.tAnim - PREPARO_BILHETE_HORNET : P.tAnim;
   const quadros = sprites[nome];
   const fps = pet.animacoes[nome]?.fps || 4;
-  const q = quadros[Math.floor(P.tAnim * fps) % quadros.length];
+  const q = quadros[Math.floor(tempo * fps) % quadros.length];
   const img = P.olhando > 0 ? q.normal : q.espelhado;
   const andando = ["andando", "correndo"].includes(nome);
   const pulo = andando ? -Math.abs(Math.sin(P.tAnim * fps * Math.PI)) * 2 : 0;
@@ -832,9 +867,7 @@ function desenharExtras(topo, dt) {
     }
     ctx.globalAlpha = 1;
   }
-  if (P.estado === "pensando") balao(".".repeat(1 + (Math.floor(relogio * 3) % 3)), P.x, topo);
-  else if (P.estado === "trabalhando") balao("trabalhando… 🔧", P.x, topo);
-  else if (P.fala && relogio < P.fala.ate) balao(P.fala.texto, P.x, topo);
+  desenharNotificacao(P.x, topo);
 
   coracoes = coracoes.filter((c) => (c.vida -= dt) > 0);
   ctx.font = "16px system-ui, sans-serif";
@@ -857,13 +890,16 @@ function desenhar3D(dt) {
       planando: (P.estado === "caindo" && P.aberto && !!window.Vida?.plana()) || !!window.Hornet?.planando(),
       voando: !!P.voando,
       acao: window.Hornet?.acao3d() || null,
-      deCostas: P.estado === "segurando" || P.estado === "arrastando", // puxando: anda de costas
+      deCostas: P.estado === "segurando" || (P.estado === "arrastando" && pet.desenho !== "hornet"),
+      preparoBilhete: Math.min(1, P.tAnim / PREPARO_BILHETE_HORNET),
     });
     boca3d = img?.boca ? { ...img.boca, em: relogio, peX: P.x, peY: P.y } : null;
+    maoBilhete3d = img?.maoBilhete ? { dx: img.maoBilhete.x - P.x, dy: img.maoBilhete.y - P.y, em: relogio } : null;
   } catch (e) {
     console.error("[3d] falhou, voltando para o 2D:", e);
     window.Pet3D = null;
     boca3d = null;
+    maoBilhete3d = null;
     return false;
   }
   if (!img) return false;
@@ -976,7 +1012,7 @@ async function trocarPet(novo) {
   } catch (e) {
     if (troca !== ultimaTroca) return;
     console.warn(`[sprites] não consegui carregar ${novo.nome}: ${e.message}`);
-    if (pet) return falar(`Não consegui carregar ${novo.nome}.`, 3);
+    if (pet) return;
     if (petReserva && novo !== petReserva) return trocarPet(petReserva);
     return;
   }
@@ -986,14 +1022,18 @@ async function trocarPet(novo) {
   sprites = preparo.quadros;
   tamGrade = preparo.grade;
   boca3d = null;
+  maoBilhete3d = null;
   P.acao = null;
   P.dashAte = 0;
   P.tAnim = 0;
-  falar(pet.desenho === "hornet" ? "Saudações. Eu sou Hornet." : `Oi! Eu sou ${pet.nome} 👋`, 3);
   mudar("acenando", 2);
 }
 
-window.api.ouvir("cursor", (c) => (cursor = c));
+window.api.ouvir("cursor", ({ x, y, origem, dueloRetomado }) => {
+  const atual = tela?.origem;
+  cursor = origem && atual ? { x: x + origem.x - atual.x, y: y + origem.y - atual.y } : { x, y };
+  if (dueloRetomado != null) window.Hornet?.encerrarCombate(dueloRetomado);
+});
 window.api.ouvir("config", (c) => {
   config = c;
   if (!config.passear && ["andar", "perseguir", "seguir", "segurando", "buscar", "arrastando", "combate", "cacar"].includes(P.estado)) {
@@ -1009,7 +1049,7 @@ window.api.ouvir("tela", (t) => {
   const dx = (tela.origem?.x ?? t.origem?.x ?? 0) - (t.origem?.x ?? 0);
   const dy = (tela.origem?.y ?? t.origem?.y ?? 0) - (t.origem?.y ?? 0);
   if (dx || dy) {
-    for (const p of [P, P.ancora, P.alvo, P.cursorEsperado]) if (p) Object.assign(p, { x: p.x + dx, y: p.y + dy });
+    for (const p of [P, P.ancora, P.alvo, P.cursorEsperado, P.mouse, cursor]) if (p) Object.assign(p, { x: p.x + dx, y: p.y + dy });
     if (segurado?.inicio) Object.assign(segurado.inicio, { x: segurado.inicio.x + dx, y: segurado.inicio.y + dy });
     window.Vida?.deslocar?.(dx, dy);
   }
@@ -1027,7 +1067,10 @@ window.api.ouvir("tela", (t) => {
   const emCasa = P.ancora && Math.hypot(P.ancora.x - antiga.x, P.ancora.y - antiga.y) < 1;
   if (mudou && emCasa) P.ancora = { ...t.casa };
   const ocupado = segurado || ["perseguir", "segurando", "buscar", "arrastando", "pousando", "travessura", "combate", "pogo", "planar", "storm"].includes(P.estado);
-  const foraDasTelas = !t.areas.some((a) => dentro(P, a));
+  // No duelo, o corpo pode estar sobre a barra ou com os pés abaixo da tela.
+  const foraDasTelas = P.estado === "combate"
+    ? !monitores().some(petVisivelEm)
+    : !t.areas.some((a) => dentro(P, a));
   if (!segurado && foraDasTelas) chamarDeVolta(8, { ficar: false }); // a tela onde ele estava deixou de ser permitida
   else if (mudou && !ocupado && (Math.hypot(P.x - antiga.x, P.y - antiga.y) < 140 || !config.passear)) chamarDeVolta(8, { ficar: false });
   else if (!ocupado) {
@@ -1037,24 +1080,15 @@ window.api.ouvir("tela", (t) => {
 });
 window.api.ouvir("pet:trocar", trocarPet);
 window.api.ouvir("pet:interagir", (id) => window.Vida?.interagir(id));
-// o Windows não deixou mexer no cursor (janela de administrador na frente): solta e explica
-let avisouMouse = -999;
-window.api.ouvir("mouse:bloqueado", ({ janelaAdmin } = {}) => {
+// O sistema não deixou mexer no cursor (ex.: janela de administrador na frente).
+window.api.ouvir("mouse:bloqueado", ({ duelo } = {}) => {
+  if (duelo != null && duelo !== P.mouse?.id) return;
   if (!["segurando", "perseguir", "combate"].includes(P.estado)) return;
-  if (relogio - avisouMouse > 120) {
-    avisouMouse = relogio;
-    falar(
-      janelaAdmin
-        ? "Não consigo puxar o mouse nessa janela: ela é de administrador. Em ⚙️ dá para me dar permissão."
-        : "Ué, o mouse não quis vir comigo... 😕",
-      5
-    );
-  }
+  P.acao = null;
   mudar("parado", 2);
 });
 window.api.ouvir("pet:voltar", () => {
   travessura = null;
-  falar(escolha(["Tô indo!", "Voltei!", "Já vou!"]), 2);
   chamarDeVolta(20);
 });
 window.api.ouvir("bilhete:fechado", (id) => {

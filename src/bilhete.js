@@ -1,5 +1,6 @@
 // Bilhetinho trazido pelo pet. Os dados já chegam validados pelo processo principal.
-const dados = JSON.parse(new URLSearchParams(location.search).get("dados") || "{}");
+const parametros = new URLSearchParams(location.search);
+const dados = JSON.parse(parametros.get("dados") || "{}");
 const el = document.getElementById("conteudo");
 
 // ---------- cor ----------
@@ -29,3 +30,18 @@ if (typeof dados.imagem === "string" && dados.imagem.startsWith("file:")) {
 } else mostrarTexto(typeof dados.texto === "string" ? dados.texto : "");
 
 document.getElementById("x").onclick = () => window.api.enviar("bilhete:fechar");
+
+// No Linux, janelas fora do alternador de tarefas não ganham o arrasto do gerenciador.
+if (parametros.get("arrastoManual") === "1") {
+  const topo = document.querySelector("header");
+  topo.classList.add("arrasto-manual");
+  topo.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.target.closest("button")) return;
+    topo.setPointerCapture(e.pointerId);
+    window.api.enviar("bilhete:arrastar", { fase: "inicio", x: e.screenX, y: e.screenY });
+  });
+  topo.addEventListener("pointermove", (e) => {
+    if (topo.hasPointerCapture(e.pointerId)) window.api.enviar("bilhete:arrastar", { fase: "mover", x: e.screenX, y: e.screenY });
+  });
+  topo.addEventListener("lostpointercapture", () => window.api.enviar("bilhete:arrastar", { fase: "fim" }));
+}

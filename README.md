@@ -200,10 +200,10 @@ e edite o `travessuras.json`:
 
 - **teclas:** as primeiras ficam seguradas e a última é apertada `vezes` vezes (número ou
   `[mín, máx]`, até 10). Só são aceitas teclas que não apagam, enviam ou fecham nada:
-  `alt, tab, shift, win, esquerda, cima, direita, baixo, d, m`. Funciona no Windows, no macOS e no
-  Linux com X11. No Mac, `alt` vira Command (Alt+Tab vira Cmd+Tab) e `win` vira Control, que só vale
+  `alt, tab, shift, win, esquerda, cima, direita, baixo, d, m`. Funciona no Windows e no macOS.
+  No Mac, `alt` vira Command (Alt+Tab vira Cmd+Tab) e `win` vira Control, que só vale
   com setas (Ctrl+setas troca de Space); combinações perigosas no Mac, como Cmd+D, são puladas.
-- **abrir:** sorteia um dos links (só `http://` ou `https://`).
+- **abrir:** sorteia um dos links (só `http://` ou `https://`), no Windows e no macOS.
 - **"admin": true:** a travessura aparece com cadeado e só pode ser ligada com o app rodando como
   administrador.
 
@@ -234,8 +234,9 @@ Tudo funciona nos três sistemas, com estas diferenças (que vêm dos próprios 
 | Ícone perto do relógio | Bandeja | Barra de menus | Bandeja (no GNOME, precisa da extensão AppIndicator, que o Ubuntu já traz) | Igual ao X11 |
 | Iniciar com o sistema | Sim | Sim (app instalado) | Sim | Sim |
 | Pegar o mouse | Sim | Sim | Sim | Não |
-| Travessuras de teclado | Sim | Sim, com Acessibilidade | Sim | Não |
-| Abrir o navegador | Sim | Sim | Sim | Sim |
+| Travessuras de teclado | Sim | Sim, com Acessibilidade | Não | Não |
+| Abrir o navegador por travessura | Sim | Sim | Não | Não |
+| Balões de notificações recebidas | Não | Não | Sim, via D-Bus | Sim, via D-Bus |
 | Pet percebe o mouse em qualquer lugar | Sim | Sim | Sim | Só em cima das janelas do próprio app |
 | Andar em cima da barra | Barra de tarefas | Em cima do Dock | Em cima do painel de baixo | Igual ao X11 |
 | Permissão extra | Administrador (opcional) | Acessibilidade (só para teclas) | Nenhuma | — |
@@ -252,7 +253,7 @@ outro monitor e ele vai junto. Com a opção desligada (Ajustes → Mesa e Dock)
 **Linux com Wayland** (padrão no Ubuntu e Fedora novos): o app abre sozinho pelo XWayland, porque o
 Wayland não deixa um app escolher onde a própria janela fica. Mesmo assim, o Wayland não deixa nenhum
 app comum apertar teclas, mover o mouse ou saber onde ele está fora das próprias janelas. Isso é uma
-regra de segurança do Wayland, não dá para contornar de dentro do app. Para ter tudo, escolha a
+regra de segurança do Wayland, não dá para contornar de dentro do app. Para brincar com o mouse, escolha a
 sessão **"Ubuntu em Xorg"** (ou "GNOME em Xorg", "Plasma (X11)") na engrenagem da tela de login.
 O aviso aparece nas configurações quando você está no Wayland.
 

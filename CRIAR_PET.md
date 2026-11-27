@@ -92,7 +92,7 @@ você tenha editado o `pet.json`**. Nesse caso, a sua versão é respeitada.
 | `saudacao` | A primeira mensagem do chat quando esse pet é escolhido. |
 | `mao` | `[coluna, linha]` da mão da frente, no desenho virado para a direita. É onde ele segura o mouse. |
 | `maoTras` | `[coluna, linha]` da mão de trás. É onde ele segura os bilhetes. |
-| `falas` | Frases que ele diz de vez em quando num balãozinho. |
+| `falas` | Campo opcional de formatos antigos; os balões agora exibem notificações do sistema. |
 | `bilhetes` | Textos, `{ "texto": "...", "cor": "#ffd6e0" }` ou `{ "imagem": "arquivo.png" }` (imagem dentro da pasta do pet) que ele traz no modo bagunça, junto com os bilhetes padrão e os da comunidade. |
 
 ### Animações
@@ -125,7 +125,7 @@ Foi assim que o Palito nasceu. Abra o terminal na pasta de pets e peça algo com
 > direita, com as animações parado (2 quadros, um piscando), andando (4 quadros),
 > correndo, feliz, acenando, pensando, segurando, arrastando, carregado e dormindo.
 > Use letras na paleta, `.` para transparente, e todas as linhas do mesmo tamanho.
-> Inclua `mao`, `maoTras`, 5 falas e 5 bilhetes em português.
+> Inclua `mao`, `maoTras` e 5 bilhetes em português.
 
 Depois rode `npm run validar-pet -- sapinho` e escolha o pet no app.
 

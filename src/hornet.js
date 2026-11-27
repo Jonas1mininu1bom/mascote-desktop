@@ -1,31 +1,22 @@
 // Hornet: comportamentos só dela. Em vez de pegar o mouse, ela luta com ele (o cursor ricocheteia
 // pela tela a cada golpe); em vez de comer, enfrenta um Caranid (golpe ou pogo, e desce
-// planando com a capa); chacoalhada, solta o Thread Storm. Fala sempre educadamente e tem sons.
+// planando com a capa); chacoalhada, solta o Thread Storm.
 // Usa o estado e as funções do overlay.js e do vida.js.
 window.Hornet = (() => {
-  const FALAS = {
-    combateFim: ["Perdoe-me. Foi necessário.", "Espero não tê-lo machucado.", "Um bom duelo. Obrigada.", "Com licença, já terminei."],
-    inimigo: ["Um oponente. Que assim seja.", "Fique atrás de mim, por favor.", "Permita-me cuidar disso."],
-    vitoria: ["Descanse.", "Foi breve.", "Está a salvo agora.", "Mais algum?"],
-    storm: ["Com licença!", "Afaste-se, por gentileza.", "Isso foi indelicado."],
-    solta: ["Obrigada por me pôr no chão.", "Que inconveniente.", "Por favor, com mais cuidado."],
-    pouso: ["Hm.", "Com licença.", "Obrigada."],
-    pancada: ["Isso doeu... mas estou bem.", "Nada que eu não aguente."],
-    brava: ["Irritante.", "Creio que você não entendeu.", "Não faça isso novamente."],
-    recusa: ["Não me toque, por favor.", "Respeite meu espaço.", "Ainda não."],
-  };
   const ativo = () => pet?.desenho === "hornet";
   const som = (n) => window.HornetSom?.[n]?.();
-  const texto = (tipo) => escolha(FALAS[tipo]);
-  const dizer = (tipo, seg = 2.4) => falar(texto(tipo), seg);
   const lerp = (a, b, k) => a + (b - a) * k;
   const esc = () => alturaPx() / 110; // tamanho dos efeitos e do inimigo acompanha o dela
 
   // ação de ataque em andamento (a pose do modelo 3D depende dela)
-  function acao(tipo, dur) {
-    P.acao = { tipo, inicio: relogio, fim: relogio + dur };
+  function acao(tipo, dur, ataque) {
+    P.acao = { tipo, inicio: relogio, fim: relogio + dur, ...ataque };
   }
-  const acao3d = () => (ativo() && P.acao && relogio < P.acao.fim ? { tipo: P.acao.tipo, t: relogio - P.acao.inicio } : null);
+  function acao3d() {
+    if (!ativo() || !P.acao || relogio >= P.acao.fim) return null;
+    const { tipo, inicio, mira, angulo, contato } = P.acao;
+    return { tipo, t: relogio - inicio, mira, angulo, contato };
+  }
   const planando = () => ativo() && P.estado === "planar" && P.abriu;
 
   // ---------- efeitos (cortes e faíscas) ----------
@@ -44,7 +35,6 @@ window.Hornet = (() => {
   function storm() {
     som("storm");
     som("hegale");
-    falar("Hegale!", 1.2);
     acao("storm", 1.3);
     mudar("storm", 1.3);
   }
@@ -56,86 +46,143 @@ window.Hornet = (() => {
   function atualizarStorm() {
     if (inimigo?.vivo && Math.hypot(inimigo.x - P.x, inimigo.y - (P.y - alturaPx() * 0.4)) < raioStorm()) matar();
     if (P.tempo > 0) return;
-    dizer("storm");
     P.x = limitarX(P.x);
     if (window.Vida?.precisaCair()) return Vida.cair();
     P.y = limitarY(P.y);
     mudar("bravo", 2.5);
   }
 
-  // tocou o chão depois de cair ou planar: agacha e a capa assenta (fala só de vez em quando)
-  function pousou(falaTipo = "pouso") {
+  // Tocou o chão depois de cair ou planar: agacha e a capa assenta.
+  function pousou() {
     acao("pouso", 0.45);
     som("pouso");
-    if (falaTipo !== "pouso" || Math.random() < 0.25) dizer(falaTipo, 1.8);
-    else if (Math.random() < 0.35) som("hm");
+    if (Math.random() < 0.35) som("hm");
     mudar("parado", 0.9);
   }
 
   // ---------- combate com o mouse ----------
-  // chamada quando ela alcança o cursor (no lugar de "pegar o mouse")
+  const DIRECOES = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+  let numeroDuelo = 0;
+  const dentroDoMonitor = (p, a) => Math.round(p.x) >= a.x && Math.round(p.x) < a.x + a.w &&
+    Math.round(p.y) >= a.y && Math.round(p.y) < a.y + a.h;
+  const monitorDoCursor = (p) => monitores().find((a) => dentroDoMonitor(p, a));
   function acertouMouse() {
+    if (!monitorDoCursor(cursor)) return mudar("parado", 1);
     som("shaw");
-    falar("SHAW!", 1.4);
-    P.mouse = { x: cursor.x, y: cursor.y, vx: 0, vy: 0 };
-    mudar("combate", rand(7, 10), { proxGolpe: 0 });
-    golpearMouse(true);
+    mudar("combate", rand(5, 6.5), {
+      mouse: {
+        id: `${performance.timeOrigin}:${++numeroDuelo}`, x: cursor.x, y: cursor.y,
+        vx: 0, vy: 0, arrasto: 1.8, golpes: 0, direcoes: [...DIRECOES],
+      },
+    });
+    prepararGolpeMouse();
+    P.tempo += P.acao.contato; // O primeiro preparo não consome o tempo de duelo.
   }
-  function golpearMouse(primeiro = false) {
+  function prepararGolpeMouse() {
     const M = P.mouse;
-    const dx = M.x - P.x, dy = M.y - (P.y - alturaPx() * 0.55);
-    const pogo = !primeiro && dy > alturaPx() * 0.15 && Math.random() < 0.6;
-    const ang = pogo ? Math.PI / 2 + rand(-0.5, 0.5) : Math.atan2(dy, dx) + rand(-0.7, 0.7);
-    const forca = rand(1100, 1500);
-    M.vx = Math.cos(ang) * forca;
-    M.vy = Math.sin(ang) * forca;
-    P.proxGolpe = relogio + 0.4;
-    acao(pogo ? "pogo" : "golpe", 0.3);
-    if (pogo) P.y -= 30 * esc(); // quica para cima, como o pogo do jogo
+    const horizontal = faixaDoCursor(M, "x", "y", "w", "h");
+    const vertical = faixaDoCursor(M, "y", "x", "h", "w");
+    if (!horizontal || !vertical) return;
+    if (!M.direcoes.length) M.direcoes = [...DIRECOES];
+    const forte = (M.golpes + 1) % 3 === 0;
+    const espaco = [horizontal.max - M.x, vertical.max - M.y, M.x - horizontal.min, M.y - vertical.min];
+    const comEspaco = M.direcoes.filter((d) => espaco[DIRECOES.indexOf(d)] > 70);
+    const comRicochete = forte ? comEspaco.filter((d) => espaco[DIRECOES.indexOf(d)] < 440) : [];
+    const direcao = escolha(comRicochete.length ? comRicochete : comEspaco.length ? comEspaco : M.direcoes);
+    M.direcoes = M.direcoes.filter((d) => d !== direcao);
+    const angulo = direcao + rand(-0.45, 0.45);
+    const forca = forte ? rand(2300, 2750) : rand(1340, 1740);
+    const pogo = direcao === Math.PI / 2 && M.y > P.y - alturaPx() * 0.42;
+    M.golpe = { angulo, forca, forte, pogo };
+    M.proxGolpe = relogio + (forte ? 1.05 : rand(0.47, 0.62));
+    if (Math.abs(Math.cos(angulo)) > 0.45) P.olhando = Math.sign(Math.cos(angulo));
+    acao(pogo ? "pogo" : "golpe", pogo ? 0.3 : 0.38, { angulo, mira: -Math.sin(angulo), contato: pogo ? 0.10 : 0.18 });
+  }
+
+  function atingirMouse(M) {
+    const { angulo, forca, forte, pogo } = M.golpe;
+    M.golpe = null;
+    M.vx = Math.cos(angulo) * forca;
+    M.vy = Math.sin(angulo) * forca;
+    M.arrasto = forte ? 1.25 : 1.8;
+    M.golpes++;
+    // Mantém o quadro de contato mesmo se a atualização passou do instante exato.
+    const atraso = relogio - (P.acao.inicio + P.acao.contato);
+    P.acao.inicio += atraso;
+    P.acao.fim += atraso;
+    if (pogo) P.y -= 20 * esc();
     som("golpe");
     som("hit");
-    corte(M.x, M.y, ang);
-    faiscas(M.x, M.y, ["#ffffff", "#f4e9c8", "#e8eef7"]);
-    // às vezes ela solta um grito no golpe
-    const grito = primeiro ? null : Math.random();
-    if (grito !== null && grito < 0.15) {
-      som("shaw");
-      falar("SHAW!", 1);
-    } else if (grito !== null && grito < 0.4) som(Math.random() < 0.5 ? "ha" : "hup");
+    if (forte) som("hup");
+    corte(M.x, M.y, angulo);
+    faiscas(M.x, M.y, ["#ffffff", "#f4e9c8", "#e8eef7"], forte ? 18 : 9);
+    if (forte) corte(M.x, M.y, angulo + 0.65);
   }
+
+  // Une trechos de monitores contíguos em cada eixo. Um vão é parede, a emenda entre telas não.
+  function faixaDoCursor(p, eixo, outro, tamanho, outroTamanho) {
+    const pixel = Math.round(p[eixo]);
+    const linha = Math.round(p[outro]);
+    const faixas = monitores()
+      .filter((a) => linha >= a[outro] && linha < a[outro] + a[outroTamanho])
+      .sort((a, b) => a[eixo] - b[eixo]);
+    let min = Infinity, max = -Infinity;
+    for (const a of faixas) {
+      const inicio = a[eixo], fim = inicio + a[tamanho] - 1;
+      if (inicio > max + 1) {
+        if (pixel >= min && pixel <= max) return { min, max };
+        if (inicio > pixel) return null;
+        min = inicio;
+        max = fim;
+      } else max = Math.max(max, fim);
+    }
+    return pixel >= min && pixel <= max ? { min, max } : null;
+  }
+
+  function rebater(M, dt, eixo, outro, tamanho, outroTamanho) {
+    const faixa = faixaDoCursor(M, eixo, outro, tamanho, outroTamanho);
+    if (!faixa) return false;
+    const { min, max } = faixa;
+    const vel = "v" + eixo;
+    // Na emenda, o pixel pode pertencer à faixa antes da coordenada fracionária.
+    const inicio = Math.max(min, Math.min(M[eixo], max));
+    const alvo = inicio + M[vel] * dt;
+    const borda = Math.max(min, Math.min(alvo, max));
+    M[eixo] = borda;
+    if (borda === alvo) return false;
+    M[eixo] = Math.max(min, Math.min(2 * borda - alvo, max));
+    M[vel] *= -0.93;
+    return true;
+  }
+
+  function encerrarCombate(id = P.mouse?.id) {
+    if (P.estado !== "combate" || id !== P.mouse?.id) return;
+    P.x = limitarX(P.x);
+    if (window.Vida?.precisaCair()) return Vida.cair();
+    P.y = limitarY(P.y);
+    mudar("acenando", 1.6);
+  }
+
   function atualizarCombate(dt) {
     const M = P.mouse;
-    if (!M) return mudar("parado", 1);
-    // o cursor voa e ricocheteia nas bordas das telas, perdendo velocidade aos poucos
-    const atrito = Math.exp(-1.5 * dt);
+    if (!M || P.tempo <= 0 || !pegarMouseLigado() || !monitorDoCursor(M)) return encerrarCombate();
+    const atrito = Math.exp(-M.arrasto * dt);
     M.vx *= atrito;
     M.vy *= atrito;
-    const prox = { x: M.x + M.vx * dt, y: M.y + M.vy * dt };
-    const q = prenderNaTela(prox);
-    if (q.x !== prox.x) M.vx = -M.vx * 0.8;
-    if (q.y !== prox.y) M.vy = -M.vy * 0.8;
-    M.x = q.x;
-    M.y = q.y;
-    window.api.enviar("pet:moverCursor", { x: Math.round(M.x), y: Math.round(M.y) });
-    // ela persegue o cursor (com a ponta da agulha) e golpeia quando alcança
-    virarPara(M.x);
-    const m = mao();
-    const { min, max } = limites();
-    const alvo = {
-      x: Math.max(min - larguraPx() / 2, Math.min(max + larguraPx() / 2, P.x + (M.x - m.x))),
-      y: Math.max(alturaPx() * 0.5, Math.min(tela.altura + alturaPx(), P.y + (M.y - m.y))),
-    };
-    andarAte(alvo, dt, Math.max(2.2, VEL_PERSEGUIR / velocidade()), false);
-    const m2 = mao();
-    if (relogio >= P.proxGolpe && Math.hypot(M.x - m2.x, M.y - m2.y) < 55 * esc()) golpearMouse();
-    if (P.tempo <= 0 || !pegarMouseLigado()) {
-      P.mouse = null;
-      dizer("combateFim", 2.8);
-      P.x = limitarX(P.x);
-      if (window.Vida?.precisaCair()) return Vida.cair();
-      P.y = limitarY(P.y);
-      mudar("acenando", 1.6);
+    const rebateuX = rebater(M, dt, "x", "y", "w", "h");
+    const rebateuY = rebater(M, dt, "y", "x", "h", "w");
+    if (rebateuX || rebateuY) {
+      const impacto = Math.hypot(M.vx, M.vy);
+      faiscas(M.x, M.y, ["#e0b3be", "#fff5eb"], impacto > 950 ? 10 : 5);
+      if (impacto > 950) corte(M.x, M.y, Math.atan2(M.vy, M.vx));
     }
+    window.api.enviar("pet:moverCursor", { x: Math.round(M.x), y: Math.round(M.y), duelo: M.id, origem: tela.origem });
+    if (!acao3d()) virarPara(M.x);
+    // Mira pelo corpo: a ponta da agulha muda de lado ao animar e atrapalhava a perseguição.
+    const alvo = prenderNaTela({ x: M.x, y: M.y + alturaPx() * 0.48 }, 0, alturaPx() * 0.5, alturaPx() * 0.42);
+    andarAte(alvo, dt, Math.max(2.2, (VEL_PERSEGUIR + 170) / velocidade()), false);
+    if (M.golpe && relogio >= P.acao.inicio + P.acao.contato) atingirMouse(M);
+    if (!M.golpe && relogio >= M.proxGolpe && Math.hypot(alvo.x - P.x, alvo.y - P.y) < 53 * esc()) prepararGolpeMouse();
   }
 
   // ---------- inimigo (no lugar da comida) ----------
@@ -149,7 +196,6 @@ window.Hornet = (() => {
     if (Math.abs(x - P.x) < 120) x = limitarX(P.x - lado * rand(170, 280) * esc());
     const chao = noChao() ? chaoDe(x) : P.y;
     inimigo = { x, y: chao - alturaPx() * 0.5 - 170, chao, dir: x > P.x ? -1 : 1, vivo: true, t: 0 }; // chega voando de cima
-    dizer("inimigo", 2);
     mudar("cacar", 14);
   }
   function matar() {
@@ -196,12 +242,11 @@ window.Hornet = (() => {
     P.olhando = dx >= 0 ? 1 : -1;
     if (Math.random() < 0.5) {
       // golpe direto
-      acao("golpe", 0.3);
+      acao("golpe", 0.38);
       som("golpe");
       if (Math.random() < 0.6) som("ha");
       corte(I.x, I.y, dx >= 0 ? 0 : Math.PI);
       matar();
-      dizer("vitoria", 2);
       mudar("acenando", 1.6);
     } else iniciarPogo();
   }
@@ -236,7 +281,6 @@ window.Hornet = (() => {
       acao("pogo", 1);
       som("golpe");
       som("adino");
-      falar("Adino!", 0.9);
     }
     // mergulha guiando a ponta da agulha até o alvo (a linha já sai em ~45°)
     const ponta = mao();
@@ -275,7 +319,7 @@ window.Hornet = (() => {
     if ((P.abriu && P.y >= chao) || P.tempo <= 0) {
       P.y = chao;
       P.ancora = { x: P.x, y: P.y };
-      pousou("vitoria");
+      pousou();
     }
   }
 
@@ -488,5 +532,5 @@ window.Hornet = (() => {
     ctx.restore();
   }
 
-  return { ativo, texto, pousou, acertouMouse, chacoalhada, storm, invocarInimigo, passo, atualizar, desenhar, acao3d, planando, som };
+  return { ativo, pousou, acertouMouse, encerrarCombate, chacoalhada, storm, invocarInimigo, passo, atualizar, desenhar, acao3d, planando, som };
 })();

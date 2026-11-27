@@ -93,7 +93,7 @@ const LEIA_ME = `Travessuras do modo bagunça 😈
 Edite travessuras.json para criar as suas. Depois ligue cada uma em ⚙️ no chat.
 Uma travessura com o mesmo "id" de uma padrão substitui a padrão.
 
-Apertar teclas (Windows, macOS e Linux com X11; no Wayland não dá):
+Apertar teclas (Windows e macOS):
   { "id": "minimiza-tudo", "nome": "Minimizar tudo", "tipo": "teclas", "teclas": ["win", "d"], "vezes": 1 }
   { "id": "alt-tab-doido", "nome": "Alt+Tab doido", "tipo": "teclas", "teclas": ["alt", "tab"], "vezes": [3, 8] }
 
@@ -105,7 +105,7 @@ Apertar teclas (Windows, macOS e Linux com X11; no Wayland não dá):
     setas (Ctrl+setas troca de Space). Combinações perigosas no Mac, como Cmd+D, são puladas.
     O Mac pede a permissão de Acessibilidade para isso (botão em ⚙️).
 
-Abrir um link no navegador:
+Abrir um link no navegador (Windows e macOS):
   { "id": "patos", "nome": "Fotos de patos", "tipo": "abrir", "links": ["https://www.google.com/search?q=patos+fofos"] }
 
   - Só links http:// ou https://. Ele sorteia um da lista.

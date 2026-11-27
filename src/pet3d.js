@@ -220,7 +220,7 @@ window.Pet3D = (() => {
   }
 
   // ---------- Hornet: máscara branca com chifres, corpo preto, capa vermelha e agulha ----------
-  // peça fina (perna, braço, chifre, agulha) de a até b, com contorno de espessura fixa
+  // peça fina (perna, braço, agulha) de a até b, com contorno de espessura fixa
   // (a casca escalada do parte() some em peças finas e alongaria as pontas)
   // lados: 10 = redondo; 4 = seção quadrada (lâmina facetada)
   function tubo(pai, a, b, ra, rb, cor, contorno = 0.012, lados = 10) {
@@ -245,7 +245,7 @@ window.Pet3D = (() => {
   function montarHornet() {
     const raiz = new T.Group();
     raiz.rotation.order = "YXZ"; // inclinar (x) no eixo dela, depois de virar (y)
-    const MASCARA = 0xf6f2e9, PRETO = 0x1c1b25, VERMELHO = 0xc0232d, PRATA = 0xdfe3ea, LINHA = 0xf4f0e6;
+    const PRETO = 0x2f2936, PRATA = 0xdfe3ea;
     // articulação fininha (bolinha preta da grossura do membro, para a dobra não abrir buraco)
     const junta = (pai, r) => parte(esfera(10), PRETO, { pai, esc: [r, r, r], contorno: 0.01 / r });
     // pernas pretas finíssimas que terminam em ponta: coxa (pivô no quadril) e canela (pivô no joelho)
@@ -263,49 +263,61 @@ window.Pet3D = (() => {
     parte(capsula(0.06, 0.3), PRETO, { pai: corpo, pos: [0, 0.27, 0], esc: [1, 1, 0.85] });
     tubo(corpo, [0, 0.5, 0], [0, 0.64, 0], 0.03, 0.026, PRETO, 0.01);
 
-    // capinha franzida: curta (termina na cintura), bem aberta, com dobras arredondadas na barra.
-    // Os vértices são mexidos a cada quadro pela animação (tecido).
-    const SAIA_RAD = 56, SAIA_SEG = 8, SAIA_H = 0.31; // 7 pétalas × 8 segmentos
-    const saiaGeo = new T.CylinderGeometry(0.09, 0.42, SAIA_H, SAIA_RAD, SAIA_SEG, true);
+    // A capa cai estreita dos ombros e abre em pregas. A barra se deforma com o movimento.
+    const SAIA_RAD = 60, SAIA_SEG = 8, SAIA_H = 0.4;
+    const saiaGeo = new T.CylinderGeometry(1, 1, 1, SAIA_RAD, SAIA_SEG, true);
     const saia = pivo(corpo, [0, 0.56, 0]);
-    // cor por vértice: vincos vinho-escuro, meio das pétalas vermelho vivo (pintada a cada quadro)
     saiaGeo.setAttribute("color", new T.Float32BufferAttribute(new Float32Array(saiaGeo.attributes.position.count * 3), 3));
     saia.add(new T.Mesh(saiaGeo, new T.MeshToonMaterial({ color: 0xffffff, vertexColors: true, gradientMap: degraus })));
-    // por dentro a capa é magenta escuro (aparece nas dobras e quando ela abre a cúpula)
-    saia.add(new T.Mesh(saiaGeo, new T.MeshToonMaterial({ color: 0x7c1840, gradientMap: degraus, side: T.BackSide })));
+    saia.add(new T.Mesh(saiaGeo, new T.MeshToonMaterial({ color: 0x572236, gradientMap: degraus, side: T.BackSide })));
     const contornoSaia = new T.Mesh(saiaGeo, matContorno);
     contornoSaia.scale.setScalar(1.045);
     saia.add(contornoSaia);
-    parte(new T.SphereGeometry(1, 18, 8, 0, TAU, 0, Math.PI * 0.5), VERMELHO, { pai: corpo, pos: [0, 0.53, -0.005], esc: [0.13, 0.08, 0.12], contorno: 0.08 });
+    parte(esfera(16), 0x9e3948, { pai: corpo, pos: [0, 0.555, 0], esc: [0.092, 0.047, 0.09], contorno: 0.08 });
 
-    // máscara: uma peça só em "U" alto (queixo redondo embaixo, os "chifres" são as duas pontas
-    // da própria máscara, grossas na base, com um entalhe em U entre elas)
     const cabeca = pivo(corpo, [0, 0.6, 0]);
-    const contornoU = new T.Shape();
-    // (a borda arredondada da extrusão engorda o desenho em 0,03 para todos os lados)
-    contornoU.moveTo(0, 0.03);
-    contornoU.bezierCurveTo(0.11, 0.03, 0.16, 0.12, 0.16, 0.28);
-    contornoU.bezierCurveTo(0.16, 0.5, 0.168, 0.72, 0.145, 0.84);
-    contornoU.quadraticCurveTo(0.125, 0.885, 0.105, 0.84);
-    contornoU.bezierCurveTo(0.095, 0.7, 0.088, 0.53, 0.072, 0.45);
-    contornoU.quadraticCurveTo(0, 0.32, -0.072, 0.45);
-    contornoU.bezierCurveTo(-0.088, 0.53, -0.095, 0.7, -0.105, 0.84);
-    contornoU.quadraticCurveTo(-0.125, 0.885, -0.145, 0.84);
-    contornoU.bezierCurveTo(-0.168, 0.72, -0.16, 0.5, -0.16, 0.28);
-    contornoU.bezierCurveTo(-0.16, 0.12, -0.11, 0.03, 0, 0.03);
-    // pouca espessura e borda bem grossa e arredondada: de lado parece uma pastilha, não um bloco
-    const geoMascara = new T.ExtrudeGeometry(contornoU, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.095, bevelSize: 0.03, bevelSegments: 8, curveSegments: 28 });
+    const perfil = new T.Shape();
+    perfil.moveTo(0, 0.025);
+    perfil.bezierCurveTo(0.132, 0.025, 0.197, 0.137, 0.19, 0.29);
+    perfil.bezierCurveTo(0.184, 0.48, 0.173, 0.7, 0.218, 0.86);
+    perfil.bezierCurveTo(0.153, 0.812, 0.109, 0.64, 0.086, 0.51);
+    perfil.bezierCurveTo(0.067, 0.414, 0.042, 0.39, 0, 0.39);
+    perfil.bezierCurveTo(-0.042, 0.39, -0.067, 0.414, -0.086, 0.51);
+    perfil.bezierCurveTo(-0.109, 0.64, -0.153, 0.812, -0.218, 0.86);
+    perfil.bezierCurveTo(-0.173, 0.7, -0.184, 0.48, -0.19, 0.29);
+    perfil.bezierCurveTo(-0.197, 0.137, -0.132, 0.025, 0, 0.025);
+    const nucleo = 0.085;
+    const geoMascara = new T.ExtrudeGeometry(perfil, {
+      depth: nucleo, bevelThickness: 0.063, bevelSize: 0.023, bevelSegments: 9, curveSegments: 22,
+    });
+    const posMascara = geoMascara.attributes.position;
+    const normalMascara = geoMascara.attributes.normal;
+    const normal = new T.Vector3();
+    // As pontas afinam de perfil e o sombreamento acompanha o volume das bochechas.
+    for (let i = 0; i < posMascara.count; i++) {
+      const x = posMascara.getX(i), y = posMascara.getY(i), z = posMascara.getZ(i) - nucleo / 2;
+      posMascara.setZ(i, z * (1.23 - y * 0.91));
+      normal.fromBufferAttribute(normalMascara, i);
+      const face = Math.abs(normal.z);
+      normal.x += face * x * 2.8;
+      normal.y += face * (y - 0.23) * 0.64;
+      normal.normalize();
+      normalMascara.setXYZ(i, normal.x, normal.y, normal.z);
+    }
     geoMascara.computeBoundingBox();
     const centro = geoMascara.boundingBox.getCenter(new T.Vector3());
     geoMascara.center(); // centralizada, para o contorno (casca escalada) ficar por igual em volta
-    // inclinada para trás, de frente para a câmera (que olha de cima): assim o U aparece aberto
     const rosto = pivo(cabeca);
-    rosto.rotation.x = -0.42;
-    parte(geoMascara, MASCARA, { pai: rosto, pos: [centro.x, centro.y, 0], contorno: 0.035 });
-    // olhos grandes e ovais perto do queixo, inclinados para fora no alto
-    const olhos = [-1, 1].map((l) =>
-      parte(esfera(14), basico(0x101016), { pai: rosto, pos: [0.07 * l, 0.17, 0.112], esc: [0.05, 0.075, 0.03], rot: [0, 0.2 * l, -0.38 * l], contorno: 0 })
-    );
+    rosto.rotation.x = -0.39;
+    const marfim = new T.MeshStandardMaterial({ color: 0xf5eee8, roughness: 0.83 });
+    parte(geoMascara, marfim, { pai: rosto, pos: [0, centro.y, 0], contorno: 0 });
+    const olhoPreto = basico(0x101016);
+    const olhos = [-1, 1].map((l) => {
+      const orbita = pivo(rosto, [0.087 * l, 0.149, 0.114]);
+      orbita.rotation.set(0, 0.16 * l, -0.28 * l);
+      parte(esfera(18), 0x8f7d85, { pai: orbita, esc: [0.054, 0.073, 0.012], contorno: 0 });
+      return parte(esfera(18), olhoPreto, { pai: orbita, pos: [0, 0, 0.009], esc: [0.045, 0.062, 0.007], contorno: 0 });
+    });
 
     // braços pretos finíssimos e compridos (a mão fica para fora da capa), terminando em ponta:
     // braço (pivô no ombro) e antebraço (pivô no cotovelo)
@@ -319,6 +331,8 @@ window.Pet3D = (() => {
       cotovelos.push(c);
       return p;
     });
+    const maoBilhete = pivo(cotovelos[0], [0, -0.22, 0]);
+    parte(esfera(10), PRETO, { pai: maoBilhete, esc: [0.029, 0.033, 0.025], contorno: 0.14 });
     // agulha na mão direita (o eixo +Y aponta para a ponta), toda prateada: lâmina longa de seção
     // quadrada e facetada, ombro chanfrado, haste fina redonda (onde ela segura) e o olho na ponta de trás
     const agulha = pivo(cotovelos[1], [0, -0.2, 0]); // na mão (fim do antebraço)
@@ -327,15 +341,10 @@ window.Pet3D = (() => {
     tubo(agulha, [0, -0.25, 0], [0, 0.07, 0], 0.012, 0.012, PRATA);
     parte(new T.TorusGeometry(0.04, 0.009, 8, 20), PRATA, { pai: agulha, pos: [0, -0.29, 0], contorno: 0.22 });
     const ponta = pivo(agulha, [0, 0.92, 0]);
-    // linha de seda presa no olho da agulha
-    const linha = pivo(agulha, [0, -0.33, 0]);
-    const curva = new T.CatmullRomCurve3([[0, 0, 0], [0.03, -0.09, -0.02], [-0.01, -0.19, -0.06], [-0.05, -0.28, -0.04]].map((p) => new T.Vector3(...p)));
-    linha.add(new T.Mesh(new T.TubeGeometry(curva, 16, 0.006, 5), basico(LINHA)));
-
     return {
-      raiz, corpo, cabeca, olhos, bracos, cotovelos, pernas, joelhos, saia, saiaGeo, agulha, ponta, linha,
-      saiaR0: 0.09, saiaR1: 0.42, saiaH: SAIA_H, saiaRad: SAIA_RAD, saiaSeg: SAIA_SEG,
-      abre: 0, arrasto: 0, vento: 0.15,
+      raiz, corpo, cabeca, olhos, bracos, cotovelos, pernas, joelhos, saia, saiaGeo, agulha, ponta, maoBilhete,
+      saiaH: SAIA_H, saiaRad: SAIA_RAD, saiaSeg: SAIA_SEG,
+      abre: 0, arrasto: 0, vento: 0.15, faseBilhete: 0,
       tipo: "hornet", altura: 1.92,
     };
   }
@@ -398,39 +407,31 @@ window.Pet3D = (() => {
   const EIXO_Y = T ? new T.Vector3(0, 1, 0) : null, EIXO_Z = T ? new T.Vector3(0, 0, 1) : null;
   const qBate = T ? new T.Quaternion() : null, qAbre = T ? new T.Quaternion() : null, qDeita = T ? new T.Quaternion() : null;
   const MARCHA = { andando: 9, correndo: 15, arrastando: 9, segurando: 15, trabalhando: 15, combate: 15, cacar: 15 };
-  // Tecido da saia: cada vértice é recalculado a cada quadro. d = 0 no ombro, 1 na barra.
-  // abre: planando (a capa abre como um paraquedas); arrasto: correndo (a barra vai para trás);
-  // vento: o quanto a barra ondula e tremula.
-  // Vestido: gola franzida em sino. Abre rápido a partir do pescoço e a barra forma 7 pétalas
-  // arredondadas; os vincos entre elas começam lá no pescoço (aparece o magenta de dentro).
-  // d = 0 no pescoço, 1 na barra. abre: planando (cúpula de água-viva); arrasto: correndo
-  // (a barra vai para trás); vento: o quanto o tecido ondula e tremula.
-  const COR_PETALA = T ? new T.Color(0xd02a36) : null, COR_VINCO = T ? new T.Color(0x6e1027) : null;
+  // Cada vértice da capa vai do pescoço (d = 0) à barra (d = 1).
+  // Em corrida, a barra acompanha o corpo. Ao planar, as pregas se abrem em cúpula.
+  const COR_PREGA = new T.Color(0xc94a56), COR_VINCO = new T.Color(0x4c182a);
   function vestirHornet(m, abre, arrasto, vento, tempo) {
     const pos = m.saiaGeo.attributes.position, cor = m.saiaGeo.attributes.color;
     const N = m.saiaRad + 1;
-    const balanco = Math.sin(tempo * 1.3) * 0.25;
+    const balanco = Math.sin(tempo * 1.3) * 0.12;
+    const franzido = 1 - abre * 0.92;
+    const profundidade = lerp(0.7, 1, abre);
     for (let i = 0; i < pos.count; i++) {
       const lin = Math.floor(i / N), col = i % N;
       const d = lin / m.saiaSeg, d2 = d * d;
       const th = (col / m.saiaRad) * TAU;
-      const petala = 0.5 + 0.5 * Math.sin(th * 7 + balanco); // 1 no meio da pétala, 0 no vinco
-      const franzido = 1 - abre * 0.92; // aberta em cúpula, o tecido fica liso (como no jogo)
-      // perfil: sino fechado ou cúpula aberta
-      // cúpula: topo largo e redondo logo abaixo da cabeça, borda curvando um pouco para dentro
+      const prega = 0.5 + 0.5 * Math.cos(th * 5 + d * 0.75 + balanco);
       const fi = d * Math.PI * 0.58;
-      let r = lerp(m.saiaR0 + (m.saiaR1 - m.saiaR0) * Math.sin(d * Math.PI / 2), 0.08 + 0.34 * Math.sin(fi), abre);
+      let r = lerp(0.075 + 0.3 * d ** 1.19, 0.08 + 0.34 * Math.sin(fi), abre);
       let y = lerp(-d * m.saiaH, -0.36 * (1 - Math.cos(fi)), abre);
-      // pétalas: avançam e descem na barra; vincos: entram e sobem
-      r += d ** 0.8 * (0.065 * petala - 0.03) * franzido;
-      y -= d2 * 0.05 * petala * franzido;
+      r += d * (0.078 * prega - 0.036) * franzido;
+      y -= d2 * 0.057 * prega * franzido;
       // tecido no vento (suave, por cima das pétalas)
       r += d ** 1.5 * vento * (0.022 * Math.sin(th * 3 + tempo * 5.5) + 0.012 * Math.sin(th * 5 - tempo * 9));
       y += d2 * (arrasto * 0.12 + vento * 0.018 * Math.sin(th * 4 + tempo * 8));
-      pos.setXYZ(i, Math.sin(th) * r, y, Math.cos(th) * r - arrasto * d2 * 0.22);
-      // perto do pescoço quase sem contraste; na barra, vinco bem escuro
-      const k = lerp(1, petala ** 0.7, Math.min(1, d * 1.5) * franzido);
-      cor.setXYZ(i, lerp(COR_VINCO.r, COR_PETALA.r, k), lerp(COR_VINCO.g, COR_PETALA.g, k), lerp(COR_VINCO.b, COR_PETALA.b, k));
+      pos.setXYZ(i, Math.sin(th) * r, y, Math.cos(th) * r * profundidade - arrasto * d2 * 0.22);
+      const k = lerp(0.78, prega ** 0.7, Math.min(1, d * 1.35) * franzido);
+      cor.setXYZ(i, lerp(COR_VINCO.r, COR_PREGA.r, k), lerp(COR_VINCO.g, COR_PREGA.g, k), lerp(COR_VINCO.b, COR_PREGA.b, k));
     }
     pos.needsUpdate = true;
     cor.needsUpdate = true;
@@ -464,6 +465,25 @@ window.Pet3D = (() => {
     else m.agulha.position.set(0, -0.2, 0);
   }
 
+  function passadaComBilhete(m, s, dt, apoio, perna) {
+    const passo = 0.28; // distância entre a aterrissagem do pé e a saída dele do chão
+    const contato = 0.57;
+    if (apoio < 1) m.faseBilhete = 0;
+    else m.faseBilhete = (m.faseBilhete + Math.min(0.12, estado.vel * dt * m.altura / s.alturaPx) * contato / passo) % 1;
+    m.raiz.position.y = -0.046 * apoio;
+    for (const i of [0, 1]) {
+      const fase = (m.faseBilhete + i * 0.5) % 1;
+      const suspenso = fase >= contato;
+      const k = suspenso ? (fase - contato) / (1 - contato) : fase / contato;
+      const z = (suspenso ? lerp(-0.5, 0.5, k) : lerp(0.5, -0.5, k)) * passo * apoio;
+      const y = 0.438 + m.raiz.position.y - (suspenso ? Math.sin(k * Math.PI) * 0.093 : 0);
+      const joelho = 2 * Math.acos(Math.min(1, Math.hypot(y, z) / 0.44));
+      perna(i, -Math.atan2(z, y) - joelho / 2, joelho);
+    }
+  }
+
+  const direcaoAgulha = new T.Vector3(), inversa = new T.Quaternion();
+
   function animarHornet(m, s, dt, anda, t, extraYaw) {
     const anim = s.anim, rel = s.relogio;
     const tipo = s.acao?.tipo, ta = s.acao?.t || 0;
@@ -487,7 +507,7 @@ window.Pet3D = (() => {
     braco(0, 0.1, -0.35, -0.25 - Math.sin(rel * 2.2) * 0.03);
     braco(1, -0.5, 0.12, -0.15);
     let agulha = [-0.75, -0.38, 0.32], pega = null;
-    let abre = 0, arrasto = 0, vento = 0.15;
+    let abre = 0, arrasto = 0, vento = 0.15, alinharAgulha = 0;
 
     if (tipo === "storm") {
       // gira no lugar com a agulha para o alto; os laços de seda são desenhados em 2D pelo overlay
@@ -501,23 +521,35 @@ window.Pet3D = (() => {
       abre = 0.55;
       vento = 1;
     } else if (tipo === "golpe") {
-      // estocada: o braço estica de uma vez, avança a perna da frente e a de trás dobra
-      const p = ta < 0.07 ? ta / 0.07 : Math.max(0, 1 - (ta - 0.16) / 0.14);
-      const k = Math.min(1, ta / 0.07);
-      m.corpo.rotation.x = 0.4 * p;
-      braco(1, lerp(0.9, -1.6, k), 0.15, lerp(-1.4, 0, k));
-      agulha = [0.05, lerp(-0.6, 0.05, p), 1];
-      braco(0, 0.9 * p, -0.3, -0.6);
-      perna(0, -0.8 * p, 0.35 * p);
-      perna(1, 0.55 * p, 0.7 * p);
-      m.raiz.position.z = 0.14 * p;
-      arrasto = 0.7;
-      vento = 0.7;
+      // A agulha parte junto ao ombro, cruza o corpo num arco e termina diante do pé da frente.
+      const contato = s.acao.contato ?? 0.185;
+      const fimPreparo = contato * 0.4;
+      const preparo = Math.min(1, ta / fimPreparo);
+      const corte = Math.min(1, Math.max(0, (ta - fimPreparo) / (contato - fimPreparo)));
+      const volta = Math.min(1, Math.max(0, (ta - contato) / (0.38 - contato)));
+      const estica = Math.sin(corte * PI / 2) * (1 - volta);
+      alinharAgulha = estica;
+      const mira = s.acao?.mira ?? 0;
+      const recuo = preparo * (1 - corte);
+      m.corpo.rotation.set((0.49 - mira * 0.24) * estica - recuo * 0.15, lerp(0.52, -0.45, corte) * (1 - volta), -estica * 0.12);
+      braco(1, -0.5 + 0.92 * recuo - (1.28 + mira * 0.42) * estica, 0.13 + 0.65 * recuo, -0.15 - 1.22 * recuo);
+      agulha = [lerp(0.85, -0.52, corte), 0.36 + mira * 1.05 - recuo * 0.15, -0.55 * recuo + 1.1 * corte];
+      braco(0, estica * 0.9, -0.35 - estica * 0.43, -0.5);
+      perna(0, -0.84 * estica, 0.15 + 0.33 * estica, -0.08);
+      perna(1, 0.46 * estica, 0.12 + 0.91 * estica, 0.11);
+      m.cabeca.rotation.y = -m.corpo.rotation.y * 0.52;
+      m.raiz.position.set(0, -0.055 * estica - recuo * 0.026, 0.22 * estica - recuo * 0.045);
+      arrasto = 0.8 * estica;
+      vento = 0.3 + estica * 0.7;
     } else if (tipo === "pogo") {
       // mergulho na diagonal (45°): corpo inclinado, joelhos encolhidos, agulha no eixo do corpo
-      girarNoCentro(m, 0.78);
-      perna(0, -0.7, 1.3);
-      perna(1, -0.35, 1.5);
+      const contato = s.acao.contato;
+      const mergulho = contato == null ? 1 : Math.sin(Math.min(1, ta / contato) * PI / 2) *
+        (1 - Math.min(1, Math.max(0, (ta - contato) / (0.3 - contato))));
+      alinharAgulha = mergulho;
+      girarNoCentro(m, 0.78 * mergulho);
+      perna(0, lerp(-0.04, -0.7, mergulho), lerp(0.08, 1.3, mergulho));
+      perna(1, lerp(-0.02, -0.35, mergulho), lerp(0.06, 1.5, mergulho));
       braco(1, -0.35, 0.12);
       agulha = [0, -1, 0.12];
       pega = [0.03, 0.06, 0.26];
@@ -601,6 +633,17 @@ window.Pet3D = (() => {
       for (const i of [0, 1]) perna(i, Math.sin(rel * 14 + i * 3) * 0.5, 0.5 + Math.sin(rel * 14 + i * 3 + 1) * 0.5);
       abre = 0.4;
       vento = 1;
+    } else if (anim === "arrastando") {
+      const k = s.preparoBilhete ?? Math.min(1, t / 0.28);
+      const apoio = k * k * (3 - 2 * k);
+      passadaComBilhete(m, s, dt, apoio, perna);
+      m.corpo.rotation.set(lerp(-0.12, 0.24, apoio), -0.14 * apoio, Math.sin(m.faseBilhete * TAU) * 0.055 * apoio);
+      m.cabeca.rotation.set(-0.12 * apoio, -0.48 * (1 - k), -0.08 * (1 - k));
+      braco(0, lerp(-0.58, 1.18, apoio), -0.56, lerp(-0.44, -0.08, apoio));
+      braco(1, -0.15, 0.32, -0.48);
+      agulha = [0.46, -0.43, 0.88];
+      arrasto = 0.34 * apoio;
+      vento = 0.23;
     } else if (correndo) {
       // corrida elegante: braços baixos junto do corpo (a capa cai por cima sem embolar),
       // passada fluida, tronco firme e cabeça estável; só as pernas fazem o trabalho
@@ -677,12 +720,21 @@ window.Pet3D = (() => {
       for (const i of [0, 1]) perna(i, Math.sin(rel * 7 + i) * 0.2, 0.3);
     }
 
+    if (alinharAgulha && s.acao?.angulo != null) {
+      // Converte a direção do golpe na tela para o espaço do tronco, onde a agulha é animada.
+      const vertical = Math.sin(s.acao.angulo);
+      direcaoAgulha.set(Math.cos(s.acao.angulo), -vertical * Math.cos(ELEVACAO), vertical * SEN_ELEVACAO)
+        .applyAxisAngle(EIXO_Y, -estado.yaw)
+        .applyQuaternion(inversa.copy(m.raiz.quaternion).invert())
+        .applyQuaternion(inversa.copy(m.corpo.quaternion).invert());
+      agulha = [lerp(agulha[0], direcaoAgulha.x, alinharAgulha), lerp(agulha[1], direcaoAgulha.y, alinharAgulha),
+        lerp(agulha[2], direcaoAgulha.z, alinharAgulha)];
+    }
     apontarAgulha(m, ...agulha, pega);
     m.abre = lerp(m.abre, abre, Math.min(1, dt * (abre > m.abre ? 16 : 6))); // abre de estalo, fecha devagar
     m.arrasto = lerp(m.arrasto, arrasto, Math.min(1, dt * 6));
     m.vento = lerp(m.vento, vento, Math.min(1, dt * 5));
     vestirHornet(m, m.abre, m.arrasto, m.vento, rel);
-    m.linha.rotation.set(m.arrasto * 0.6, 0, Math.sin(rel * 3) * 0.3);
   }
 
   function animar(m, s, dt) {
@@ -699,7 +751,7 @@ window.Pet3D = (() => {
     // piscar
     const pisca = anim !== "dormindo" && s.relogio % 3.7 > 3.58;
     const fechado = anim === "dormindo" || pisca;
-    for (const o of m.olhos) o.scale.y = (fechado ? 0.15 : 1) * ({ pato: 0.032, tartaruga: 0.07, hornet: 0.07 }[m.tipo] || 0.04);
+    for (const o of m.olhos) o.scale.y = (fechado ? 0.15 : 1) * ({ pato: 0.032, tartaruga: 0.07, hornet: 0.062 }[m.tipo] || 0.04);
     const extraYaw = { v: 0 };
 
     if (m.tipo === "pato") {
@@ -918,8 +970,16 @@ window.Pet3D = (() => {
     }
     estado.ultX = s.x;
     estado.ultY = s.y;
+    if (modelo.tipo === "hornet" && s.anim === "arrastando") estado.alvoYaw = Math.PI * 0.46 * s.olhando;
+    let giro = Math.min(1, dt * 7);
+    if (modelo.tipo === "hornet" && s.anim === "combate" && s.acao?.angulo != null) {
+      const { angulo, contato, t } = s.acao;
+      estado.alvoYaw = Math.atan2(Math.cos(angulo), Math.sin(angulo) / SEN_ELEVACAO);
+      const falta = contato - t;
+      giro = falta > 0 ? dt / (dt + falta) : 1;
+    }
     if (s.yaw != null) estado.alvoYaw = estado.yaw = s.yaw; // para testes e prévias
-    estado.yaw = lerpAng(estado.yaw, estado.alvoYaw, Math.min(1, dt * 7));
+    estado.yaw = lerpAng(estado.yaw, estado.alvoYaw, giro);
     const extra = animar(modelo, s, dt);
     modelo.raiz.rotation.y = estado.yaw + extra;
 
@@ -938,13 +998,16 @@ window.Pet3D = (() => {
     const x0 = s.x - larg / 2, y0 = s.y - alt + vista.abaixo * pxPorUnidade;
     // onde fica a "boca" na tela (bico do Pato, boca da Tartaruga, mão do Palito): é com ela que ele
     // morde/segura o mouse e os bilhetes. Muda com o ângulo, então é calculada a cada quadro.
-    const p = pontoDaBoca(modelo);
-    let boca = null;
-    if (p) {
+    const projetar = (p) => {
+      if (!p) return null;
       p.project(camera);
-      boca = { x: x0 + ((p.x + 1) / 2) * larg, y: y0 + ((1 - p.y) / 2) * alt };
-    }
-    return { canvas: renderer.domElement, x: x0, y: y0, w: larg, h: alt, topo: s.y - s.alturaPx, boca };
+      return { x: x0 + ((p.x + 1) / 2) * larg, y: y0 + ((1 - p.y) / 2) * alt };
+    };
+    const boca = projetar(pontoDaBoca(modelo));
+    const maoBilhete = s.anim === "arrastando" && modelo.maoBilhete
+      ? projetar(modelo.maoBilhete.getWorldPosition(new T.Vector3()))
+      : null;
+    return { canvas: renderer.domElement, x: x0, y: y0, w: larg, h: alt, topo: s.y - s.alturaPx, boca, maoBilhete };
   }
 
   // ---------- objetos soltos na tela (o Caranid que a Hornet enfrenta) ----------

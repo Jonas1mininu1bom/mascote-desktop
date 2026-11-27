@@ -8,8 +8,6 @@ window.Vida = (() => {
 
   let bravoAte = 0; // até quando ele fica emburrado (recusa carinho)
   let depoisDeCair = null; // "tonto" se caiu depois de ser chacoalhado
-  let fome = 30;
-  let ultimaQueixa = 0;
   const chacoalho = { amostras: [], ultimo: null, viradas: [], tonto: false };
   let comida = null; // { x, y, vy, chao, mordidas, emoji }
   let bola = null; // { x, y, vx, vy, chao, giro }
@@ -72,7 +70,6 @@ window.Vida = (() => {
     }
     if (voltarAoJogo()) return;
     if (window.Hornet?.ativo()) return Hornet.pousou();
-    if (P.aberto) falar(escolha(plana() ? ["Quá! Pouso de pato!", "Voei!", "Quem precisa de paraquedas?"] : ["Ufa! 🪂", "Pouso perfeito!", "Que vista!"]), 2);
     mudar(P.aberto ? "feliz" : "parado", P.aberto ? 1.4 : 0.6);
   }
 
@@ -99,7 +96,6 @@ window.Vida = (() => {
     }
     if (!chacoalho.tonto && chacoalho.viradas.length >= 5) {
       chacoalho.tonto = true;
-      falar(escolha(["Aaaaah!", "Para, para, paraaa!", "Tô ficando tonto!"]), 1.5);
     }
     if (chacoalho.tonto) animarPet("tonto");
   }
@@ -123,25 +119,17 @@ window.Vida = (() => {
   }
   function ficarTonto() {
     if (window.Hornet?.ativo()) {
-      falar(Hornet.texto("pancada"), 2.5);
       return mudar("parado", 1.5);
     }
-    falar(escolha(["Tudo girando... 😵‍💫", "Ui... onde eu tô?", "Vejo estrelinhas..."]), 2.5);
     mudar("tonto", 3);
   }
   function ficarBravo() {
     bravoAte = relogio + 25;
     P.olhando = cursor.x >= P.x ? 1 : -1;
-    if (window.Hornet?.ativo()) {
-      falar(Hornet.texto("brava"), 3);
-      return mudar("bravo", 5);
-    }
-    falar(escolha(["Para de me chacoalhar! 😠", "Hmph! Não gostei!", "Tô bravo com você! 😤"]), 3);
     mudar("bravo", 5);
   }
   function carinhoRecusado() {
     if (relogio >= bravoAte) return false;
-    falar(window.Hornet?.ativo() ? Hornet.texto("recusa") : escolha(["Hmph! 😤", "Não quero carinho agora.", "Ainda tô bravo..."]), 1.8);
     mudar("bravo", 1.5);
     return true;
   }
@@ -159,7 +147,6 @@ window.Vida = (() => {
     else if (id === "bola") brincar();
     else if (id === "carinho" && !carinhoRecusado()) {
       coracao(6);
-      falar(escolha(pet.falas.length ? pet.falas : ["Hehe ❤"]), 2);
       mudar("feliz", 1.4);
     }
   }
@@ -170,7 +157,6 @@ window.Vida = (() => {
     const lado = P.olhando || 1;
     const x = limitarX(P.x + lado * (larguraPx() / 2 + 34));
     comida = { x, y: P.y - alturaPx() - 80, vy: 0, chao: noChao() ? chaoDe(x) : P.y, mordidas: 0, emoji: COMIDAS[pet.id] || "🍎" };
-    falar(escolha(["Oba, comida!", "Hmmm! 😋", "É pra mim?"]), 1.8);
     mudar("comendo", 12);
     animarPet("andando");
   }
@@ -195,11 +181,7 @@ window.Vida = (() => {
     }
     if (comida.mordidas >= 4) {
       comida = null;
-      fome = 0;
-      if (relogio < bravoAte) {
-        bravoAte = 0;
-        falar("Tá bom... te perdoo 😌", 2.5);
-      } else falar(escolha(["Nham! Valeu! 😋", "Delícia!", "Barriga cheia ❤"]), 2.2);
+      bravoAte = 0;
       coracao(6);
       if (bola) mudar("brincando", 15); // a bola continua em campo: volta para o jogo
       else mudar("feliz", 1.6);
@@ -219,13 +201,11 @@ window.Vida = (() => {
   // - "tela": vista de cima (como o pet anda), sem gravidade: rola pela tela toda e rebate nas bordas.
   function brincar() {
     if (relogio < bravoAte) {
-      falar("Não quero brincar com você agora. 😤", 2);
       return mudar("bravo", 1.5);
     }
     const x = limitarX(P.x + (P.olhando || 1) * 70);
     const y = noChao() ? P.y - alturaPx() - 60 : P.y - R_BOLA; // na barra ela cai do alto; na tela, aparece nos pés dele
     bola = { x, y, vx: 0, vy: 0, giro: 0, r: R_BOLA, chutePet: 0, jogou: relogio, felizAte: 0 };
-    falar(escolha(["Bola! ⚽", "Vamos jogar!", "Chuta pra mim!"]), 1.8);
     mudar("brincando", 15);
   }
   // Depois de carinho, de ser arrastado ou de cair: se a bola ainda está em campo, volta para o jogo
@@ -251,7 +231,6 @@ window.Vida = (() => {
     if (P.estado === "brincando") P.tempo = Math.max(P.tempo, 15); // você está jogando: ele continua
     else if (ocioso()) mudar("brincando", 15); // ele tinha parado: volta a jogar
     if (debug) console.warn(`[debug] chute seu: vx=${Math.round(bola.vx)} vy=${Math.round(bola.vy)}`);
-    if (Math.random() < 0.35) falar(escolha(["Uau, que chute!", "Lá vou eu!", "Essa é minha!"]), 1.4);
     return true;
   }
   // física da bola na barra de tarefas (de lado, com gravidade)
@@ -322,7 +301,6 @@ window.Vida = (() => {
       animarPet("feliz");
       bola.felizAte = relogio + 0.35;
       if (debug) console.warn(`[debug] chute do pet para o mouse: vx=${Math.round(bola.vx)} vy=${Math.round(bola.vy)}`);
-      if (Math.random() < 0.3) falar(escolha(["Toma! ⚽", "Pra você!", "Gol!"]), 1.2);
     } else if (!alcance) {
       // na barra ele corre pelo chão; na tela, vai até onde a bola estiver (com os pés na altura dela)
       const alvo = naBarra ? { x: limitarX(bola.x), y: chaoDe(bola.x) } : { x: limitarX(bola.x), y: limitarY(bola.y + bola.r, bola.x) };
@@ -331,7 +309,6 @@ window.Vida = (() => {
     } else animarPet("parado");
     if (P.tempo <= 0) {
       bola = null;
-      falar(escolha(["Cansei, foi divertido!", "Ufa! Valeu! ❤", "De novo depois?"]), 2.2);
       coracao(4);
       mudar("feliz", 1.4);
     }
@@ -339,11 +316,6 @@ window.Vida = (() => {
 
   // ---------- laço ----------
   function atualizar(dt) {
-    fome = Math.min(100, fome + dt / 20); // ~1 ponto a cada 20 s
-    if (fome > 70 && ocioso() && relogio - ultimaQueixa > 90 && !window.Hornet?.ativo()) {
-      ultimaQueixa = relogio;
-      falar(escolha(["Tô com fome... 🍽️", "Minha barriga roncou...", "Me dá comida?"]), 3);
-    }
     if (bola) {
       fisicaBola(dt);
       // ficou 20 s fora do jogo (foi arrastado, caiu, ficou tonto...): a bola vai embora

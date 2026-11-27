@@ -663,12 +663,15 @@ function enviarParaTodos(canal, dados) {
 }
 
 // Envia a posição do mouse para o overlay (~60 vezes por segundo).
+function enviarCursor(p, o, dueloRetomado) {
+  overlay?.webContents.send("cursor", { x: p.x - o.x, y: p.y - o.y, origem: { x: o.x, y: o.y }, dueloRetomado });
+}
+
 function iniciarCursor() {
   setInterval(() => {
     if (!overlay || overlay.isDestroyed()) return;
     const p = screen.getCursorScreenPoint();
-    const o = areaTotal();
-    overlay.webContents.send("cursor", { x: p.x - o.x, y: p.y - o.y });
+    enviarCursor(p, areaTotal());
     vigiarTopoDaTela(p);
   }, 16);
 }
@@ -807,6 +810,7 @@ function criarBilhete({ y, lado }, tela) {
   const w = new BrowserWindow({
     icon: ICONE_APP,
     ...bounds,
+    ...(plataforma.LINUX ? { type: "toolbar", focusable: false } : {}),
     frame: false,
     resizable: false,
     skipTaskbar: true,
@@ -816,7 +820,9 @@ function criarBilhete({ y, lado }, tela) {
   });
   b.janela = w;
   w.setAlwaysOnTop(true, "floating");
-  w.loadFile(path.join(__dirname, "src/bilhete.html"), { query: { dados: JSON.stringify(conteudo) } });
+  w.loadFile(path.join(__dirname, "src/bilhete.html"), {
+    query: { dados: JSON.stringify(conteudo), arrastoManual: plataforma.LINUX ? "1" : "0" },
+  });
   w.once("ready-to-show", () => {
     if (!escondido) w.showInactive();
     // O arrasto pode ter avançado enquanto a página carregava.
@@ -846,6 +852,74 @@ let proxPermissao = 1;
 let falhasCursor = 0;
 let ultimoCursor = null;
 let contaMoverCursor = 0;
+let cursorDuelo = null;
+const distanciaCursor = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+function retomouCursor(estado, antes) {
+  const agora = performance.now();
+  estado.puxada *= Math.exp(-(agora - estado.instante) / 180);
+  estado.instante = agora;
+  const anterior = estado.referencia;
+  if (!anterior) return false;
+  let desvio = distanciaCursor(antes, anterior.alvo);
+  if (!anterior.confirmado && estado.puxada < 12) {
+    // A leitura logo após um movimento nativo pode chegar um pedido atrasada (X11).
+    // Um cursor que não saiu do lugar segue sendo tratado pelo detector de bloqueio.
+    if (distanciaCursor(antes, anterior.antes) <= 1) return false;
+    if (anterior.alvoAnterior) desvio = Math.min(desvio, distanciaCursor(antes, anterior.alvoAnterior));
+  }
+  estado.puxada += Math.max(0, desvio - 12);
+  return estado.puxada >= 110;
+}
+
+function moverCursor(_e, { x, y, duelo, origem } = {}) {
+  if (escondido || !config.bagunca || config.travessuras?.["pegar-mouse"] === false || !num(x) || !num(y)) return;
+  const o = areaTotal();
+  const alvo = { x: Math.round(o.x + x), y: Math.round(o.y + y) };
+  let antes;
+  if (typeof duelo === "string") {
+    // Uma mensagem que saiu antes da mudança de origem ainda usa as coordenadas antigas.
+    if (origem?.x !== o.x || origem.y !== o.y) return;
+    if (!telasPermitidas().some(({ bounds: b }) => alvo.x >= b.x && alvo.x < b.x + b.width &&
+      alvo.y >= b.y && alvo.y < b.y + b.height)) return;
+    if (cursorDuelo?.id !== duelo) {
+      cursorDuelo = { id: duelo, origem, referencia: null, puxada: 0, instante: performance.now(), encerrado: false };
+      falhasCursor = 0;
+      ultimoCursor = null;
+    }
+    if (cursorDuelo.encerrado) return;
+    if (cursorDuelo.origem.x !== o.x || cursorDuelo.origem.y !== o.y) {
+      cursorDuelo.origem = origem;
+      cursorDuelo.referencia = null;
+    }
+    // Mede a puxada antes de sobrescrever o movimento da pessoa.
+    antes = screen.getCursorScreenPoint();
+    if (retomouCursor(cursorDuelo, antes)) {
+      cursorDuelo.encerrado = true;
+      enviarCursor(antes, o, duelo);
+      return;
+    }
+  } else cursorDuelo = null;
+
+  require("./src/cursor").moverCursor(alvo.x, alvo.y);
+  // O Windows pode ignorar o movimento quando a janela da frente é de administrador.
+  const p = screen.getCursorScreenPoint();
+  if (process.env.MASCOTE_DEBUG && ++contaMoverCursor % 20 === 0) {
+    log("main", "info", `[mouse] mandei o cursor para ${alvo.x},${alvo.y} e ele está em ${p.x},${p.y}`);
+  }
+  const longeDoAlvo = distanciaCursor(p, alvo) > 4;
+  if (cursorDuelo) cursorDuelo.referencia = { antes, alvo, confirmado: !longeDoAlvo, alvoAnterior: cursorDuelo.referencia?.alvo };
+  const parado = ultimoCursor && distanciaCursor(p, ultimoCursor) <= 1;
+  ultimoCursor = p;
+  falhasCursor = longeDoAlvo && parado ? falhasCursor + 1 : 0;
+  if (falhasCursor >= 8) {
+    falhasCursor = 0;
+    if (cursorDuelo) cursorDuelo.encerrado = true;
+    const janelaAdmin = process.platform === "win32" && !admin.ehAdmin() && admin.janelaDaFrenteEhAdmin();
+    log("main", "info", "[mouse] o cursor não obedeceu", janelaAdmin ? "(janela de administrador na frente)" : "");
+    overlay?.webContents.send("mouse:bloqueado", { janelaAdmin, duelo });
+  }
+}
 
 function registrarIpc() {
   const on = (canal, fn) => ipcMain.on(canal, (e, ...a) => origemConfiavel(e) && fn(e, ...a));
@@ -857,29 +931,7 @@ function registrarIpc() {
   });
   on("pet:onde", (_e, { x, y } = {}) => num(x) && num(y) && petEm(x, y));
   on("pet:ignorar", (_e, ignorar) => overlay?.setIgnoreMouseEvents(ignorar === true, { forward: true }));
-  on("pet:moverCursor", (_e, { x, y } = {}) => {
-    if (escondido || !config.bagunca || config.travessuras?.["pegar-mouse"] === false || !num(x) || !num(y)) return;
-    const o = areaTotal();
-    const alvo = { x: Math.round(o.x + x), y: Math.round(o.y + y) };
-    require("./src/cursor").moverCursor(alvo.x, alvo.y);
-    // O Windows ignora o pedido, sem dar erro, quando a janela da frente é de administrador e o app não é.
-    // Bloqueado = o cursor fica PARADO no mesmo ponto enquanto mandamos ele ir para outro lugar.
-    // (Se ele está se mexendo, é a mão da pessoa: aí quem decide é a regra de "puxou com força" do pet.)
-    const p = screen.getCursorScreenPoint();
-    if (process.env.MASCOTE_DEBUG && ++contaMoverCursor % 20 === 0) {
-      log("main", "info", `[mouse] mandei o cursor para ${alvo.x},${alvo.y} e ele está em ${p.x},${p.y}`);
-    }
-    const longeDoAlvo = Math.hypot(p.x - alvo.x, p.y - alvo.y) > 4;
-    const parado = ultimoCursor && Math.hypot(p.x - ultimoCursor.x, p.y - ultimoCursor.y) <= 1;
-    ultimoCursor = p;
-    falhasCursor = longeDoAlvo && parado ? falhasCursor + 1 : 0;
-    if (falhasCursor >= 8) {
-      falhasCursor = 0;
-      const janelaAdmin = process.platform === "win32" && !admin.ehAdmin() && admin.janelaDaFrenteEhAdmin();
-      log("main", "info", "[mouse] o cursor não obedeceu", janelaAdmin ? "(janela de administrador na frente)" : "");
-      overlay?.webContents.send("mouse:bloqueado", { janelaAdmin });
-    }
-  });
+  on("pet:moverCursor", moverCursor);
   handle("bilhete:criar", (_e, dados) => {
     if (escondido || !config.bagunca || !num(dados?.y) || ![-1, 1].includes(dados.lado)) return null;
     const tela = telasPermitidas().find((d) => d.id === dados.telaId);
@@ -901,6 +953,22 @@ function registrarIpc() {
       b.alvo = { x: o.x + x, y: o.y + y };
     } else if (solto !== true) return;
     if (solto === true) b.lado = 0;
+    posicionarBilhete(b);
+  });
+  on("bilhete:arrastar", (e, { x, y, fase } = {}) => {
+    if (!plataforma.LINUX) return;
+    const b = [...bilhetes.values()].find(({ janela }) => !janela.isDestroyed() && janela.webContents === e.sender);
+    if (!b || b.lado) return;
+    if (fase === "fim") { b.arrasto = null; return; }
+    if (!num(x) || !num(y)) return;
+    if (fase === "inicio") {
+      const bounds = b.janela.getBounds();
+      b.arrasto = { dx: x - bounds.x, dy: y - bounds.y };
+      return;
+    }
+    if (fase !== "mover" || !b.arrasto) return;
+    b.alvo = { x: x - b.arrasto.dx, y: y - b.arrasto.dy };
+    b.telaId = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) }).id;
     posicionarBilhete(b);
   });
   on("bilhete:fechar", (e) => BrowserWindow.fromWebContents(e.sender)?.close());
@@ -932,6 +1000,7 @@ function registrarIpc() {
   ];
   // Por que uma travessura está com cadeado: falta administrador (Windows) ou Acessibilidade (Mac).
   const bloqueio = (t) => {
+    if (plataforma.LINUX && (t.tipo === "teclas" || t.tipo === "abrir")) return "desativada no Linux";
     if (t.admin && !admin.ehAdmin()) return "precisa de administrador";
     if (t.tipo === "teclas" && plataforma.MAC && !plataforma.acessibilidade()) return "precisa de Acessibilidade";
     return null;
@@ -1003,7 +1072,7 @@ function registrarIpc() {
     return { ...estadoSistema(), cancelado: !aceitou };
   });
   handle("travessura:pedir", () => {
-    if (escondido || !config.bagunca) return null;
+    if (escondido || !config.bagunca || plataforma.LINUX) return null;
     const t = travessuras.sortear(listaTravessuras(), config.travessuras || {}, {
       semIntervalo: process.env.MASCOTE_DEBUG === "travessura",
       admin: admin.ehAdmin(),
@@ -1013,7 +1082,7 @@ function registrarIpc() {
     return t;
   });
   on("travessura:executar", async (_e, token) => {
-    if (escondido || !config.bagunca || typeof token !== "string") return;
+    if (escondido || !config.bagunca || plataforma.LINUX || typeof token !== "string") return;
     try {
       await travessuras.executar(token, {
         abrirLink: (url) => shell.openExternal(url),
@@ -1248,6 +1317,12 @@ app.whenReady().then(async () => {
   criarBarra();
   montarBandeja();
   iniciarCursor();
+  if (plataforma.LINUX) {
+    const parar = require("./src/notificacoes-linux").ouvirNotificacoes((aviso) => {
+      if (!escondido && overlay && !overlay.isDestroyed()) overlay.webContents.send("pet:notificacao", aviso);
+    });
+    app.once("will-quit", parar);
+  }
   globalShortcut.register("CommandOrControl+Alt+Shift+Q", () => app.quit());
   const telasMudaram = () => {
     log("main", "info", "telas mudaram:", resumoTelas());
