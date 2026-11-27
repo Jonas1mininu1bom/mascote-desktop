@@ -1,5 +1,5 @@
 # Gera os instaladores do Mascote Desktop para Windows, macOS e Linux, em duas versões:
-# a completa (com o chat do Claude Code) e a "só o mascote" (sem o chat, bem menor).
+# a completa (com o chat do Claude Code) e a "só o mascote" (sem o chat).
 # - Em todo PR e push na main: gera e guarda os arquivos na aba "Actions" (por 14 dias).
 # - Numa tag v* (ex.: v0.2.0): também publica uma Release no GitHub com todos eles.
 name: Gerar instaladores
@@ -32,7 +32,7 @@ jobs:
             arquivos: |
               dist/*.AppImage
               dist/*.deb
-          # Cada Mac gera para o próprio processador: o Claude Code e o koffi vêm compilados por arquitetura.
+          # Cada Mac gera para o próprio processador: o koffi vem compilado por arquitetura.
           - nome: macOS Apple Silicon (dmg)
             os: macos-latest
             alvo: dist:mac

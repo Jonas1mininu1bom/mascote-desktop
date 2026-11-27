@@ -1,6 +1,8 @@
 // Conversa com o Claude Code através do Claude Agent SDK.
 // Usa o Claude Code instalado e logado no computador (ou ANTHROPIC_API_KEY).
 
+const { acharClaude, COMO_INSTALAR } = require("./claude-local");
+
 let sdk = null;
 async function carregarSdk() {
   if (!sdk) sdk = await import("@anthropic-ai/claude-agent-sdk");
@@ -62,6 +64,15 @@ class ChatClaude {
     this.ocupado = true;
     this.abortar = new AbortController();
     try {
+      const executavelClaude = acharClaude({ deNovo: true });
+      if (!executavelClaude) {
+        return eventos.erro(
+          "Não achei o Claude Code neste computador. Instale uma vez e faça o login rodando 'claude':\n" +
+            `${COMO_INSTALAR}\n` +
+            "Depois é só mandar a mensagem de novo (não precisa reabrir o mascote). " +
+            "Ou troque a IA do chat em Ajustes."
+        );
+      }
       const { query } = await carregarSdk();
       // Com imagem, a mensagem vai como blocos (imagens + texto); sem imagem, como texto simples.
       const prompt = imagens.length
@@ -81,6 +92,8 @@ class ChatClaude {
         options: {
           resume: this.sessao,
           cwd: pasta,
+          // o Claude Code instalado no computador (os instaladores não trazem uma cópia; veja claude-local.js)
+          pathToClaudeCodeExecutable: executavelClaude,
           abortController: this.abortar,
           permissionMode: "default",
           systemPrompt: {
