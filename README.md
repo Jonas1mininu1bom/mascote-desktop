@@ -36,8 +36,11 @@ Mecânicas inspiradas nos pets de desktop clássicos, com personagens e código 
 
 | Versão | O que tem | Tamanho do instalador |
 |---|---|---|
-| **Completa** | O mascote e o chat com o Claude Code (ou outra IA) | Grande (~250 MB): traz o Claude Code dentro |
-| **Só o mascote** | O mascote, os brinquedos, os bilhetes e as travessuras, sem o chat | Bem menor: sem o Claude Code |
+| **Completa** | O mascote e o chat com o Claude Code (ou outra IA) | ~100-125 MB (instalado: ~275 MB) |
+| **Só o mascote** | O mascote, os brinquedos, os bilhetes e as travessuras, sem o chat | Quase o mesmo: só não tem o chat |
+
+O instalador não traz uma cópia do Claude Code (eram ~360 MB a mais): o chat usa o Claude Code que
+você instala no computador para fazer o login.
 
 As duas podem ficar instaladas ao mesmo tempo e usam os mesmos ajustes, pets e bilhetes (só uma roda
 por vez). Os arquivos da versão só o mascote têm `so-mascote` no nome.
@@ -45,12 +48,16 @@ por vez). Os arquivos da versão só o mascote têm `so-mascote` no nome.
 ## Requisitos
 
 - Node.js 18 ou superior
-- Só para a versão completa: Claude Code instalado e logado, para o chat funcionar:
+- Só para o chat com o Claude Code: Claude Code instalado e logado no computador:
   ```bash
-  npm install -g @anthropic-ai/claude-code
+  # Windows (PowerShell): irm https://claude.ai/install.ps1 | iex
+  # Mac e Linux:          curl -fsSL https://claude.ai/install.sh | bash
+  # ou: npm install -g @anthropic-ai/claude-code
   claude   # faça o login uma vez e saia
   ```
-  Alternativa: defina a variável `ANTHROPIC_API_KEY`.
+  Alternativa ao login: defina a variável `ANTHROPIC_API_KEY` (o Claude Code continua precisando
+  estar instalado). O app procura o `claude` no PATH e nas pastas dos instaladores oficiais; se ele
+  estiver em outro lugar, defina `MASCOTE_CLAUDE=/caminho/do/claude`.
 - **Ou outra IA:** o chat também funciona com o Gemini, a OpenAI, o OpenRouter, o Ollama (offline)
   ou qualquer API no formato da OpenAI. Veja [Usar outra IA](#usar-outra-ia).
 
@@ -90,9 +97,9 @@ macOS avisa que não pode verificar o app. Clique com o botão direito no Mascot
 → **Abrir** → **Abrir**. Se aparecer "está danificado", rode uma vez no Terminal:
 `xattr -cr "/Applications/Mascote Desktop.app"`.
 
-O instalador completo já traz o Claude Code dentro dele (por isso é grande, ~250 MB). Você só precisa
-fazer o login uma vez (`claude` no terminal) ou definir `ANTHROPIC_API_KEY`. A versão só o mascote não
-precisa de nada disso.
+Para o chat com o Claude Code, instale o Claude Code e faça o login uma vez (`claude` no terminal; veja
+[Requisitos](#requisitos)). Se ele não estiver instalado, o próprio chat avisa e mostra o comando. As
+outras IAs e a versão só o mascote não precisam dele.
 
 ### Abrir pelo código como um aplicativo (Windows e Linux)
 

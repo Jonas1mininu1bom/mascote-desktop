@@ -49,8 +49,20 @@
       "bilhetes/**",
       "travessuras/**",
       "assets/**",
-      "!node_modules/@anthropic-ai/claude-agent-sdk-linux-*-musl/**",
+      "!node_modules/@anthropic-ai/claude-agent-sdk-*/**",
+      "!node_modules/@anthropic-ai/claude-agent-sdk/{browser-sdk.js,bridge.mjs,*.d.ts}",
+      "!node_modules/three/{src,examples}/**",
+      "!node_modules/three/build/{three.module.js,three.module.min.js,three.webgpu*.js,three.tsl*.js,three.core*.js}",
+      "!node_modules/koffi/{doc,src,vendor}/**",
       "!node_modules/electron-builder/**"
+    ],
+    "electronLanguages": [
+      "pt-BR",
+      "pt_BR",
+      "pt-PT",
+      "pt_PT",
+      "en-US",
+      "en"
     ],
     "mac": {
       "target": [

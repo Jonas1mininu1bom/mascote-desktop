@@ -21,13 +21,22 @@ const nomeSistema = () => (WIN ? "Windows" : MAC ? "macOS" : "Linux");
 // ---------- iniciar com o sistema ----------
 // Windows e Mac: o próprio Electron registra. Linux: um arquivo .desktop em ~/.config/autostart
 // (padrão do freedesktop, vale para GNOME, KDE, XFCE, Cinnamon...).
+// As duas versões (completa e só o mascote) têm cada uma o seu registro: senão ligar numa apagava o
+// da outra, e pelo código (npm run start:mascote) o sistema abria a versão completa no lugar da só-mascote.
+const PELA_FLAG = process.argv.includes("--so-mascote"); // npm run start:mascote
+const SO_MASCOTE = PELA_FLAG || require("../package.json").edicao === "so-mascote";
 const arqAutostart = () =>
-  path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"), "autostart", "mascote-desktop.desktop");
+  path.join(
+    process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"),
+    "autostart",
+    SO_MASCOTE ? "mascote-desktop-so-mascote.desktop" : "mascote-desktop.desktop"
+  );
 
 // Como abrir este mesmo app de novo: AppImage, instalado (.deb) ou rodando pelo código (npm start).
 function comandoDoApp() {
   const exe = process.env.APPIMAGE || process.execPath;
   const args = app.isPackaged ? [] : [app.getAppPath()];
+  if (PELA_FLAG) args.push("--so-mascote");
   if (LINUX) args.push("--ozone-platform=x11");
   return { exe, args };
 }
@@ -38,7 +47,7 @@ function textoDesktop() {
   return [
     "[Desktop Entry]",
     "Type=Application",
-    "Name=Mascote Desktop",
+    `Name=${SO_MASCOTE ? "Mascote Desktop (só o mascote)" : "Mascote Desktop"}`,
     "Comment=Um bichinho que mora na sua tela",
     `Exec=${[exe, ...args].map(aspas).join(" ")}`,
     `Icon=${path.join(__dirname, "..", "assets", "icone.png")}`,
@@ -52,14 +61,24 @@ function textoDesktop() {
 // o sistema abriria o Electron "vazio", sem o mascote.
 const iniciarDisponivel = () => WIN || LINUX || (MAC && app.isPackaged);
 
+// Windows: o registro fica em HKCU\...\Run, com o nome do app. A completa mantém o nome padrão do
+// Electron (quem já tinha ligado continua ligado); a só-mascote ganha um nome próprio.
+const NOME_WIN_SO_MASCOTE = "Mascote Desktop (so o mascote)";
 function itemLoginWin() {
   const { exe, args } = comandoDoApp();
-  return { path: exe, args };
+  return SO_MASCOTE ? { path: exe, args, name: NOME_WIN_SO_MASCOTE } : { path: exe, args };
+}
+// O openAtLogin do Electron só olha o registro com o nome padrão; a só-mascote procura o dela.
+function ligadoNoWindows() {
+  const item = itemLoginWin();
+  const s = app.getLoginItemSettings({ path: item.path, args: item.args });
+  if (!SO_MASCOTE) return s.openAtLogin;
+  return (s.launchItems || []).some((i) => i.name === NOME_WIN_SO_MASCOTE && i.scope === "user" && i.enabled !== false);
 }
 
 function iniciarComSistema() {
   try {
-    if (WIN) return app.getLoginItemSettings(itemLoginWin()).openAtLogin;
+    if (WIN) return ligadoNoWindows();
     if (MAC) return app.isPackaged && app.getLoginItemSettings().openAtLogin;
     if (LINUX) return fs.existsSync(arqAutostart());
   } catch {}
